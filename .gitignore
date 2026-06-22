@@ -40,3 +40,6 @@ out/
 ### Environment Variables ###
 .env
 .env.*
+
+.mopl/
+.logs/
