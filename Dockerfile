@@ -28,7 +28,7 @@ COPY src ./src
 RUN ./gradlew clean bootJar --no-daemon
 
 # ========== 2. Runtime stage ==========
-# 2-1. Amazon Corretto 17-alpine3.21 이미지를 런타임 베이스 이미지로 설정
+# 2-1. Amazon Corretto 17-alpine3.23 이미지를 런타임 베이스 이미지로 설정
 FROM amazoncorretto:17-alpine3.23
 
 # 2-2. 작업 디렉터리 설정
