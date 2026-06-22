@@ -1,0 +1,121 @@
+# 서비스 정의
+services:
+  app: # 애플리케이션 서비스
+    build: .  # 현재 디렉터리의 Dockerfile을 사용해 이미지 build
+    image: mopl:local
+    environment:
+      SERVER_PORT: ${SERVER_PORT}
+
+      MOPL_STORAGE_TYPE: ${MOPL_STORAGE_TYPE}
+      PROFILE_STORAGE_LOCAL_ROOT_PATH: ${PROFILE_STORAGE_LOCAL_ROOT_PATH}
+      THUMBNAIL_STORAGE_LOCAL_ROOT_PATH: ${THUMBNAIL_STORAGE_LOCAL_ROOT_PATH}
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+
+      SPRING_CACHE_TYPE: ${SPRING_CACHE_TYPE}
+      SPRING_DATA_REDIS_HOST: ${SPRING_DATA_REDIS_HOST}
+      SPRING_DATA_REDIS_PORT: ${SPRING_DATA_REDIS_PORT}
+
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+      SPRING_KAFKA_CONSUMER_GROUP_ID: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
+      SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}
+    ports: # 포트 매핑(로컬:컨테이너)
+      - "8080:8080"
+    volumes: # 애플리케이션 볼륨 구성
+      # 컨테이너가 재시작되어도 데이터 유지
+      - ./.mopl/storage/profiles:/app/${PROFILE_STORAGE_LOCAL_ROOT_PATH}
+      - ./.mopl/storage/thumbnails:/app/${THUMBNAIL_STORAGE_LOCAL_ROOT_PATH}
+      - ./.logs:/app/.logs
+    depends_on: # 서비스간 의존성 설정
+      postgres:
+        # PostgreSQL 서비스가 정상 상태(healthy)가 된 후 app 서비스가 실행되도록 설정
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    networks:
+      # backend 네트워크에 app 서비스 연결
+      - backend
+
+  postgres: # PostgreSQL 서비스
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes: # PostgreSQL 볼륨 구성
+      # 컨테이너 재시작되어도 PostgreSQL 데이터가 유지되도록 설정
+      - postgres-data:/var/lib/postgresql/data
+      # 서비스 실행 후 `schema.sql`이 자동으로 실행되도록 구성
+      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck: # PostgreSQL 서비스 상태 확인을 위한 healthcheck 구성
+      # 지정한 사용자/db 기준으로 PostgreSQL 준비 상태 확인
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      # 10초마다 확인
+      interval: 10s
+      # 각 healthcheck의 최대 대기 시간
+      timeout: 5s
+      # 3번 재시도 후 실패 처리
+      retries: 3
+    networks:
+      # backend 네트워크에 postgres 서비스 연결
+      - backend
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - backend
+
+  broker:
+    image: apache/kafka:latest
+    hostname: broker
+    container_name: broker
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:29093
+      KAFKA_LISTENERS: PLAINTEXT://broker:29092,CONTROLLER://broker:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: [ "CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "broker:29092", "--list" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - backend
+
+networks: # 서비스 간 통신을 위한 네트워크 정의
+  backend:
+
+volumes: # 데이터 영속성을 위한 볼륨 정의
+  # PostgreSQL 데이터 저장용 볼륨
+  postgres-data:
+  redis-data:
