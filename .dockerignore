@@ -4,6 +4,5 @@
 .idea
 .logs
 build
-storage
 .env
-.discodeit
+.mopl
