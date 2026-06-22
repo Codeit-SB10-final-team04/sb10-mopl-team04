@@ -20,7 +20,7 @@
 
 > 도메인 단위로 패키지를 구성합니다. 각 도메인 안에 `controller` / `service` / `dto`를 두는 구조로, 응집도를 높이고 관련 코드를 한 곳에서 찾을 수 있도록 합니다.
 
-```
+```text
 Member
     ⎿ controller
     ⎿ service
