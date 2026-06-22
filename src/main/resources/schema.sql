@@ -199,7 +199,7 @@ CREATE TABLE playlist_subscriptions (
                                         id            UUID        NOT NULL,
                                         subscriber_id UUID        NOT NULL,
                                         playlist_id   UUID        NOT NULL,
-                                        created_at    TIMESTAMPTZ NULL,
+                                        created_at    TIMESTAMPTZ NOT NULL,
 
                                         CONSTRAINT pk_playlist_subscriptions PRIMARY KEY (id),
                                         CONSTRAINT fk_playlist_subscriptions_subscriber FOREIGN KEY (subscriber_id) REFERENCES users (id) ON DELETE CASCADE,
