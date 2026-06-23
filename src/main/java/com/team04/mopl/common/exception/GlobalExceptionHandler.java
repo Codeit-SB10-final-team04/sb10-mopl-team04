@@ -26,7 +26,7 @@ public class GlobalExceptionHandler {
     ErrorCode errorCode = exception.getErrorCode();
     HttpStatus status = errorCode.getHttpStatus();
 
-    // 5xx 오류는 stack trace를 포함하여 error 레벨로 기록
+    // 4xx는 로그를 남기지 않고, 5xx 커스텀 예외만 error 로그 기록
     if (status.is5xxServerError()) {
       log.error(
           "[MoplException] code={}, exceptionName={}, message={}, details={}",
@@ -35,14 +35,6 @@ public class GlobalExceptionHandler {
           exception.getMessage(),
           exception.getDetails(),
           exception
-      );
-    } else {
-      log.warn(
-          "[MoplException] code={}, exceptionName={}, message={}, details={}",
-          errorCode.getCode(),
-          exception.getClass().getSimpleName(),
-          exception.getMessage(),
-          exception.getDetails()
       );
     }
 
@@ -80,11 +72,6 @@ public class GlobalExceptionHandler {
             )
         );
 
-    log.warn(
-        "[MethodArgumentNotValidException] 요청 데이터 유효성 검사 실패: details={}",
-        details
-    );
-
     return ResponseEntity
         .badRequest()
         .body(ErrorResponse.of(
@@ -111,11 +98,6 @@ public class GlobalExceptionHandler {
                 defaultMessage(violation.getMessage())
             )
         );
-
-    log.warn(
-        "[ConstraintViolationException] 요청 파라미터 유효성 검사 실패: details={}",
-        details
-    );
 
     return ResponseEntity
         .badRequest()
@@ -145,11 +127,6 @@ public class GlobalExceptionHandler {
       );
     }
 
-    log.warn(
-        "[MethodArgumentTypeMismatchException] 요청 파라미터 형식 오류: details={}",
-        details
-    );
-
     return ResponseEntity
         .badRequest()
         .body(ErrorResponse.of(
@@ -171,11 +148,6 @@ public class GlobalExceptionHandler {
         exception.getParameterType()
     );
 
-    log.warn(
-        "[MissingServletRequestParameterException] 필수 요청 파라미터 누락: details={}",
-        details
-    );
-
     return ResponseEntity
         .badRequest()
         .body(ErrorResponse.of(
@@ -190,10 +162,6 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
       HttpMessageNotReadableException exception
   ) {
-    log.warn(
-        "[HttpMessageNotReadableException] 요청 본문 형식 오류"
-    );
-
     return ResponseEntity
         .badRequest()
         .body(ErrorResponse.of(

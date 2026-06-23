@@ -16,29 +16,13 @@ public abstract class MoplException extends RuntimeException {
 
   // 에러코드만 포함하는 예외
   protected MoplException(ErrorCode errorCode) {
-    super(
-        Objects.requireNonNull(
-            errorCode,
-            "errorCode는 null일 수 없습니다."
-        ).getMessage()
-    );
-
+    super(validateErrorCode(errorCode).getMessage());
     this.errorCode = errorCode;
   }
 
   // 에러코드와 기존 예외를 원인으로 포함하는 예외
-  protected MoplException(
-      ErrorCode errorCode,
-      Throwable cause
-  ) {
-    super(
-        Objects.requireNonNull(
-            errorCode,
-            "errorCode는 null일 수 없습니다."
-        ).getMessage(),
-        cause
-    );
-
+  protected MoplException(ErrorCode errorCode, Throwable cause) {
+    super(validateErrorCode(errorCode).getMessage(), cause);
     this.errorCode = errorCode;
   }
 
@@ -46,7 +30,7 @@ public abstract class MoplException extends RuntimeException {
   public MoplException addDetail(String key, Object value) {
     details.put(
         Objects.requireNonNull(key, "detail key는 null일 수 없습니다."),
-        value
+        Objects.requireNonNull(value, "detail value는 null일 수 없습니다.")
     );
 
     return this;
@@ -57,5 +41,29 @@ public abstract class MoplException extends RuntimeException {
     return Collections.unmodifiableMap(
         new LinkedHashMap<>(details)
     );
+  }
+
+  // ErrorCode 구현체의 필수 값 검증
+  // 예외 처리 중 getHttpStatus(), getCode(), getMessage()에서 2차 NPE가 터지는 것을 방지
+  private static ErrorCode validateErrorCode(ErrorCode errorCode) {
+    ErrorCode validated = Objects.requireNonNull(
+        errorCode,
+        "errorCode는 null일 수 없습니다."
+    );
+
+    Objects.requireNonNull(
+        validated.getHttpStatus(),
+        "errorCode.httpStatus는 null일 수 없습니다."
+    );
+
+    if (validated.getCode() == null || validated.getCode().isBlank()) {
+      throw new IllegalArgumentException("errorCode.code는 null/blank일 수 없습니다.");
+    }
+
+    if (validated.getMessage() == null || validated.getMessage().isBlank()) {
+      throw new IllegalArgumentException("errorCode.message는 null/blank일 수 없습니다.");
+    }
+
+    return validated;
   }
 }
