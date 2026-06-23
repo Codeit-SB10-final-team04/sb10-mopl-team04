@@ -145,10 +145,13 @@ CREATE TABLE playlists (
 -- ================================================================
 
 CREATE TABLE content_tags (
-                              content_id  UUID    NOT NULL,
-                              tag_id      UUID    NOT NULL,
+                              id          UUID        NOT NULL,
+                              content_id  UUID        NOT NULL,
+                              tag_id      UUID        NOT NULL,
+                              created_at  TIMESTAMPTZ NOT NULL,
 
-                              CONSTRAINT pk_content_tags PRIMARY KEY (content_id, tag_id),
+                              CONSTRAINT pk_content_tags PRIMARY KEY (id),
+                              CONSTRAINT uk_content_tags_content_tag UNIQUE (content_id, tag_id),
                               CONSTRAINT fk_content_tags_content FOREIGN KEY (content_id) REFERENCES contents (id) ON DELETE CASCADE,
                               CONSTRAINT fk_content_tags_tag FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
 );
