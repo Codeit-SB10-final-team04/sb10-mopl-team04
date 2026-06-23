@@ -1,0 +1,412 @@
+package com.team04.mopl.auth.session;
+
+import static org.assertj.core.api.AssertionsForClassTypes.*;
+import static org.mockito.BDDMockito.*;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.assertj.core.api.ThrowableAssert;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.team04.mopl.auth.entity.AuthSession;
+import com.team04.mopl.auth.repository.AuthSessionRepository;
+import com.team04.mopl.user.entity.User;
+
+import jakarta.persistence.EntityManager;
+
+@ExtendWith(MockitoExtension.class)
+class DbAuthSessionStoreTest {
+	@Mock
+	private AuthSessionRepository authSessionRepository;
+
+	@Mock
+	private EntityManager entityManager;
+
+	@Mock
+	private User user;
+
+	@Mock
+	private User userReference;
+
+	@Mock
+	private AuthSession existingSession;
+
+	@InjectMocks
+	private DbAuthSessionStore authSessionStore;
+
+	@Test
+	@DisplayName("기존 세션이 없으면 새 인증 세션을 저장한다")
+	void replace_saveNewSession_whenExistingSessionDoesNotExist() {
+		// given
+		UUID sessionId = UUID.randomUUID();
+		String refreshTokenHash = "refresh-token-hash";
+		Instant issuedAt = Instant.parse("2026-06-24T00:00:00Z");
+		Instant accessExpiresAt = issuedAt.plusSeconds(1800);
+		Instant refreshExpiresAt = issuedAt.plusSeconds(1209600);
+
+		given(authSessionRepository.findByUser(user))
+			.willReturn(Optional.empty());
+
+		given(authSessionRepository.save(any(AuthSession.class)))
+			.willAnswer(invocation -> invocation.getArgument(0));
+
+		// when
+		AuthSession result = authSessionStore.replace(
+			user,
+			sessionId,
+			refreshTokenHash,
+			accessExpiresAt,
+			refreshExpiresAt,
+			issuedAt
+		);
+
+		// then
+		assertThat(result.getSessionId()).isEqualTo(sessionId);
+		assertThat(result.getUser()).isEqualTo(user);
+		assertThat(result.getRefreshTokenHash()).isEqualTo(refreshTokenHash);
+		assertThat(result.getAccessExpiresAt()).isEqualTo(accessExpiresAt);
+		assertThat(result.getRefreshExpiresAt()).isEqualTo(refreshExpiresAt);
+		assertThat(result.getUpdatedAt()).isEqualTo(issuedAt);
+
+		verify(authSessionRepository).findByUser(user);
+		verify(authSessionRepository, never()).delete(any(AuthSession.class));
+		verify(authSessionRepository).flush();
+		verify(authSessionRepository).save(any(AuthSession.class));
+	}
+
+	@Test
+	@DisplayName("기존 세션이 있으면 삭제 후 새 인증 세션으로 교체한다")
+	void replace_deleteExistingSessionAndSaveNewSession_whenExistingSessionExists() {
+		// given
+		UUID sessionId = UUID.randomUUID();
+		String refreshTokenHash = "new-refresh-token-hash";
+		Instant issuedAt = Instant.parse("2026-06-24T00:00:00Z");
+		Instant accessExpiresAt = issuedAt.plusSeconds(1800);
+		Instant refreshExpiresAt = issuedAt.plusSeconds(1209600);
+
+		given(authSessionRepository.findByUser(user))
+			.willReturn(Optional.of(existingSession));
+
+		given(authSessionRepository.save(any(AuthSession.class)))
+			.willAnswer(invocation -> invocation.getArgument(0));
+
+		// when
+		AuthSession result = authSessionStore.replace(
+			user,
+			sessionId,
+			refreshTokenHash,
+			accessExpiresAt,
+			refreshExpiresAt,
+			issuedAt
+		);
+
+		// then
+		assertThat(result.getSessionId()).isEqualTo(sessionId);
+		assertThat(result.getUser()).isEqualTo(user);
+		assertThat(result.getRefreshTokenHash()).isEqualTo(refreshTokenHash);
+
+		verify(authSessionRepository).findByUser(user);
+		verify(authSessionRepository).delete(existingSession);
+		verify(authSessionRepository).flush();
+
+		ArgumentCaptor<AuthSession> captor = ArgumentCaptor.forClass(AuthSession.class);
+		verify(authSessionRepository).save(captor.capture());
+
+		AuthSession savedSession = captor.getValue();
+
+		assertThat(savedSession.getSessionId()).isEqualTo(sessionId);
+		assertThat(savedSession.getUser()).isEqualTo(user);
+		assertThat(savedSession.getRefreshTokenHash()).isEqualTo(refreshTokenHash);
+	}
+
+	@Test
+	@DisplayName("사용자가 null이면 세션 교체에 실패한다")
+	void replace_throwNullPointerException_whenUserIsNull() {
+		// given
+		UUID sessionId = UUID.randomUUID();
+		Instant issuedAt = Instant.parse("2026-06-24T00:00:00Z");
+
+		// when
+		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.replace(
+			null,
+			sessionId,
+			"refresh-token-hash",
+			issuedAt.plusSeconds(1800),
+			issuedAt.plusSeconds(1209600),
+			issuedAt
+		);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOf(NullPointerException.class)
+			.hasMessage("user는 필수입니다.");
+
+		verifyNoInteractions(authSessionRepository);
+		verifyNoInteractions(entityManager);
+	}
+
+	@Test
+	@DisplayName("사용자 기준으로 활성 인증 세션을 조회한다")
+	void findByUser_returnSession_whenSessionExists() {
+		// given
+		given(authSessionRepository.findByUser(user))
+			.willReturn(Optional.of(existingSession));
+
+		// when
+		Optional<AuthSession> result = authSessionStore.findByUser(user);
+
+		// then
+		assertThat(result).contains(existingSession);
+		verify(authSessionRepository).findByUser(user);
+	}
+
+	@Test
+	@DisplayName("사용자 기준 조회 시 세션이 없으면 empty를 반환한다")
+	void findByUser_returnEmpty_whenSessionDoesNotExist() {
+		// given
+		given(authSessionRepository.findByUser(user))
+			.willReturn(Optional.empty());
+
+		// when
+		Optional<AuthSession> result = authSessionStore.findByUser(user);
+
+		// then
+		assertThat(result).isEmpty();
+		verify(authSessionRepository).findByUser(user);
+	}
+
+	@Test
+	@DisplayName("사용자가 null이면 활성 인증 세션 조회에 실패한다")
+	void findByUser_throwNullPointerException_whenUserIsNull() {
+		// given
+
+		// when
+		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.findByUser(null);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOf(NullPointerException.class)
+			.hasMessage("user는 필수입니다.");
+
+		verifyNoInteractions(authSessionRepository);
+		verifyNoInteractions(entityManager);
+	}
+
+	@Test
+	@DisplayName("userId와 sessionId가 일치하면 활성 세션으로 판단한다")
+	void isActive_returnTrue_whenUserIdAndSessionIdMatch() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID sessionId = UUID.randomUUID();
+
+		given(entityManager.getReference(User.class, userId))
+			.willReturn(userReference);
+
+		given(authSessionRepository.existsByUserAndSessionId(userReference, sessionId))
+			.willReturn(true);
+
+		// when
+		boolean result = authSessionStore.isActive(userId, sessionId);
+
+		// then
+		assertThat(result).isTrue();
+
+		verify(entityManager).getReference(User.class, userId);
+		verify(authSessionRepository).existsByUserAndSessionId(userReference, sessionId);
+	}
+
+	@Test
+	@DisplayName("sessionId가 다르면 활성 세션이 아니라고 판단한다")
+	void isActive_returnFalse_whenSessionIdDoesNotMatch() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID sessionId = UUID.randomUUID();
+
+		given(entityManager.getReference(User.class, userId))
+			.willReturn(userReference);
+
+		given(authSessionRepository.existsByUserAndSessionId(userReference, sessionId))
+			.willReturn(false);
+
+		// when
+		boolean result = authSessionStore.isActive(userId, sessionId);
+
+		// then
+		assertThat(result).isFalse();
+
+		verify(entityManager).getReference(User.class, userId);
+		verify(authSessionRepository).existsByUserAndSessionId(userReference, sessionId);
+	}
+
+	@Test
+	@DisplayName("userId가 null이면 활성 세션이 아니라고 판단한다")
+	void isActive_returnFalse_whenUserIdIsNull() {
+		// given
+		UUID sessionId = UUID.randomUUID();
+
+		// when
+		boolean result = authSessionStore.isActive(null, sessionId);
+
+		// then
+		assertThat(result).isFalse();
+
+		verifyNoInteractions(entityManager);
+		verifyNoInteractions(authSessionRepository);
+	}
+
+	@Test
+	@DisplayName("sessionId가 null이면 활성 세션이 아니라고 판단한다")
+	void isActive_returnFalse_whenSessionIdIsNull() {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		// when
+		boolean result = authSessionStore.isActive(userId, null);
+
+		// then
+		assertThat(result).isFalse();
+
+		verifyNoInteractions(entityManager);
+		verifyNoInteractions(authSessionRepository);
+	}
+
+	@Test
+	@DisplayName("인증 세션이 있으면 refresh token hash와 만료시간을 갱신한다")
+	void refresh_updateSessionAndReturnSession_whenSessionExists() {
+		// given
+		String refreshTokenHash = "new-refresh-token-hash";
+		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
+		Instant accessExpiresAt = refreshedAt.plusSeconds(1800);
+		Instant refreshExpiresAt = refreshedAt.plusSeconds(1209600);
+
+		given(authSessionRepository.findByUser(user))
+			.willReturn(Optional.of(existingSession));
+
+		// when
+		Optional<AuthSession> result = authSessionStore.refresh(
+			user,
+			refreshTokenHash,
+			accessExpiresAt,
+			refreshExpiresAt,
+			refreshedAt
+		);
+
+		// then
+		assertThat(result).contains(existingSession);
+
+		verify(authSessionRepository).findByUser(user);
+		verify(existingSession).refresh(
+			refreshTokenHash,
+			accessExpiresAt,
+			refreshExpiresAt,
+			refreshedAt
+		);
+	}
+
+	@Test
+	@DisplayName("인증 세션이 없으면 refresh 시 empty를 반환한다")
+	void refresh_returnEmpty_whenSessionDoesNotExist() {
+		// given
+		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
+
+		given(authSessionRepository.findByUser(user))
+			.willReturn(Optional.empty());
+
+		// when
+		Optional<AuthSession> result = authSessionStore.refresh(
+			user,
+			"new-refresh-token-hash",
+			refreshedAt.plusSeconds(1800),
+			refreshedAt.plusSeconds(1209600),
+			refreshedAt
+		);
+
+		// then
+		assertThat(result).isEmpty();
+
+		verify(authSessionRepository).findByUser(user);
+		verify(existingSession, never()).refresh(
+			any(String.class),
+			any(Instant.class),
+			any(Instant.class),
+			any(Instant.class)
+		);
+	}
+
+	@Test
+	@DisplayName("사용자가 null이면 refresh에 실패한다")
+	void refresh_throwNullPointerException_whenUserIsNull() {
+		// given
+		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
+
+		// when
+		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.refresh(
+			null,
+			"new-refresh-token-hash",
+			refreshedAt.plusSeconds(1800),
+			refreshedAt.plusSeconds(1209600),
+			refreshedAt
+		);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOf(NullPointerException.class)
+			.hasMessage("user는 필수입니다.");
+
+		verifyNoInteractions(authSessionRepository);
+		verifyNoInteractions(entityManager);
+	}
+
+	@Test
+	@DisplayName("사용자 인증 세션이 있으면 삭제한다")
+	void deleteByUser_deleteSession_whenSessionExists() {
+		// given
+		given(authSessionRepository.findByUser(user))
+			.willReturn(Optional.of(existingSession));
+
+		// when
+		authSessionStore.deleteByUser(user);
+
+		// then
+		verify(authSessionRepository).findByUser(user);
+		verify(authSessionRepository).delete(existingSession);
+	}
+
+	@Test
+	@DisplayName("사용자 인증 세션이 없어도 삭제 요청은 정상 종료된다")
+	void deleteByUser_completeWithoutDelete_whenSessionDoesNotExist() {
+		// given
+		given(authSessionRepository.findByUser(user))
+			.willReturn(Optional.empty());
+
+		// when
+		authSessionStore.deleteByUser(user);
+
+		// then
+		verify(authSessionRepository).findByUser(user);
+		verify(authSessionRepository, never()).delete(any(AuthSession.class));
+	}
+
+	@Test
+	@DisplayName("사용자가 null이면 세션 삭제에 실패한다")
+	void deleteByUser_throwNullPointerException_whenUserIsNull() {
+		// given, when
+		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.deleteByUser(null);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOf(NullPointerException.class)
+			.hasMessage("user는 필수입니다.");
+
+		verifyNoInteractions(authSessionRepository);
+		verifyNoInteractions(entityManager);
+	}
+}
