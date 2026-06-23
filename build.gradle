@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'checkstyle'
     id 'org.springframework.boot' version '3.5.15'
     id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -66,6 +67,26 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// ---------------------------------------------------------------------------
+// Checkstyle 설정
+// ---------------------------------------------------------------------------
+compileJava.options.encoding = 'UTF-8'
+compileTestJava.options.encoding = 'UTF-8'
+
+checkstyle {
+    maxWarnings = 0 // 경고 발생 시 빌드 실패
+    toolVersion = "8.24"
+    configFile = file("${rootDir}/naver-checkstyle-rules.xml")
+    configProperties = ["suppressionFile": "${rootDir}/naver-checkstyle-suppressions.xml"]
+}
+
+tasks.withType(Checkstyle) {
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
 
 // ---------------------------------------------------------------------------
