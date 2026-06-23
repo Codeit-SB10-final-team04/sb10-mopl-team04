@@ -6,6 +6,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import com.team04.mopl.common.entity.BaseUpdatableEntity;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -47,8 +48,7 @@ public class User extends BaseUpdatableEntity {
 
 	// 사용자 권한
 	@Enumerated(EnumType.STRING)
-	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
-	@Column(name= "role", nullable = false, columnDefinition = "user_role")
+	@Column(nullable = false, length = 50)
 	private UserRole role;
 
 	// 계정 잠금 상태

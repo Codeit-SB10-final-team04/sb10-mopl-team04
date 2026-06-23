@@ -2,9 +2,8 @@ package com.team04.mopl.user.entity;
 
 import java.util.Objects;
 
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import com.team04.mopl.common.entity.BaseEntity;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -25,7 +24,7 @@ import lombok.NoArgsConstructor;
 	uniqueConstraints = {
 		@UniqueConstraint(
 			name = "uq_social_accounts_provider",
-			columnNames = {"provider", "provider_user_id"}
+			columnNames = {"social_provider", "provider_user_id"}
 		)
 	}
 )
@@ -44,8 +43,7 @@ public class SocialAccount extends BaseEntity {
 
 	// Google 또는 Kakao
 	@Enumerated(EnumType.STRING)
-	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
-	@Column(name = "provider", nullable = false, columnDefinition = "social_provider")
+	@Column(name = "social_provider", nullable = false, length = 20)
 	private SocialProvider provider;
 
 	// Google/Kakao에서 제공하는 사용자 고유 식별자
