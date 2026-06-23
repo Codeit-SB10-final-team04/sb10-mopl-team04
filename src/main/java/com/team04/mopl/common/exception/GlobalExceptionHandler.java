@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -154,6 +155,32 @@ public class GlobalExceptionHandler {
         .body(ErrorResponse.of(
             exception,
             "요청 파라미터 형식이 올바르지 않습니다.",
+            details
+        ));
+  }
+
+  // 필수 @RequestParam 값이 누락된 경우 처리
+  @ExceptionHandler(MissingServletRequestParameterException.class)
+  public ResponseEntity<ErrorResponse> handleMissingRequestParameterException(
+      MissingServletRequestParameterException exception
+  ) {
+    Map<String, String> details = Map.of(
+        "parameter",
+        exception.getParameterName(),
+        "parameterType",
+        exception.getParameterType()
+    );
+
+    log.warn(
+        "[MissingServletRequestParameterException] 필수 요청 파라미터 누락: details={}",
+        details
+    );
+
+    return ResponseEntity
+        .badRequest()
+        .body(ErrorResponse.of(
+            exception,
+            "필수 요청 파라미터가 누락되었습니다.",
             details
         ));
   }
