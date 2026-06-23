@@ -76,8 +76,8 @@ compileJava.options.encoding = 'UTF-8'
 compileTestJava.options.encoding = 'UTF-8'
 
 checkstyle {
-    maxWarnings = 0         // 경고 발생 시 빌드 실패
-    ignoreFailures = true   // 초반엔 빌드 실패 안 시킴
+    maxWarnings = 0         // 경고 발생 시, 기록
+    ignoreFailures = true   // 빌드 자체는 성공하도록 설정
     toolVersion = "8.24"
     configFile = file("${rootDir}/naver-checkstyle-rules.xml")
     configProperties = ["suppressionFile": "${rootDir}/naver-checkstyle-suppressions.xml"]
