@@ -16,7 +16,7 @@ CREATE TABLE users (
                        email_type          email_type      NOT NULL DEFAULT 'REAL',
                        password_hash       VARCHAR(255)    NULL,
                        profile_image_url   VARCHAR(500)    NULL,
-                       role                VARCHAR(50)     NOT NULL DEFAULT 'USER',
+                       role                user_role       NOT NULL DEFAULT 'USER',
                        is_locked           BOOLEAN         NOT NULL DEFAULT false,
                        created_at          TIMESTAMPTZ     NOT NULL,
                        updated_at          TIMESTAMPTZ     NOT NULL,
@@ -88,14 +88,14 @@ CREATE TABLE temporary_passwords (
 CREATE TABLE social_accounts (
                                  id               UUID            NOT NULL,
                                  user_id          UUID            NOT NULL,
-                                 social_provider         VARCHAR(20)     NOT NULL,
+                                 provider         social_provider NOT NULL,
                                  provider_user_id VARCHAR(255)    NOT NULL,
                                  provider_email   VARCHAR(255)    NULL,
                                  created_at       TIMESTAMPTZ     NOT NULL,
 
                                  CONSTRAINT pk_social_accounts PRIMARY KEY (id),
                                  CONSTRAINT fk_social_accounts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-                                 CONSTRAINT uq_social_accounts_provider UNIQUE (social_provider, provider_user_id)
+                                 CONSTRAINT uq_social_accounts_provider UNIQUE (provider, provider_user_id)
 );
 
 CREATE TABLE auth_sessions (
