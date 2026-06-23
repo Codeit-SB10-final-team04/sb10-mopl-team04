@@ -157,7 +157,7 @@ CREATE TABLE content_reviews (
                                  id          UUID        NOT NULL,
                                  user_id     UUID        NOT NULL,
                                  content_id  UUID        NOT NULL,
-                                 content     TEXT        NOT NULL,
+                                 text     TEXT        NOT NULL,
                                  rating      SMALLINT    NOT NULL,
                                  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                                  updated_at  TIMESTAMPTZ NOT NULL,
