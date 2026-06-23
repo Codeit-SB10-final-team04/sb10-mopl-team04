@@ -6,39 +6,3 @@ spring:
 
 server:
   port: 8080
-  batch:
-    jdbc:
-      # Spring Batch 메타데이터 테이블 자동 생성 (BATCH_JOB_INSTANCE 등)
-      initialize-schema: always
-    job:
-      # 애플리케이션 시작 시 Job 자동 실행 방지 (스케줄러에서 수동 실행)
-      enabled: false
-
-# TheSportsDB 배치 수집 설정
-sports:
-  batch:
-    # 수집할 시즌 (EventCollectTasklet에서 사용)
-    season: 2024-2025
-  cache:
-    type: ${SPRING_CACHE_TYPE:caffeine}
-    caffeine:
-      spec: >
-        maximumSize=1000,
-        expireAfterAccess=300s,
-        recordStats
-    redis:
-      enable-statistics: true
-  data:
-    redis:
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
-      port: ${SPRING_DATA_REDIS_PORT:6379}
-  kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-    consumer:
-      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:discodeit-group}
-      auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
