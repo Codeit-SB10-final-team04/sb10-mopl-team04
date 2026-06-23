@@ -39,7 +39,7 @@ public class MdcLoggingFilter extends OncePerRequestFilter {
 			MDC.put("request_uri", request.getRequestURI());
 
 			// 응답 헤더에 Request ID 추가
-			response.setHeader("Discodeit-Request-ID", requestId);
+			response.setHeader("Mople-Request-ID", requestId);
 
 			// 다음 필터로 요청 및 응답 객체 전달
 			filterChain.doFilter(request, response);
