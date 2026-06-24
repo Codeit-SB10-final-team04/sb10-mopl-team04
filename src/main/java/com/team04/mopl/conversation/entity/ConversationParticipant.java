@@ -48,7 +48,7 @@ public class ConversationParticipant {
 		this.lastReadAt = null;
 	}
 
-	private void updateLastReadAt() {
+	public void updateLastReadAt() {
 		this.lastReadAt = Instant.now();
 	}
 }
