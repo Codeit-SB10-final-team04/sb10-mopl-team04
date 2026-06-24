@@ -61,7 +61,7 @@ public class MatchCollectTasklet implements Tasklet {
 	@Override
 	@SuppressWarnings("unchecked") // Object[] -> List<String> cast 변환 경고 무시
 	public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
-		log.info("[Batch] ===== Step 2: EventCollectTasklet 시작 (시즌: {}) =====", targetSeason);
+		log.info("[Batch] ===== Step 2: MatchCollectTasklet 시작 (시즌: {}) =====", targetSeason);
 
 		// chunkContext load
 		ExecutionContext jobContext = chunkContext.getStepContext()
