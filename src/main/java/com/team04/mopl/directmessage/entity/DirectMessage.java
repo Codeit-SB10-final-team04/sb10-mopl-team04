@@ -2,7 +2,7 @@ package com.team04.mopl.directmessage.entity;
 
 import java.time.Instant;
 
-import com.team04.mopl.common.entity.BaseUpdatableEntity;
+import com.team04.mopl.common.entity.BaseEntity;
 import com.team04.mopl.conversation.entity.Conversation;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "direct_messages")
-public class DirectMessage extends BaseUpdatableEntity {
+public class DirectMessage extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "sender_id", nullable = false)
