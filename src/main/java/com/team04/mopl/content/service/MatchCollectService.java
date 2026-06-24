@@ -35,8 +35,7 @@ public class MatchCollectService {
 	@Transactional
 	public boolean saveIfNotExists(JsonNode eventDetail, String eventName) {
 		// 중복 체크: title + type 기준 (Todo: QA 대응 후 개선 예정)
-		if (contentRepository.existsByTitleAndType(eventName, ContentType.sport)) {
-			log.debug("[Batch] 경기 이미 존재, 건너뜀: {}", eventName);
+		if (isDuplicateMatch(eventName)) {
 			return false;
 		}
 
@@ -101,5 +100,14 @@ public class MatchCollectService {
 			.content(content)
 			.tag(tag)
 			.build());
+	}
+
+	// Todo: 중복 검증, QA 후에 로직 수정
+	private boolean isDuplicateMatch(String eventName) {
+		boolean exists = contentRepository.existsByTitleAndType(eventName, ContentType.sport);
+		if (exists) {
+			log.debug("[Batch] 경기 이미 존재, 건너뜀: {}", eventName);
+		}
+		return exists;
 	}
 }
