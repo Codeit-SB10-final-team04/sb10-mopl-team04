@@ -10,6 +10,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,7 +19,15 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "follows")
+@Table(
+	name = "follows",
+	uniqueConstraints = {
+		@UniqueConstraint(
+			name = "uk_follow_followee_follower",
+			columnNames = {"followee_id", "follower_id"}
+		)
+	}
+)
 public class Follow extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY)
