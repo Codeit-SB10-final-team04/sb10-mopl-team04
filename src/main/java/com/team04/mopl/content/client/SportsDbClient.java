@@ -1,10 +1,14 @@
 package com.team04.mopl.content.client;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
@@ -34,7 +38,18 @@ public class SportsDbClient {
 	private final RestClient restClient;
 
 	public SportsDbClient() {
+		// 타임아웃 설정 객체
+		ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.defaults()
+			.withConnectTimeout(Duration.ofSeconds(10))  // 연결 타임아웃
+			.withReadTimeout(Duration.ofSeconds(30));    // 응답 읽기 타임아웃
+
+		// 설정을 factory에 적용!
+		ClientHttpRequestFactory factory =
+			ClientHttpRequestFactoryBuilder.detect().build(settings);
+
+		// RestClient에 적용해서 build
 		this.restClient = RestClient.builder()
+			.requestFactory(factory)
 			.baseUrl(BASE_URL)
 			.build();
 	}
