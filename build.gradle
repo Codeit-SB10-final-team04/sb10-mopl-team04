@@ -42,6 +42,12 @@ dependencies {
     // event message (kafka)
     implementation 'org.springframework.kafka:spring-kafka'
 
+    // Spring Batch (스포츠 데이터 수집 배치)
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
+    // Spring Retry (@Retryable - TheSportsDB Rate Limit 429 재시도)
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
     // Querydsl
     implementation 'io.github.openfeign.querydsl:querydsl-jpa:6.10.1'
     annotationProcessor 'io.github.openfeign.querydsl:querydsl-apt:6.10.1:jpa'

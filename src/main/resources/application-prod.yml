@@ -32,7 +32,16 @@ spring:
       auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  batch:
+    jdbc:
+      initialize-schema: never
+    job:
+      enabled: false
 
 logging:
   level:
     root: WARN
+
+sports:
+  batch:
+    season: 2024-2025

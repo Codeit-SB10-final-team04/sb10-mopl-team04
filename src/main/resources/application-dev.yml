@@ -38,6 +38,12 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+
 logging:
   level:
     root: INFO
@@ -48,3 +54,7 @@ logging:
     org.apache.kafka.clients.consumer.ConsumerConfig: WARN
     org.apache.kafka.clients.consumer.internals: WARN
     org.springframework.kafka.listener: WARN
+
+sports:
+  batch:
+    season: 2024-2025
