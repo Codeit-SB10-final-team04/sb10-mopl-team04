@@ -12,6 +12,7 @@ import com.team04.mopl.content.entity.ContentTag;
 
 public interface ContentTagRepository extends JpaRepository<ContentTag, UUID> {
 
+	// ContentSummary의 tags 일괄 조합을 위한 조회 메서드
 	@Query(value = """
 		SELECT new com.team04.mopl.content.dto.row.TagRow(ct.content.id, ct.tag.name)
 		FROM ContentTag AS ct
