@@ -53,7 +53,7 @@ public class PlaylistService {
 		playlistRepository.save(playlist);
 
 		// 플레이리스트 소유자 summary
-		// TODO: PlaylistUserSummary 구현 후 변경
+		// TODO: UserSummary 구현 후 변경
 		// UserSummary ownerSummary = getUserSummary(owner);
 		PlaylistUserSummary ownerSummary = getUserSummary(owner);
 		// 플레이리스트 구독자 조회 (생성이라 존재 X)
@@ -85,7 +85,7 @@ public class PlaylistService {
 			.orElseThrow(() -> new IllegalArgumentException("User not found!"));
 	}
 
-	// TODO: PlaylistUserSummary 구현 후 변경
+	// TODO: UserSummary 구현 후 변경
 	// private UserSummary getUserSummary(User user) {
 	// 	return new UserSummary(
 	// 		user.getId(),
@@ -102,7 +102,7 @@ public class PlaylistService {
 	}
 
 	// TODO(#: 하단의 조회 조립용 `private` 메서드는 처음 Playlist 생성 시 필요한줄 알고 구현했다가 단건/목록 조회에 사용하기 위해 삭제하지 않고 유지한 상태입니다.
-	// TODO: ContentSummary 필요
+	// TODO: UserSummary, ContentSummary 필요
 	// private Map<UUID, Long> getSubscriberCountsByPlaylistIds(List<UUID> playlistIds) {
 	// 	if (playlistIds.isEmpty()) {
 	// 		return Map.of();

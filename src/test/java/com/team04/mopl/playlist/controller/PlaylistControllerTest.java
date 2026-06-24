@@ -47,7 +47,7 @@ class PlaylistControllerTest {
 
 		PlaylistDto response = new PlaylistDto(
 			playlistId,
-			// TODO: PlaylistUserSummary 구현 후 변경
+			// TODO: UserSummary 구현 후 변경
 			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new PlaylistUserSummary(currentUserId, "테스트 사용자", null),
 			request.title(),

@@ -62,7 +62,7 @@ class PlaylistServiceTest {
 
 		PlaylistCreateRequest request = new PlaylistCreateRequest("테스트 제목", "테스트 설명");
 		User owner = createUser(currentUserId);
-		// TODO: PlaylistUserSummary 구현 후 변경
+		// TODO: UserSummary 구현 후 변경
 		// UserSummary ownerSummary = new UserSummary(owner.getId(), owner.getName(), owner.getProfileImageUrl());
 		PlaylistUserSummary ownerSummary = new PlaylistUserSummary(owner.getId(), owner.getName(),
 			owner.getProfileImageUrl());
@@ -81,7 +81,7 @@ class PlaylistServiceTest {
 			.thenReturn(Optional.of(owner));
 		when(playlistMapper.toDto(
 				any(Playlist.class),
-				// TODO: PlaylistUserSummary 구현 후 변경
+				// TODO: UserSummary 구현 후 변경
 				// any(UserSummary.class),
 				any(PlaylistUserSummary.class),
 				anyLong(),
@@ -102,7 +102,7 @@ class PlaylistServiceTest {
 		verify(playlistRepository).save(any(Playlist.class));
 		verify(playlistMapper).toDto(
 			any(Playlist.class),
-			// TODO: PlaylistUserSummary 구현 후 변경
+			// TODO: UserSummary 구현 후 변경
 			// any(UserSummary.class),
 			any(PlaylistUserSummary.class),
 			anyLong(),
@@ -131,7 +131,7 @@ class PlaylistServiceTest {
 		verify(playlistRepository, never()).save(any(Playlist.class));
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
-			// TODO: PlaylistUserSummary 구현 후 변경
+			// TODO: UserSummary 구현 후 변경
 			// any(UserSummary.class),
 			any(PlaylistUserSummary.class),
 			anyLong(),

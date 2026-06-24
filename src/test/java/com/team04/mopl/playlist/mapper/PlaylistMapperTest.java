@@ -43,7 +43,7 @@ class PlaylistMapperTest {
 			.build();
 		ReflectionTestUtils.setField(playlist, "id", playlistId);
 
-		// TODO: PlaylistUserSummary 구현 후 변경
+		// TODO: UserSummary 구현 후 변경
 		// UserSummary ownerSummary = new UserSummary(ownerId, owner.getName(), owner.getProfileImageUrl());
 		PlaylistUserSummary ownerSummary = new PlaylistUserSummary(ownerId, owner.getName(),
 			owner.getProfileImageUrl());

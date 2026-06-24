@@ -7,7 +7,7 @@ import java.util.UUID;
 public record PlaylistDto(
 
 	UUID id,
-	// TODO: PlaylistUserSummary 구현 후 변경
+	// TODO: UserSummary 구현 후 변경
 	// UserSummary owner,
 	PlaylistUserSummary owner,
 	String title,

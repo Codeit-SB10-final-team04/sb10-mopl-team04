@@ -24,7 +24,7 @@ public interface PlaylistMapper {
 	@Mapping(target = "contents", source = "contents")
 	PlaylistDto toDto(
 		Playlist playlist,
-		// TODO: PlaylistUserSummary 구현 후 변경
+		// TODO: UserSummary 구현 후 변경
 		// UserSummary owner,
 		PlaylistUserSummary owner,
 		long subscriberCount,
