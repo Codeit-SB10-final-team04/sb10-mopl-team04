@@ -284,7 +284,6 @@ class PlaylistServiceTest {
 
 		User currentUser = createUser(currentUserId);
 		User owner = createUser(ownerId);
-		Playlist playlist = createPlaylist(owner, playlistId);
 
 		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
 		when(userRepository.findById(currentUserId))
