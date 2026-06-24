@@ -13,6 +13,7 @@ import com.team04.mopl.auth.repository.AuthSessionRepository;
 import com.team04.mopl.user.entity.User;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 
 @Component
@@ -26,14 +27,18 @@ public class DbAuthSessionStore implements AuthSessionStore {
 	@Override
 	@Transactional
 	public AuthSession replace(
-		User user,
+		UUID userId,
 		UUID sessionId,
 		String refreshTokenHash,
 		Instant accessExpiresAt,
 		Instant refreshExpiresAt,
 		Instant issuedAt
 	) {
-		Objects.requireNonNull(user, "user는 필수입니다.");
+		Objects.requireNonNull(userId, "userId는 필수입니다.");
+
+		// 같은 사용자에 대한 동시 replace()를 직렬화하기 위해 사용자 row에 비관적 락
+		// 동시에 로그인 요청이 들어오면 delete -> insert 과정에서 user_id unique 충돌이 날 수 있음
+		User user = findUserForUpdate(userId);
 
 		// 사용자당 활성 세션은 하나만 있어야 하므로 기존 세션이 있으면 삭제
 		deleteByUser(user);
@@ -56,9 +61,9 @@ public class DbAuthSessionStore implements AuthSessionStore {
 
 	// 사용자 활성 인증 세션 조회
 	@Override
-	public Optional<AuthSession> findByUser(User user) {
-		// 사용자 현재 활성 세션 조회
-		Objects.requireNonNull(user, "user는 필수입니다.");
+	public Optional<AuthSession> findByUserId(UUID userId) {
+		// DB 구현체 내부에서만 userId를 User 프록시 객체로 변환하여 활용
+		User user = getUserReference(userId);
 
 		return authSessionRepository.findByUser(user);
 	}
@@ -83,14 +88,14 @@ public class DbAuthSessionStore implements AuthSessionStore {
 	@Override
 	@Transactional
 	public Optional<AuthSession> refresh(
-		User user,
+		UUID userId,
 		String refreshTokenHash,
 		Instant accessExpiresAt,
 		Instant refreshExpiresAt,
 		Instant refreshedAt
 	) {
 		// refresh token 재발급 시 기존 인증 세션 조회
-		Objects.requireNonNull(user, "user는 필수입니다.");
+		User user = getUserReference(userId);
 
 		return authSessionRepository.findByUser(user)
 			.map(authSession -> {
@@ -108,10 +113,17 @@ public class DbAuthSessionStore implements AuthSessionStore {
 	// 사용자 인증 세션 삭제
 	@Override
 	@Transactional
-	public void deleteByUser(User user) {
-		// 로그아웃, 권한 변경, 계정 잠금 시 호출
+	public void deleteByUserId(UUID userId) {
+		User user = getUserReference(userId);
+
+		deleteByUser(user);
+	}
+
+	private void deleteByUser(User user) {
 		Objects.requireNonNull(user, "user는 필수입니다.");
 
+		// 세션이 없어도 예외를 던지지 않음
+		// 로그아웃/강제 로그아웃 흐름에서 멱등하게 호출 가능해야 함
 		authSessionRepository.findByUser(user)
 			.ifPresent(authSessionRepository::delete);
 	}
@@ -121,5 +133,23 @@ public class DbAuthSessionStore implements AuthSessionStore {
 
 		// DB 조회를 하지 않고 id만 가진 User 프록시를 만들어서 활용
 		return entityManager.getReference(User.class, userId);
+	}
+
+	private User findUserForUpdate(UUID userId) {
+		Objects.requireNonNull(userId, "userId는 필수입니다.");
+
+		// replace() 동시 호출 방지를 위해 PESSIMISTIC_WRITE 락 적용
+		// 같은 사용자에 대한 로그인 요청이 동시에 들어오면 user row 기준으로 직렬화됨
+		User user = entityManager.find(
+			User.class,
+			userId,
+			LockModeType.PESSIMISTIC_WRITE
+		);
+
+		if (user == null) {
+			throw new IllegalArgumentException("사용자를 찾을 수 없습니다.");
+		}
+
+		return user;
 	}
 }
