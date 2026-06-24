@@ -5,6 +5,7 @@ import java.util.Objects;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.team04.mopl.common.entity.BaseUpdatableEntity;
 
 import jakarta.persistence.Column;
@@ -111,13 +112,14 @@ public class User extends BaseUpdatableEntity {
 	}
 
 	// 비밀번호 인증용
+	@JsonIgnore
 	public String getPasswordHashForAuthentication() {
 		return passwordHash;
 	}
 
 	private static String requireText(String value, String fieldName) {
 		if (value == null || value.isBlank()) {
-			throw new IllegalArgumentException(fieldName + "은 필수입니다.");
+			throw new IllegalArgumentException(fieldName + "은/는 필수입니다.");
 		}
 
 		return value;

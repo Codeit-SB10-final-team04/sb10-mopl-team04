@@ -68,7 +68,7 @@ class UserTest {
 		// then
 		assertThatThrownBy(action)
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("사용자 이름은 필수입니다.");
+			.hasMessage("사용자 이름은/는 필수입니다.");
 	}
 
 	@Test
@@ -86,7 +86,7 @@ class UserTest {
 		// then
 		assertThatThrownBy(action)
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("사용자 이름은 필수입니다.");
+			.hasMessage("사용자 이름은/는 필수입니다.");
 	}
 
 	@Test
@@ -104,7 +104,7 @@ class UserTest {
 		// then
 		assertThatThrownBy(action)
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("이메일은 필수입니다.");
+			.hasMessage("이메일은/는 필수입니다.");
 	}
 
 	@Test
@@ -122,7 +122,7 @@ class UserTest {
 		// then
 		assertThatThrownBy(action)
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("이메일은 필수입니다.");
+			.hasMessage("이메일은/는 필수입니다.");
 	}
 
 	@Test
@@ -150,7 +150,7 @@ class UserTest {
 		// then
 		assertThatThrownBy(action)
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("사용자 이름은 필수입니다.");
+			.hasMessage("사용자 이름은/는 필수입니다.");
 	}
 
 	@Test
@@ -177,6 +177,7 @@ class UserTest {
 
 		// then
 		assertThat(user.isPasswordLoginSupported()).isTrue();
+		assertThat(user.getPasswordHashForAuthentication()).isEqualTo("new-encoded-password");
 	}
 
 	@Test
@@ -191,7 +192,7 @@ class UserTest {
 		// then
 		assertThatThrownBy(action)
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("비밀번호은 필수입니다.");
+			.hasMessage("비밀번호은/는 필수입니다.");
 	}
 
 	@Test
