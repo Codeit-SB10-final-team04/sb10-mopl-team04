@@ -2,12 +2,14 @@ package com.team04.mopl.follow.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.service.FollowService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -31,9 +33,9 @@ public class FollowController implements FollowControllerDocs {
 
 	@Override
 	@GetMapping("/count")
-	public ResponseEntity<Long> getFollowerCount(FollowRequest followRequest) {
+	public ResponseEntity<Long> getFollowerCount(@Valid @RequestBody FollowRequest followRequest) {
 
-		Long response = followService.getFollowCount(followRequest);
+		Long response = followService.getFollowerCount(followRequest);
 
 		return ResponseEntity.ok(response);
 	}
