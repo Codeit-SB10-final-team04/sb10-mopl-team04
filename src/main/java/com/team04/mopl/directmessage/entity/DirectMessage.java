@@ -41,7 +41,7 @@ public class DirectMessage extends BaseUpdatableEntity {
 	private String content;
 
 	@Column(name = "is_read", nullable = false)
-	private boolean isRead;
+	private boolean read;
 
 	@Column(name = "read_at")
 	private Instant readAt;
@@ -59,13 +59,13 @@ public class DirectMessage extends BaseUpdatableEntity {
 		this.receiver = receiver;
 		this.conversation = conversation;
 		this.content = content;
-		this.isRead = false;        // 기본 상태: 안 읽음
+		this.read = false;        // 기본 상태: 안 읽음
 		this.readAt = null;
 	}
 
 	// 읽음 상태로 전환 (역은 성립하지 않음)
 	public void markAsRead() {
-		this.isRead = true;
+		this.read = true;
 		this.readAt = Instant.now();
 	}
 
