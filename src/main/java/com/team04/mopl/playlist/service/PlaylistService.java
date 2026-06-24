@@ -49,13 +49,22 @@ public class PlaylistService {
 		User owner = getUserOrThrow(currentUserId);
 
 		// 플레이리스트 생성
-		Playlist playlist = new Playlist(owner, request.title(), request.description());
+		Playlist playlist = Playlist.builder()
+			.owner(owner)
+			.title(request.title())
+			.description(request.description())
+			.build();
+
 		// 플레이리스트 저장
 		playlistRepository.save(playlist);
 
+		// 플레이리스트 소유자 summary
 		UserSummary ownerSummary = getUserSummary(owner);
+		// 플레이리스트 구독자 조회 (생성이라 존재 X)
 		long subscriberCount = 0L;
+		// 플레이리스트 구독 여부 조회 (생성이라 존재 X)
 		boolean subscribedByMe = false;
+		// 플레이리스트 내 콘텐츠 조회 (생성이라 존재 X)
 		List<ContentSummary> contentSummaries = List.of();
 
 		PlaylistDto playlistDto = playlistMapper.toDto(
