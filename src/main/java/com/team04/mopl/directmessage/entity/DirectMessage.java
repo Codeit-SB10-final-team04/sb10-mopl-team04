@@ -63,15 +63,13 @@ public class DirectMessage extends BaseUpdatableEntity {
 		this.readAt = null;
 	}
 
-	public void updateIsRead(boolean isRead) {
-		this.isRead = isRead;
-
-		// 읽은 경우에만 갱신
-		if (isRead) {
-			this.readAt = Instant.now();
-		}
+	// 읽음 상태로 전환 (역은 성립하지 않음)
+	public void markAsRead() {
+		this.isRead = true;
+		this.readAt = Instant.now();
 	}
 
+	// 유효성 검증: 메시지 공백
 	private void validateContent(String content) {
 		if (content == null || content.isBlank()) {
 			throw new DirectMessageException(DirectMessageErrorCode.DM_BLANK);
