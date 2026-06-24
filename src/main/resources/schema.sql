@@ -223,9 +223,11 @@ CREATE TABLE conversation_participants (
                                            user_id         UUID        NOT NULL,
                                            last_read_at    TIMESTAMPTZ NULL,
 
-                                           CONSTRAINT pk_conversation_participants PRIMARY KEY (conversation_id, user_id),
+                                           CONSTRAINT pk_conversation_participants PRIMARY KEY (conversation_id),
                                            CONSTRAINT fk_conversation_participants_conversation FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE,
-                                           CONSTRAINT fk_conversation_participants_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+                                           CONSTRAINT fk_conversation_participants_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+
+                                           CONSTRAINT uk_conversation_user UNIQUE (conversation_id, user_id)
 );
 
 CREATE TABLE direct_messages (

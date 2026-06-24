@@ -19,7 +19,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
 	name = "conversation_participants",
-	uniqueConstraints = @UniqueConstraint(columnNames = {"conversation_id", "user_id"})
+	uniqueConstraints = {
+		@UniqueConstraint(
+			name = "uk_conversation_user",
+			columnNames = {"conversation_id", "user_id"}
+		)
+	}
 )
 public class ConversationParticipant extends BaseEntity {
 
