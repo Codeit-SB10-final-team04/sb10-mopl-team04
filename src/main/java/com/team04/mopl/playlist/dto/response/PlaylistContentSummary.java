@@ -16,6 +16,6 @@ public record PlaylistContentSummary(
 	String thumbnailUrl,
 	List<String> tags,
 	BigDecimal averageRating,
-	long reviewCount
+	Long reviewCount
 ) {
 }

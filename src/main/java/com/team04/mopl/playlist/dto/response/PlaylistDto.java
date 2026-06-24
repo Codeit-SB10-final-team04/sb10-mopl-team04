@@ -13,8 +13,8 @@ public record PlaylistDto(
 	String title,
 	String description,
 	Instant updatedAt,
-	long subscriberCount,
-	boolean subscribedByMe,
+	Long subscriberCount,
+	Boolean subscribedByMe,
 	// TODO: ContentSummary 구현 후 변경
 	// List<ContentSummary> contents
 	List<PlaylistContentSummary> contents
