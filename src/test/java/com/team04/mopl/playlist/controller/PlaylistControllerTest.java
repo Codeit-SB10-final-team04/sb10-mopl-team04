@@ -79,7 +79,7 @@ class PlaylistControllerTest {
 	}
 
 	@Test
-	@DisplayName("제목이나 설명이 비어있으면 플레이리스트 생성 요청이 실패한다.")
+	@DisplayName("제목이나 설명이 비어있으면 플레이리스트 생성 요청이 400 Bad Request로 실패한다.")
 	void createPlaylist_returnBadRequest_whenTitleOrDescriptionBlank() throws Exception {
 		// given
 		PlaylistCreateRequest request = new PlaylistCreateRequest("", "테스트 설명");
@@ -125,8 +125,8 @@ class PlaylistControllerTest {
 	}
 
 	@Test
-	@DisplayName("잘못된 엔드포인트로 오면 플레이리스트 단건 조회 요청이 실패한다.")
-	void findPlaylist_returnBadRequest_whenMethodNotAllowed() throws Exception {
+	@DisplayName("GET /api/playlists 요청은 지원하지 않는 메서드로 실패한다.")
+	void findPlaylist_returnIsInternalServerError_whenPlaylistIdIsMissing() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 
@@ -136,11 +136,10 @@ class PlaylistControllerTest {
 				.contentType(MediaType.APPLICATION_JSON))
 			// .andExpect(status().isMethodNotAllowed());
 			.andExpect(status().isInternalServerError());
-
 	}
 
 	@Test
-	@DisplayName("플레이리스트 id가 비어있으면 플레이리스트 단건 조회 요청이 실패한다.")
+	@DisplayName("플레이리스트 id가 UUID 형식이 아니면 400 Bad Request로 실패한다.")
 	void findPlaylist_returnBadRequest_whenPlaylistIdIsBlank() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
@@ -151,5 +150,4 @@ class PlaylistControllerTest {
 				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isBadRequest());
 	}
-
 }

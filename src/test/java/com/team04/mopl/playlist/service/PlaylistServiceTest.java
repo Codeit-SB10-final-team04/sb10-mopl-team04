@@ -151,7 +151,7 @@ class PlaylistServiceTest {
 	}
 
 	@Test
-	@DisplayName("플레이리스트 조회에 성공하면 플레이리스트 DTO가 반환된다.")
+	@DisplayName("플레이리스트 단건 조회에 성공하면 플레이리스트 DTO를 반환된다.")
 	void findPlaylist_returnPlaylistDto_whenValidRequest() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
@@ -243,7 +243,7 @@ class PlaylistServiceTest {
 	}
 
 	@Test
-	@DisplayName("사용자가 존재하지 않을 때 예외가 발생한다.")
+	@DisplayName("플레이리스트 단건 조회 시 현재 사용자가 존재하지 않으면 예외가 발생한다.")
 	void findPlaylist_throwException_whenUserNotFound() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
@@ -275,7 +275,7 @@ class PlaylistServiceTest {
 	}
 
 	@Test
-	@DisplayName("플레이리스트가 존재하지 않을 때 예외가 발생한다.")
+	@DisplayName("플레이리스트 단건 조회 시 플레이리스트가 존재하지 않으면 예외가 발생한다.")
 	void findPlaylist_throwException_whenPlaylistNotFound() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
