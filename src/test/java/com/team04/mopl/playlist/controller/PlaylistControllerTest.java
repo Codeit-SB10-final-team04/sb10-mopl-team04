@@ -122,7 +122,6 @@ class PlaylistControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(playlistId.toString()))
 			.andExpect(jsonPath("$.owner.userId").value(currentUserId.toString()))
-			.andExpect(jsonPath("$.owner.userId").value(currentUserId.toString()))
 			.andExpect(jsonPath("$.subscriberCount").value(0))
 			.andExpect(jsonPath("$.subscribedByMe").value(false))
 			.andExpect(jsonPath("$.contents").isArray());
