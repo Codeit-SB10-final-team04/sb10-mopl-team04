@@ -1,6 +1,7 @@
 package com.team04.mopl.content.scheduler;
 
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
@@ -44,8 +45,11 @@ public class DataCollectScheduler {
 				.addLong("timestamp", System.currentTimeMillis())
 				.toJobParameters();
 
-			jobLauncher.run(sportsDataCollectJob, params);
-			log.info("[Scheduler] 스포츠 데이터 수집 Job 실행 완료");
+			JobExecution jobExecution = jobLauncher.run(sportsDataCollectJob, params);
+			log.info("[Scheduler] 스포츠 데이터 수집 Job 실행 완료 - status: {}, exitCode: {}, jobId: {}",
+				jobExecution.getStatus(),
+				jobExecution.getExitStatus().getExitCode(),
+				jobExecution.getJobId());
 		} catch (Exception e) {
 			log.error("[Scheduler] 스포츠 데이터 수집 Job 실행 실패: {}", e.getMessage(), e);
 		}
