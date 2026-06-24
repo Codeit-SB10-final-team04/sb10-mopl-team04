@@ -38,7 +38,7 @@ class PlaylistControllerTest {
 
 	@Test
 	@DisplayName("플레이리스트 생성 요청에 성공하면 201 Created와 생성된 플레이리스트 DTO를 반환한다.")
-	void createPlaylist_returnCrested_whenValidRequest() throws Exception {
+	void createPlaylist_returnCreated_whenValidRequest() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 		UUID playlistId = UUID.randomUUID();
