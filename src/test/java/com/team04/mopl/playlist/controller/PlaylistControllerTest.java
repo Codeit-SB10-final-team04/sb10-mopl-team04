@@ -121,7 +121,11 @@ class PlaylistControllerTest {
 				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(playlistId.toString()))
-			.andExpect(jsonPath("$.owner.userId").value(currentUserId.toString()));
+			.andExpect(jsonPath("$.owner.userId").value(currentUserId.toString()))
+			.andExpect(jsonPath("$.owner.userId").value(currentUserId.toString()))
+			.andExpect(jsonPath("$.subscriberCount").value(0))
+			.andExpect(jsonPath("$.subscribedByMe").value(false))
+			.andExpect(jsonPath("$.contents").isArray());
 	}
 
 	@Test
@@ -140,7 +144,7 @@ class PlaylistControllerTest {
 
 	@Test
 	@DisplayName("플레이리스트 id가 UUID 형식이 아니면 400 Bad Request로 실패한다.")
-	void findPlaylist_returnBadRequest_whenPlaylistIdIsBlank() throws Exception {
+	void findPlaylist_returnBadRequest_whenPlaylistIdIsInvalidFormat() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 
