@@ -1,5 +1,6 @@
 package com.team04.mopl.follow.entity;
 
+import java.util.Objects;
 import java.util.UUID;
 
 import com.team04.mopl.common.entity.BaseEntity;
@@ -40,6 +41,9 @@ public class Follow extends BaseEntity {
 
 	@Builder
 	public Follow(User followee, User follower) {
+		this.followee = Objects.requireNonNull(followee, "팔로우 대상은 필수입니다.");
+		this.follower = Objects.requireNonNull(follower, "팔로워는 필수입니다.");
+
 		validateSelfFollow(followee.getId(), follower.getId());
 
 		this.followee = followee;
