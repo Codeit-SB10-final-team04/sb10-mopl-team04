@@ -3,7 +3,9 @@ package com.team04.mopl.content.client;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
@@ -146,6 +148,46 @@ public class TmdbClient {
 	}
 
 	/**
+	 영화 장르 목록 조회
+
+	 엔드포인트: GET /genre/movie/list?language=ko-KR
+	 응답 구조: { "genres": [{"id": 28, "name": "액션"}, ...] }
+
+	 Tasklet 시작 시 1회 호출 → Map으로 변환해서 Content 저장 시 태그 매핑에 사용
+
+	 @return 장르 ID → 장르명 Map (예: {28: "액션", 18: "드라마"})
+	 */
+	public Map<Integer, String> getMovieGenres() {
+		log.debug("[TMDB] 영화 장르 목록 조회");
+
+		JsonNode root = restClient.get()
+			.uri("/genre/movie/list?api_key={key}&language={lang}", apiKey, LANGUAGE)
+			.retrieve()
+			.body(JsonNode.class);
+
+		return extractGenreMap(root);
+	}
+
+	/**
+	 TV 시리즈 장르 목록 조회
+
+	 엔드포인트: GET /genre/tv/list?language=ko-KR
+	 응답 구조: { "genres": [{"id": 18, "name": "드라마"}, ...] }
+
+	 @return 장르 ID → 장르명 Map (예: {18: "드라마", 16: "애니메이션"})
+	 */
+	public Map<Integer, String> getTvGenres() {
+		log.debug("[TMDB] TV 장르 목록 조회");
+
+		JsonNode root = restClient.get()
+			.uri("/genre/tv/list?api_key={key}&language={lang}", apiKey, LANGUAGE)
+			.retrieve()
+			.body(JsonNode.class);
+
+		return extractGenreMap(root);
+	}
+
+	/**
 	 응답 루트에서 "results" 배열 추출
 
 	 @param root API 응답 루트 JsonNode
@@ -180,6 +222,33 @@ public class TmdbClient {
 			return 1;
 		}
 		return root.path("total_pages").asInt(1);
+	}
+
+	/**
+	 응답 루트에서 "genres" 배열 → Map<Integer, String> 변환
+
+	 @param root API 응답 루트 JsonNode
+	 @return 장르 ID → 장르명 Map (없으면 빈 Map)
+	 */
+	private Map<Integer, String> extractGenreMap(JsonNode root) {
+		if (root == null || root.isMissingNode()) {
+			return Collections.emptyMap();
+		}
+
+		JsonNode genres = root.path("genres");
+		if (genres.isMissingNode() || !genres.isArray()) {
+			return Collections.emptyMap();
+		}
+
+		Map<Integer, String> genreMap = new HashMap<>();
+		for (JsonNode genre : genres) {
+			int id = genre.path("id").asInt();
+			String name = genre.path("name").asText("");
+			if (id > 0 && !name.isBlank()) {
+				genreMap.put(id, name);
+			}
+		}
+		return genreMap;
 	}
 
 	/**
