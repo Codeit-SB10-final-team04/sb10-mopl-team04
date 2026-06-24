@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,13 +27,14 @@ public class PlaylistController implements PlaylistControllerDocs {
 	@PostMapping
 	@Override
 	public ResponseEntity<PlaylistDto> createPlaylist(
-		@Valid @RequestBody PlaylistCreateRequest request
+		@Valid @RequestBody PlaylistCreateRequest request,
+		@RequestHeader("X-MOPL-USER-ID") UUID currentUserId
 		// @AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 		// TODO: Security 구현 완료 후 @AuthenticationPrincipal 사용
+		// Security 구현 완료 전까지 임시 헤더로 받기
 		// TODO: Security 구현 완료 후 주석 해제
 		// UUID currentUserId = moplUserDetails.getId();
-		UUID currentUserId = UUID.fromString("506a74ce-564a-4890-9f12-c2ffd3ef4c4b");
 		PlaylistDto playlistDto = playlistService.createPlaylist(request, currentUserId);
 
 		return ResponseEntity.status(HttpStatus.CREATED).body(playlistDto);
