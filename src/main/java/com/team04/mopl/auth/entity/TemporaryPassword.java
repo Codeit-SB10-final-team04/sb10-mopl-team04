@@ -50,7 +50,7 @@ public class TemporaryPassword {
 	private Instant expiresAt;
 
 	// 임시 비밀번호 발급 시각
-	@Column(name = "created_at", nullable = false, updatable = false)
+	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
 	@Builder
