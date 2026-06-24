@@ -4,6 +4,8 @@ import java.time.Instant;
 
 import com.team04.mopl.common.entity.BaseUpdatableEntity;
 import com.team04.mopl.conversation.entity.Conversation;
+import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
+import com.team04.mopl.directmessage.exception.DirectMessageException;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
