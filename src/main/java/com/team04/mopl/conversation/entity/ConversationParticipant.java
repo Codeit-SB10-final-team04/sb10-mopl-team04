@@ -1,6 +1,7 @@
 package com.team04.mopl.conversation.entity;
 
 import com.team04.mopl.common.entity.BaseEntity;
+import com.team04.mopl.user.entity.User;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -26,17 +27,13 @@ public class ConversationParticipant extends BaseEntity {
 	@JoinColumn(name = "conversation_id", nullable = false)
 	private Conversation conversation;
 
-	/*
-	TODO: User 생성 후 주석 제거 예정
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "user_id", nullable = false)
 	private User user;
 
-	 */
-
 	@Builder
-	public ConversationParticipant(Conversation conversation/*, User user*/) {
+	public ConversationParticipant(Conversation conversation, User user) {
 		this.conversation = conversation;
-		// this.user = user;
+		this.user = user;
 	}
 }

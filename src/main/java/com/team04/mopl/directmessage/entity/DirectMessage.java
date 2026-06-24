@@ -6,6 +6,7 @@ import com.team04.mopl.common.entity.BaseUpdatableEntity;
 import com.team04.mopl.conversation.entity.Conversation;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
+import com.team04.mopl.user.entity.User;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -24,8 +25,6 @@ import lombok.NoArgsConstructor;
 @Table(name = "direct_messages")
 public class DirectMessage extends BaseUpdatableEntity {
 
-	/*
-		TODO: User 생성 후 주석 제거 예정
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "sender_id", nullable = false)
 	private User sender;
@@ -33,7 +32,6 @@ public class DirectMessage extends BaseUpdatableEntity {
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "receiver_id", nullable = false)
 	private User receiver;
-	 */
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "conversation_id", nullable = false)
@@ -50,15 +48,15 @@ public class DirectMessage extends BaseUpdatableEntity {
 
 	@Builder
 	public DirectMessage(
-		// User sender,
-		// User receiver,
+		User sender,
+		User receiver,
 		Conversation conversation,
 		String content
 	) {
 		validateContent(content);
 
-		// this.sender = sender;
-		// this.receiver = receiver;
+		this.sender = sender;
+		this.receiver = receiver;
 		this.conversation = conversation;
 		this.content = content;
 		this.isRead = false;        // 기본 상태: 안 읽음

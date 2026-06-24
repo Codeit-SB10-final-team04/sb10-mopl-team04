@@ -3,12 +3,15 @@ package com.team04.mopl.follow.entity;
 import java.util.UUID;
 
 import com.team04.mopl.common.entity.BaseEntity;
-import com.team04.mopl.follow.exception.FollowErrorCode;
-import com.team04.mopl.follow.exception.FollowException;
+import com.team04.mopl.user.entity.User;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -18,8 +21,6 @@ import lombok.NoArgsConstructor;
 @Table(name = "follows")
 public class Follow extends BaseEntity {
 
-	/*
-	TODO: User 생성 후 주석 제거 예정
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "followee_id", nullable = false)
 	private User followee;
@@ -35,14 +36,14 @@ public class Follow extends BaseEntity {
 		this.followee = followee;
 		this.follower = follower;
 	}
-	 */
 
 	// 유효성 검증: 본인 팔로우 제외
 	private void validateSelfFollow(UUID followeeId, UUID followerId) {
 		if (followeeId.equals(followerId)) {
-			throw new FollowException(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED)
-				.addDetail("followeeId", followeeId)
-				.addDetail("followerId", followerId);
+			// TODO: 팔로우 생성 브랜치에서 해당 예외 구현 완료 -> 이후 PR에서 주석 제거 및 병합 예정
+			// throw new FollowException(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED)
+			// 	.addDetail("followeeId", followeeId)
+			// 	.addDetail("followerId", followerId);
 		}
 	}
 
