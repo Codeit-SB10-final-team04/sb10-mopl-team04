@@ -25,7 +25,6 @@ import com.team04.mopl.user.dto.response.UserSummary;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.repository.UserRepository;
 
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -41,28 +40,22 @@ public class PlaylistService {
 	private final PlaylistContentRepository playlistContentRepository;
 	private final PlaylistMapper playlistMapper;
 
-	private final EntityManager entityManager;
-
 	@Transactional
 	public PlaylistDto createPlaylist(PlaylistCreateRequest request, UUID currentUserId) {
 		log.info("[PLAYLIST_CREATE] 플레이리스트 생성 시작: currentUserId={}, title={}",
 			currentUserId, request.title());
 
-		// TODO: User/UserRepository 개발 후 추가
+		// 사용자 조회
 		User owner = getUserOrThrow(currentUserId);
-		// User owner = entityManager.getReference(User.class, currentUserId);
 
+		// 플레이리스트 생성
 		Playlist playlist = new Playlist(owner, request.title(), request.description());
-
+		// 플레이리스트 저장
 		playlistRepository.save(playlist);
 
-		// TODO: User/UserRepository 개발 후 추가
 		UserSummary ownerSummary = getUserSummary(owner);
-		// UserSummary ownerSummary = new UserSummary(currentUserId, "테스트 사용자", null);
-
 		long subscriberCount = 0L;
 		boolean subscribedByMe = false;
-		// TODO: `ContentSummary` 생성 시 주석 해제
 		List<ContentSummary> contentSummaries = List.of();
 
 		PlaylistDto playlistDto = playlistMapper.toDto(
