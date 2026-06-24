@@ -1,6 +1,7 @@
 package com.team04.mopl.conversation.entity;
 
 import java.time.Instant;
+import java.util.Objects;
 
 import com.team04.mopl.user.entity.User;
 
@@ -42,6 +43,9 @@ public class ConversationParticipant {
 
 	@Builder
 	public ConversationParticipant(Conversation conversation, User user) {
+		Objects.requireNonNull(conversation, "참여하고자 하는 대화는 필수입니다.");
+		Objects.requireNonNull(user, "대화에 참여하고자 하는 사용자는 필수입니다.");
+
 		this.id = new ConversationParticipantId(conversation.getId(), user.getId());
 		this.conversation = conversation;
 		this.user = user;
