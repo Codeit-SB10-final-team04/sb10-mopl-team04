@@ -17,6 +17,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -47,7 +48,9 @@ public class Notification extends BaseEntity {
 	@Column(name = "read_at", nullable = true)
 	private Instant readAt;
 
-	public Notification(User receiver, String title, String content, NotificationType type, NotificationLevel level) {
+	@Builder
+	protected Notification(User receiver, String title, String content, NotificationType type,
+		NotificationLevel level) {
 		this.receiver = receiver;
 		this.title = title;
 		this.content = content;
