@@ -1,21 +1,14 @@
 package com.team04.mopl.playlist.service;
 
-import static java.util.stream.Collectors.*;
-
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.team04.mopl.content.dto.response.ContentSummary;
-import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
-import com.team04.mopl.playlist.dto.row.PlaylistContentRow;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.mapper.PlaylistMapper;
 import com.team04.mopl.playlist.repository.PlaylistContentRepository;
@@ -65,7 +58,9 @@ public class PlaylistService {
 		// 플레이리스트 구독 여부 조회 (생성이라 존재 X)
 		boolean subscribedByMe = false;
 		// 플레이리스트 내 콘텐츠 조회 (생성이라 존재 X)
-		List<ContentSummary> contentSummaries = List.of();
+		// TODO: ContentSummary 구현 후 변경
+		// List<ContentSummary> contentSummaries = List.of();
+		List<String> contentSummaries = List.of();
 
 		PlaylistDto playlistDto = playlistMapper.toDto(
 			playlist,
@@ -95,90 +90,92 @@ public class PlaylistService {
 		);
 	}
 
-	private Map<UUID, Long> getSubscriberCountsByPlaylistIds(List<UUID> playlistIds) {
-		if (playlistIds.isEmpty()) {
-			return Map.of();
-		}
-
-		return playlistSubscriptionRepository.countAllSubscribersByPlaylistIds(playlistIds)
-			.stream()
-			.collect(
-				toMap(
-					row -> row.playlistId(),
-					row -> row.subscriberCount()
-				)
-			);
-	}
-
-	// SubscriberCount 단건 조회
-	private long getSubscriberCount(UUID playlistId) {
-		return getSubscriberCountsByPlaylistIds(List.of(playlistId))
-			.getOrDefault(playlistId, 0L);
-	}
-
-	// 현재 사용자가 구독한 플레이리스트 id 목록 조회
-	private Set<UUID> getSubscribedPlaylistIds(List<UUID> playlistIds, UUID currentUserId) {
-		if (playlistIds.isEmpty()) {
-			return Set.of();
-		}
-
-		return playlistSubscriptionRepository.findSubscribedPlaylistIds(playlistIds, currentUserId);
-	}
-
-	// 단건 조회에서 현재 사용자가 플레이리스트 구독 여부 조회
-	private boolean getSubscribedByMe(UUID playlistId, UUID currentUserId) {
-		return getSubscribedPlaylistIds(List.of(playlistId), currentUserId)
-			.contains(playlistId);
-	}
-
-	private Map<UUID, List<ContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
-		if (playlistIds.isEmpty()) {
-			return Map.of();
-		}
-
-		List<PlaylistContentRow> rows = playlistContentRepository.findAllContentsByPlaylistIds(playlistIds);
-		List<UUID> contentIds = rows.stream()
-			.map(row -> row.content().getId())
-			.distinct()
-			.toList();
-
-		if (contentIds.isEmpty()) {
-			return Map.of();
-		}
-
-		// contentId에 따른 tagName 조회
-		Map<UUID, List<String>> tagNameMap = contentTagRepository
-			.findTagNamesByContentIds(contentIds)
-			.stream()
-			.collect(groupingBy(
-					tagRow -> tagRow.contentId(),
-					mapping(tagRow -> tagRow.tagName(), toList())
-				)
-			);
-
-		return rows.stream()
-			.collect(groupingBy(
-					row -> row.playlistId(),
-					mapping(row -> toContentSummary(row.content(), tagNameMap), toList())
-				)
-			);
-	}
-
-	private List<ContentSummary> getContentSummaries(UUID playlistId) {
-		return getContentSummariesByPlaylistIds(List.of(playlistId))
-			.getOrDefault(playlistId, List.of());
-	}
-
-	private ContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
-		return new ContentSummary(
-			content.getId(),
-			content.getType(),
-			content.getTitle(),
-			content.getDescription(),
-			content.getThumbnailUrl(),
-			tagNameMap.getOrDefault(content.getId(), List.of()),
-			content.getAverageRating(),
-			content.getReviewerCount()
-		);
-	}
+	// TODO(#: 하단의 조회 조립용 `private` 메서드는 처음 Playlist 생성 시 필요한줄 알고 구현했다가 단건/목록 조회에 사용하기 위해 삭제하지 않고 유지한 상태입니다.
+	// TODO: ContentSummary 필요
+	// private Map<UUID, Long> getSubscriberCountsByPlaylistIds(List<UUID> playlistIds) {
+	// 	if (playlistIds.isEmpty()) {
+	// 		return Map.of();
+	// 	}
+	//
+	// 	return playlistSubscriptionRepository.countAllSubscribersByPlaylistIds(playlistIds)
+	// 		.stream()
+	// 		.collect(
+	// 			toMap(
+	// 				row -> row.playlistId(),
+	// 				row -> row.subscriberCount()
+	// 			)
+	// 		);
+	// }
+	//
+	// // SubscriberCount 단건 조회
+	// private long getSubscriberCount(UUID playlistId) {
+	// 	return getSubscriberCountsByPlaylistIds(List.of(playlistId))
+	// 		.getOrDefault(playlistId, 0L);
+	// }
+	//
+	// // 현재 사용자가 구독한 플레이리스트 id 목록 조회
+	// private Set<UUID> getSubscribedPlaylistIds(List<UUID> playlistIds, UUID currentUserId) {
+	// 	if (playlistIds.isEmpty()) {
+	// 		return Set.of();
+	// 	}
+	//
+	// 	return playlistSubscriptionRepository.findSubscribedPlaylistIds(playlistIds, currentUserId);
+	// }
+	//
+	// // 단건 조회에서 현재 사용자가 플레이리스트 구독 여부 조회
+	// private boolean getSubscribedByMe(UUID playlistId, UUID currentUserId) {
+	// 	return getSubscribedPlaylistIds(List.of(playlistId), currentUserId)
+	// 		.contains(playlistId);
+	// }
+	//
+	// private Map<UUID, List<ContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
+	// 	if (playlistIds.isEmpty()) {
+	// 		return Map.of();
+	// 	}
+	//
+	// 	List<PlaylistContentRow> rows = playlistContentRepository.findAllContentsByPlaylistIds(playlistIds);
+	// 	List<UUID> contentIds = rows.stream()
+	// 		.map(row -> row.content().getId())
+	// 		.distinct()
+	// 		.toList();
+	//
+	// 	if (contentIds.isEmpty()) {
+	// 		return Map.of();
+	// 	}
+	//
+	// 	// contentId에 따른 tagName 조회
+	// 	Map<UUID, List<String>> tagNameMap = contentTagRepository
+	// 		.findTagNamesByContentIds(contentIds)
+	// 		.stream()
+	// 		.collect(groupingBy(
+	// 				tagRow -> tagRow.contentId(),
+	// 				mapping(tagRow -> tagRow.tagName(), toList())
+	// 			)
+	// 		);
+	//
+	// 	return rows.stream()
+	// 		.collect(groupingBy(
+	// 				row -> row.playlistId(),
+	// 				mapping(row -> toContentSummary(row.content(), tagNameMap), toList())
+	// 			)
+	// 		);
+	// }
+	//
+	// private List<ContentSummary> getContentSummaries(UUID playlistId) {
+	// 	return getContentSummariesByPlaylistIds(List.of(playlistId))
+	// 		.getOrDefault(playlistId, List.of());
+	// }
+	//
+	// private ContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
+	// 	return new ContentSummary(
+	// 		content.getId(),
+	// 		content.getType(),
+	// 		content.getTitle(),
+	// 		content.getDescription(),
+	// 		content.getThumbnailUrl(),
+	// 		tagNameMap.getOrDefault(content.getId(), List.of()),
+	// 		content.getAverageRating(),
+	// 		content.getReviewerCount()
+	// 	);
+	// }
 }

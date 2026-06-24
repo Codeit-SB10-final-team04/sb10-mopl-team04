@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import com.team04.mopl.content.dto.response.ContentSummary;
 import com.team04.mopl.user.dto.response.UserSummary;
 
 public record PlaylistDto(
@@ -16,6 +15,8 @@ public record PlaylistDto(
 	Instant updatedAt,
 	long subscriberCount,
 	boolean subscribedByMe,
-	List<ContentSummary> contents
+	List<String> contents
+	// TODO: ContentSummary 구현 후 변경
+	// List<ContentSummary> contents
 ) {
 }

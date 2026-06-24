@@ -6,7 +6,6 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 import com.team04.mopl.config.MapStructConfig;
-import com.team04.mopl.content.dto.response.ContentSummary;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.user.dto.response.UserSummary;
@@ -27,6 +26,8 @@ public interface PlaylistMapper {
 		UserSummary owner,
 		long subscriberCount,
 		boolean subscribedByMe,
-		List<ContentSummary> contents
+		List<String> contents
+		// TODO: ContentSummary 구현 후 변경
+		// List<ContentSummary> contents
 	);
 }
