@@ -14,7 +14,7 @@ public interface ContentTagRepository extends JpaRepository<ContentTag, UUID> {
 
 	// ContentSummary의 tags 일괄 조합을 위한 조회 메서드
 	@Query(value = """
-		SELECT new com.team04.mopl.content.dto.row.TagRow(ct.content.id, ct.tag.name)
+		SELECT new com.team04.mopl.content.dto.row.TagRow(ct.content.id, t.name)
 		FROM ContentTag AS ct
 		LEFT JOIN ct.tag AS t
 		WHERE ct.content.id IN :contentIds
