@@ -12,4 +12,7 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
 
 	// 유효성 검증: 중복 검사
 	boolean existsByFolloweeIdAndFollowerId(UUID followeeId, UUID followerId);
+
+	// 팔로우 대상(followee)의 팔로워 수 조회
+	long countByFolloweeId(UUID followeeId);
 }
