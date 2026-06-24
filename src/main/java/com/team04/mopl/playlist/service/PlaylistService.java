@@ -107,7 +107,7 @@ public class PlaylistService {
 		long subscriberCount = getSubscriberCount(playlistId);
 
 		// 플레이리스트 구독 여부 조회
-		boolean subscribedByMe = getSubscribedByMe(playlistId, currentUserId);
+		boolean subscribedByMe = isSubscribedByMe(playlistId, currentUserId);
 
 		// 플레이리스트 내 콘텐츠 조회
 		// TODO: ContentSummary 구현 후 변경
@@ -183,7 +183,7 @@ public class PlaylistService {
 	}
 
 	// 단건 조회에서 현재 사용자가 플레이리스트 구독 여부 조회
-	private boolean getSubscribedByMe(UUID playlistId, UUID currentUserId) {
+	private boolean isSubscribedByMe(UUID playlistId, UUID currentUserId) {
 		return getSubscribedPlaylistIds(List.of(playlistId), currentUserId)
 			.contains(playlistId);
 	}
