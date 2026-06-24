@@ -13,6 +13,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -76,7 +77,7 @@ class PlaylistServiceTest {
 		PlaylistUserSummary ownerSummary = new PlaylistUserSummary(owner.getId(), owner.getName(),
 			owner.getProfileImageUrl());
 
-		PlaylistDto expectedDto = new PlaylistDto(
+		PlaylistDto mapperResult = new PlaylistDto(
 			playlistId,
 			ownerSummary,
 			request.title(),
@@ -98,27 +99,35 @@ class PlaylistServiceTest {
 				anyBoolean(),
 				anyList()
 			)
-		).thenReturn(expectedDto);
+		).thenReturn(mapperResult);
 
 		// when
 		PlaylistDto result = playlistService.createPlaylist(request, currentUserId);
 
 		// then
-		assertEquals(expectedDto, result);
-		assertEquals(expectedDto.title(), result.title());
-		assertEquals(expectedDto.description(), result.description());
+		assertEquals(mapperResult, result);
 
 		verify(userRepository).findById(any(UUID.class));
 		verify(playlistRepository).save(any(Playlist.class));
+
+		ArgumentCaptor<Playlist> playlistCaptor = ArgumentCaptor.forClass(Playlist.class);
+		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
+		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
+		ArgumentCaptor<List<PlaylistContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
+
 		verify(playlistMapper).toDto(
-			any(Playlist.class),
+			playlistCaptor.capture(),
 			// TODO: UserSummary 구현 후 변경
 			// any(UserSummary.class),
 			any(PlaylistUserSummary.class),
-			anyLong(),
-			anyBoolean(),
-			anyList()
+			subscriberCountCaptor.capture(),
+			subscribedByMeCaptor.capture(),
+			contentCaptor.capture()
 		);
+
+		assertEquals(0L, subscriberCountCaptor.getValue());
+		assertEquals(false, subscribedByMeCaptor.getValue());
+		assertEquals(0, contentCaptor.getValue().size());
 	}
 
 	@Test
@@ -182,7 +191,7 @@ class PlaylistServiceTest {
 			3L
 		);
 
-		PlaylistDto expectedDto = new PlaylistDto(
+		PlaylistDto mapperResult = new PlaylistDto(
 			playlistId,
 			ownerSummary,
 			playlist.getTitle(),
@@ -212,34 +221,38 @@ class PlaylistServiceTest {
 				anyBoolean(),
 				anyList()
 			)
-		).thenReturn(expectedDto);
+		).thenReturn(mapperResult);
 
 		// when
 		PlaylistDto result = playlistService.findPlaylist(playlistId, currentUserId);
 
 		// then
-		assertEquals(expectedDto, result);
-		assertEquals(expectedDto.title(), result.title());
-		assertEquals(expectedDto.description(), result.description());
-		assertEquals(expectedDto.updatedAt(), result.updatedAt());
-		assertEquals(expectedDto.subscriberCount(), result.subscriberCount());
-		assertEquals(expectedDto.subscribedByMe(), result.subscribedByMe());
-		assertEquals(expectedDto.contents().size(), result.contents().size());
+		assertEquals(mapperResult, result);
 
 		verify(userRepository).findById(any(UUID.class));
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(anyList(), any(UUID.class));
 		verify(playlistContentRepository).findAllContentsByPlaylistIds(anyList());
+
+		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
+		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
+		ArgumentCaptor<List<PlaylistContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
+
 		verify(playlistMapper).toDto(
-			any(Playlist.class),
+			eq(playlist),
 			// TODO: UserSummary 구현 후 변경
 			// any(UserSummary.class),
 			any(PlaylistUserSummary.class),
-			anyLong(),
-			anyBoolean(),
-			anyList()
+			subscriberCountCaptor.capture(),
+			subscribedByMeCaptor.capture(),
+			contentCaptor.capture()
 		);
+
+		assertEquals(5L, subscriberCountCaptor.getValue());
+		assertEquals(true, subscribedByMeCaptor.getValue());
+		assertEquals(1, contentCaptor.getValue().size());
+		assertEquals(contentId, contentCaptor.getValue().get(0).id());
 	}
 
 	@Test
