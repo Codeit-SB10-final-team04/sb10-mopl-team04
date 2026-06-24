@@ -3,9 +3,7 @@ package com.team04.mopl.content.client;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
@@ -22,30 +20,34 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- TMDB API 클라이언트
-
- Base URL   : https://api.themoviedb.org/3
- 인증 방식   : api_key 쿼리 파라미터 (application.yml → tmdb.api.key)
- 언어 설정   : language=ko-KR (전 엔드포인트 공통 적용)
- 429 응답 시 @Retryable로 60초 대기 후 최대 3회 재시도
-
- 응답 구조 (공통):
- {
-   "page": 1,
-   "total_pages": 500,       // TMDB 정책상 최대 500 고정
-   "total_results": 43218,   // 실제 접근 가능 건수는 최대 10,000건 (500 × 20)
-   "results": [...]
- }
-
- API 메서드는 루트 JsonNode를 반환 → 호출부에서 extractResults(), extractTotalPages()로 분리 사용
-
- 썸네일 URL 조합:
- "https://image.tmdb.org/t/p/w500" + poster_path
-
- 필드명 차이 (Movie vs TV):
- - 제목: title (Movie) / name (TV)
- - 설명: overview (공통)
- - 썸네일: poster_path (공통)
+ * TMDB API 클라이언트
+ *
+ * <p>Base URL: {@code https://api.themoviedb.org/3}
+ *
+ * <h3>인증</h3>
+ * api_key 쿼리 파라미터 ({@code application.yml → tmdb.api.key})
+ *
+ * <h3>공통 응답 구조</h3>
+ * <pre>{@code
+ * {
+ *   "page": 1,
+ *   "total_pages": 500,      // TMDB 정책상 최대 500 고정
+ *   "total_results": 43218,  // 실제 접근 가능 건수 최대 10,000건 (500 × 20)
+ *   "results": [...]
+ * }
+ * }</pre>
+ *
+ * <h3>Movie vs TV 필드명 차이</h3>
+ * <ul>
+ *   <li>제목: {@code title} (Movie) / {@code name} (TV)</li>
+ *   <li>설명: {@code overview} (공통) — 없는 경우 빈 문자열로 대응</li>
+ *   <li>썸네일: {@code poster_path} (공통) → {@code https://image.tmdb.org/t/p/w500{poster_path}}</li>
+ * </ul>
+ *
+ * <p>API 메서드는 루트 {@link com.fasterxml.jackson.databind.JsonNode}를 반환.
+ * 호출부에서 {@code extractResults()}, {@code extractTotalPages()}로 분리 사용.
+ *
+ * <p>429 응답 시 {@code @Retryable}로 60초 대기 후 최대 3회 재시도.
  */
 @Slf4j
 @Component
@@ -148,46 +150,6 @@ public class TmdbClient {
 	}
 
 	/**
-	 영화 장르 목록 조회
-
-	 엔드포인트: GET /genre/movie/list?language=ko-KR
-	 응답 구조: { "genres": [{"id": 28, "name": "액션"}, ...] }
-
-	 Tasklet 시작 시 1회 호출 → Map으로 변환해서 Content 저장 시 태그 매핑에 사용
-
-	 @return 장르 ID → 장르명 Map (예: {28: "액션", 18: "드라마"})
-	 */
-	public Map<Integer, String> getMovieGenres() {
-		log.debug("[TMDB] 영화 장르 목록 조회");
-
-		JsonNode root = restClient.get()
-			.uri("/genre/movie/list?api_key={key}&language={lang}", apiKey, LANGUAGE)
-			.retrieve()
-			.body(JsonNode.class);
-
-		return extractGenreMap(root);
-	}
-
-	/**
-	 TV 시리즈 장르 목록 조회
-
-	 엔드포인트: GET /genre/tv/list?language=ko-KR
-	 응답 구조: { "genres": [{"id": 18, "name": "드라마"}, ...] }
-
-	 @return 장르 ID → 장르명 Map (예: {18: "드라마", 16: "애니메이션"})
-	 */
-	public Map<Integer, String> getTvGenres() {
-		log.debug("[TMDB] TV 장르 목록 조회");
-
-		JsonNode root = restClient.get()
-			.uri("/genre/tv/list?api_key={key}&language={lang}", apiKey, LANGUAGE)
-			.retrieve()
-			.body(JsonNode.class);
-
-		return extractGenreMap(root);
-	}
-
-	/**
 	 응답 루트에서 "results" 배열 추출
 
 	 @param root API 응답 루트 JsonNode
@@ -222,33 +184,6 @@ public class TmdbClient {
 			return 1;
 		}
 		return root.path("total_pages").asInt(1);
-	}
-
-	/**
-	 응답 루트에서 "genres" 배열 → Map<Integer, String> 변환
-
-	 @param root API 응답 루트 JsonNode
-	 @return 장르 ID → 장르명 Map (없으면 빈 Map)
-	 */
-	private Map<Integer, String> extractGenreMap(JsonNode root) {
-		if (root == null || root.isMissingNode()) {
-			return Collections.emptyMap();
-		}
-
-		JsonNode genres = root.path("genres");
-		if (genres.isMissingNode() || !genres.isArray()) {
-			return Collections.emptyMap();
-		}
-
-		Map<Integer, String> genreMap = new HashMap<>();
-		for (JsonNode genre : genres) {
-			int id = genre.path("id").asInt();
-			String name = genre.path("name").asText("");
-			if (id > 0 && !name.isBlank()) {
-				genreMap.put(id, name);
-			}
-		}
-		return genreMap;
 	}
 
 	/**
