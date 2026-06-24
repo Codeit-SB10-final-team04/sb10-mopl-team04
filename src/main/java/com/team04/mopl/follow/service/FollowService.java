@@ -6,7 +6,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.auth.repository.AuthSessionRepository;
-import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.exception.FollowErrorCode;
 import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
@@ -54,9 +53,9 @@ public class FollowService {
 	// }
 
 	// 특정 유저의 팔로우 수 조회
-	public Long getFollowerCount(FollowRequest followRequest) {
+	public Long getFollowerCount(UUID followeeId) {
 		// 1. 유효성 검증: 특정 사용자 존재 확인
-		User targetUser = getUserEntityOrThrow(followRequest.followeeId());
+		User targetUser = getUserEntityOrThrow(followeeId);
 
 		// 2. 특정 사용자의 팔로우 수 조회 및 반환
 		return followRepository.countByFolloweeId(targetUser.getId());
