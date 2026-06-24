@@ -39,6 +39,7 @@ public class User extends BaseUpdatableEntity {
 
 	// 일반 로그인용 비밀번호 해시
 	// 소셜 가입 사용자는 비밀번호가 없으므로 null 가능
+	@Getter(AccessLevel.NONE)
 	@Column(name = "password_hash", length = 255)
 	private String passwordHash;
 
@@ -100,13 +101,18 @@ public class User extends BaseUpdatableEntity {
 	}
 
 	// 일반 비밀번호 로그인을 지원하는 계정인지 확인
-	public boolean supportsPasswordLogin() {
+	public boolean isPasswordLoginSupported() {
 		return passwordHash != null && !passwordHash.isBlank();
 	}
 
 	// 관리자 권한 여부 확인
 	public boolean isAdmin() {
 		return role == UserRole.ADMIN;
+	}
+
+	// 비밀번호 인증용
+	public String getPasswordHashForAuthentication() {
+		return passwordHash;
 	}
 
 	private static String requireText(String value, String fieldName) {
