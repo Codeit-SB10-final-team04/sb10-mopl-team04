@@ -1,6 +1,6 @@
 package com.team04.mopl.conversation.entity;
 
-import com.team04.mopl.common.entity.BaseEntity;
+import com.team04.mopl.common.entity.BaseUpdatableEntity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -12,5 +12,5 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "conversations")
-public class Conversation extends BaseEntity {
+public class Conversation extends BaseUpdatableEntity {
 }
