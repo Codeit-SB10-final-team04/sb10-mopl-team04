@@ -72,7 +72,8 @@ CREATE TABLE follows (
                          CONSTRAINT pk_follows PRIMARY KEY (id),
                          CONSTRAINT fk_follows_followee FOREIGN KEY (followee_id) REFERENCES users (id) ON DELETE CASCADE,
                          CONSTRAINT fk_follows_follower FOREIGN KEY (follower_id) REFERENCES users (id) ON DELETE CASCADE,
-                         CONSTRAINT uq_follows UNIQUE (followee_id, follower_id)
+
+                         CONSTRAINT uk_follow_followee_follower UNIQUE (followee_id, follower_id)
 );
 
 CREATE TABLE temporary_passwords (
@@ -145,10 +146,13 @@ CREATE TABLE playlists (
 -- ================================================================
 
 CREATE TABLE content_tags (
-                              content_id  UUID    NOT NULL,
-                              tag_id      UUID    NOT NULL,
+                              id          UUID        NOT NULL,
+                              content_id  UUID        NOT NULL,
+                              tag_id      UUID        NOT NULL,
+                              created_at  TIMESTAMPTZ NOT NULL,
 
-                              CONSTRAINT pk_content_tags PRIMARY KEY (content_id, tag_id),
+                              CONSTRAINT pk_content_tags PRIMARY KEY (id),
+                              CONSTRAINT uk_content_tags_content_tag UNIQUE (content_id, tag_id),
                               CONSTRAINT fk_content_tags_content FOREIGN KEY (content_id) REFERENCES contents (id) ON DELETE CASCADE,
                               CONSTRAINT fk_content_tags_tag FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
 );
