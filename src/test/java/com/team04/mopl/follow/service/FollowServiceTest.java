@@ -14,14 +14,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.repository.FollowRepository;
-import com.team04.mopl.user.entity.EmailType;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.repository.UserRepository;
+
 // import com.team04.mopl.user.exception.UserErrorCode;
 // import com.team04.mopl.user.exception.UserException;
-import com.team04.mopl.user.entity.UserRole;
-import com.team04.mopl.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
 class FollowServiceTest {
@@ -40,14 +38,10 @@ class FollowServiceTest {
 	void getFollowerCount_ReturnFollowerCount_Success() {
 		// given
 		UUID followeeId = UUID.randomUUID();
-		FollowRequest request = new FollowRequest(followeeId);
 
 		User mockUser = User.builder()
 			.name("테스트유저")
 			.email("test@example.com")
-			.emailType(EmailType.REAL)
-			.role(UserRole.USER)
-			.locked(false)
 			.build();
 		ReflectionTestUtils.setField(mockUser, "id", followeeId);
 		long expectedCount = 15L;
@@ -56,7 +50,7 @@ class FollowServiceTest {
 		given(followRepository.countByFolloweeId(followeeId)).willReturn(expectedCount);
 
 		// when
-		Long result = followService.getFollowerCount(request);
+		Long result = followService.getFollowerCount(followeeId);
 
 		// then
 		assertThat(result).isEqualTo(expectedCount);

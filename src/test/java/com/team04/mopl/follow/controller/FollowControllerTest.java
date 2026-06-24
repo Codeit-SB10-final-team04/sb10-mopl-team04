@@ -1,6 +1,5 @@
 package com.team04.mopl.follow.controller;
 
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -12,12 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.service.FollowService;
 
 @WebMvcTest(FollowController.class)
@@ -38,16 +35,14 @@ class FollowControllerTest {
 	void getFollowerCount_Return200AndCount_Success() throws Exception {
 		// given
 		UUID followeeId = UUID.randomUUID();
-		FollowRequest request = new FollowRequest(followeeId);
 
 		long followerCount = 42L;
 
-		given(followService.getFollowerCount(any(FollowRequest.class))).willReturn(followerCount);
+		given(followService.getFollowerCount(followeeId)).willReturn(followerCount);
 
 		// when & then
 		mockMvc.perform(get("/api/follows/count")
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(objectMapper.writeValueAsString(request)))
+				.param("followeeId", followeeId.toString())) // 👈 param으로 전달
 			.andExpect(status().isOk())
 			.andExpect(content().string(String.valueOf(followerCount)));
 	}
@@ -59,8 +54,7 @@ class FollowControllerTest {
 
 		// when & then
 		// @NotNull 유효성 검사 실패로 인해 BindException 발생 -> 400 에러
-		mockMvc.perform(get("/api/follows/count")
-				.contentType(MediaType.APPLICATION_JSON))
+		mockMvc.perform(get("/api/follows/count"))
 			.andExpect(status().isBadRequest());
 	}
 
@@ -72,8 +66,7 @@ class FollowControllerTest {
 
 		// when & then
 		mockMvc.perform(get("/api/follows/count")
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(invalidFolloweeId))
+				.param("followeeId", invalidFolloweeId))
 			.andExpect(status().isBadRequest());
 	}
 
