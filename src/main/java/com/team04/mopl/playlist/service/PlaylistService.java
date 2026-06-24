@@ -8,13 +8,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
+import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
+import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.mapper.PlaylistMapper;
 import com.team04.mopl.playlist.repository.PlaylistContentRepository;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
-import com.team04.mopl.user.dto.response.UserSummary;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.repository.UserRepository;
 
@@ -52,7 +53,9 @@ public class PlaylistService {
 		playlistRepository.save(playlist);
 
 		// 플레이리스트 소유자 summary
-		UserSummary ownerSummary = getUserSummary(owner);
+		// TODO: PlaylistUserSummary 구현 후 변경
+		// UserSummary ownerSummary = getUserSummary(owner);
+		PlaylistUserSummary ownerSummary = getUserSummary(owner);
 		// 플레이리스트 구독자 조회 (생성이라 존재 X)
 		long subscriberCount = 0L;
 		// 플레이리스트 구독 여부 조회 (생성이라 존재 X)
@@ -60,7 +63,7 @@ public class PlaylistService {
 		// 플레이리스트 내 콘텐츠 조회 (생성이라 존재 X)
 		// TODO: ContentSummary 구현 후 변경
 		// List<ContentSummary> contentSummaries = List.of();
-		List<String> contentSummaries = List.of();
+		List<PlaylistContentSummary> contentSummaries = List.of();
 
 		PlaylistDto playlistDto = playlistMapper.toDto(
 			playlist,
@@ -82,8 +85,16 @@ public class PlaylistService {
 			.orElseThrow(() -> new IllegalArgumentException("User not found!"));
 	}
 
-	private UserSummary getUserSummary(User user) {
-		return new UserSummary(
+	// TODO: PlaylistUserSummary 구현 후 변경
+	// private UserSummary getUserSummary(User user) {
+	// 	return new UserSummary(
+	// 		user.getId(),
+	// 		user.getName(),
+	// 		user.getProfileImageUrl()
+	// 	);
+	// }
+	private PlaylistUserSummary getUserSummary(User user) {
+		return new PlaylistUserSummary(
 			user.getId(),
 			user.getName(),
 			user.getProfileImageUrl()

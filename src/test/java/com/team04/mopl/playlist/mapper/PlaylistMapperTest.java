@@ -11,9 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
+import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.entity.Playlist;
-import com.team04.mopl.user.dto.response.UserSummary;
 import com.team04.mopl.user.entity.User;
 
 class PlaylistMapperTest {
@@ -42,7 +43,11 @@ class PlaylistMapperTest {
 			.build();
 		ReflectionTestUtils.setField(playlist, "id", playlistId);
 
-		UserSummary ownerSummary = new UserSummary(ownerId, owner.getName(), owner.getProfileImageUrl());
+		// TODO: PlaylistUserSummary 구현 후 변경
+		// UserSummary ownerSummary = new UserSummary(ownerId, owner.getName(), owner.getProfileImageUrl());
+		PlaylistUserSummary ownerSummary = new PlaylistUserSummary(ownerId, owner.getName(),
+			owner.getProfileImageUrl());
+
 		// TODO: ContentSummary 구현 후 변경
 		// ContentSummary contentSummary = new ContentSummary(
 		// 	UUID.randomUUID(),
@@ -55,7 +60,7 @@ class PlaylistMapperTest {
 		// 	10L
 		// );
 		// List<ContentSummary> contents = List.of(contentSummary);
-		List<String> contents = List.of();
+		List<PlaylistContentSummary> contents = List.of();
 
 		// when
 		PlaylistDto result = playlistMapper.toDto(

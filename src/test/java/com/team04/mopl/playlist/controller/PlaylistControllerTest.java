@@ -20,8 +20,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
+import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.service.PlaylistService;
-import com.team04.mopl.user.dto.response.UserSummary;
 
 @WebMvcTest(PlaylistController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -47,7 +47,9 @@ class PlaylistControllerTest {
 
 		PlaylistDto response = new PlaylistDto(
 			playlistId,
-			new UserSummary(currentUserId, "테스트 사용자", null),
+			// TODO: PlaylistUserSummary 구현 후 변경
+			// new UserSummary(currentUserId, "테스트 사용자", null),
+			new PlaylistUserSummary(currentUserId, "테스트 사용자", null),
 			request.title(),
 			request.description(),
 			Instant.parse("2026-06-24T01:00:00Z"),

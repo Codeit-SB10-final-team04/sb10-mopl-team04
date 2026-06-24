@@ -19,12 +19,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
+import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.mapper.PlaylistMapper;
 import com.team04.mopl.playlist.repository.PlaylistContentRepository;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
-import com.team04.mopl.user.dto.response.UserSummary;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.repository.UserRepository;
 
@@ -62,7 +62,10 @@ class PlaylistServiceTest {
 
 		PlaylistCreateRequest request = new PlaylistCreateRequest("테스트 제목", "테스트 설명");
 		User owner = createUser(currentUserId);
-		UserSummary ownerSummary = new UserSummary(owner.getId(), owner.getName(), owner.getProfileImageUrl());
+		// TODO: PlaylistUserSummary 구현 후 변경
+		// UserSummary ownerSummary = new UserSummary(owner.getId(), owner.getName(), owner.getProfileImageUrl());
+		PlaylistUserSummary ownerSummary = new PlaylistUserSummary(owner.getId(), owner.getName(),
+			owner.getProfileImageUrl());
 		PlaylistDto expectedDto = new PlaylistDto(
 			playlistId,
 			ownerSummary,
@@ -78,7 +81,9 @@ class PlaylistServiceTest {
 			.thenReturn(Optional.of(owner));
 		when(playlistMapper.toDto(
 				any(Playlist.class),
-				any(UserSummary.class),
+				// TODO: PlaylistUserSummary 구현 후 변경
+				// any(UserSummary.class),
+				any(PlaylistUserSummary.class),
 				anyLong(),
 				anyBoolean(),
 				anyList()
@@ -97,7 +102,9 @@ class PlaylistServiceTest {
 		verify(playlistRepository).save(any(Playlist.class));
 		verify(playlistMapper).toDto(
 			any(Playlist.class),
-			any(UserSummary.class),
+			// TODO: PlaylistUserSummary 구현 후 변경
+			// any(UserSummary.class),
+			any(PlaylistUserSummary.class),
 			anyLong(),
 			anyBoolean(),
 			anyList()
@@ -113,7 +120,7 @@ class PlaylistServiceTest {
 
 		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
 		when(userRepository.findById(currentUserId))
-			.thenThrow(new IllegalArgumentException());
+			.thenReturn(Optional.empty());
 
 		// when, then
 		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
@@ -124,7 +131,9 @@ class PlaylistServiceTest {
 		verify(playlistRepository, never()).save(any(Playlist.class));
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
-			any(UserSummary.class),
+			// TODO: PlaylistUserSummary 구현 후 변경
+			// any(UserSummary.class),
+			any(PlaylistUserSummary.class),
 			anyLong(),
 			anyBoolean(),
 			anyList()
