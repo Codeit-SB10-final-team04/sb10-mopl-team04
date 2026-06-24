@@ -64,10 +64,13 @@ public class PlaylistService {
 		// TODO: UserSummary 구현 후 변경
 		// UserSummary ownerSummary = getUserSummary(owner);
 		PlaylistUserSummary ownerSummary = getUserSummary(owner);
+
 		// 플레이리스트 구독자 조회 (생성이라 존재 X)
 		long subscriberCount = 0L;
+
 		// 플레이리스트 구독 여부 조회 (생성이라 존재 X)
 		boolean subscribedByMe = false;
+
 		// 플레이리스트 내 콘텐츠 조회 (생성이라 존재 X)
 		// TODO: ContentSummary 구현 후 변경
 		// List<ContentSummary> contentSummaries = List.of();
@@ -95,7 +98,7 @@ public class PlaylistService {
 		// 현재 로그인한 인증된 사용자 조회
 		getUserOrThrow(currentUserId);
 
-		// 플레이리스트 조회
+		// 삭제되지 않은 플레이리스트를 소유자 정보와 함께 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
 
 		// 플레이리스트 소유자 summary
@@ -135,6 +138,7 @@ public class PlaylistService {
 			.orElseThrow(() -> new IllegalArgumentException("User not found!"));
 	}
 
+	// 플레이리스트 응답에 포함할 소유자 요약 정보를 만듦
 	// TODO: UserSummary 구현 후 변경
 	// private UserSummary getUserSummary(User user) {
 	private PlaylistUserSummary getUserSummary(User user) {
@@ -146,17 +150,21 @@ public class PlaylistService {
 		);
 	}
 
-	// 플레이리스트 조회
+	// 삭제되지 않은 플레이리스트를 소유자 정보와 함께 조회
 	private Playlist getPlaylistOrThrow(UUID playlistId) {
+		// UserSummary를 만들기 위해서 owner 정보가 필요
 		return playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId)
 			.orElseThrow(() -> new PlaylistException(PlaylistErrorCode.PLAYLIST_NOT_FOUND));
 	}
 
+	// 여러 플레이리스트의 구독자 수를 한 번에 조회한 후, playlistId 기준 Map으로 변환
 	private Map<UUID, Long> getSubscriberCountsByPlaylistIds(List<UUID> playlistIds) {
+		// 조회 대상이 없으면 실행 X
 		if (playlistIds.isEmpty()) {
 			return Map.of();
 		}
 
+		// 목록 조회에서도 사용할 수 있도록 playlistId별 구독자 수 Map을 만듦
 		return playlistSubscriptionRepository.countAllSubscribersByPlaylistIds(playlistIds)
 			.stream()
 			.collect(
@@ -167,14 +175,16 @@ public class PlaylistService {
 			);
 	}
 
-	// SubscriberCount 단건 조회
+	// 단건 조회에서 사용할 구독자 수 조회
 	private long getSubscriberCount(UUID playlistId) {
+		// 구독자가 없을 경우 기본값 0 반환
 		return getSubscriberCountsByPlaylistIds(List.of(playlistId))
 			.getOrDefault(playlistId, 0L);
 	}
 
-	// 현재 사용자가 구독한 플레이리스트 id 목록 조회
+	// 현재 사용자가 구독 중인 플레이리스트 id 조회
 	private Set<UUID> getSubscribedPlaylistIds(List<UUID> playlistIds, UUID currentUserId) {
+		// 조회 대상이 없다면 실행 X
 		if (playlistIds.isEmpty()) {
 			return Set.of();
 		}
@@ -182,31 +192,36 @@ public class PlaylistService {
 		return playlistSubscriptionRepository.findSubscribedPlaylistIds(playlistIds, currentUserId);
 	}
 
-	// 단건 조회에서 현재 사용자가 플레이리스트 구독 여부 조회
+	// 현재의 사용자가 해당 플레이리스트를 구독했는지 확인
 	private boolean isSubscribedByMe(UUID playlistId, UUID currentUserId) {
 		return getSubscribedPlaylistIds(List.of(playlistId), currentUserId)
 			.contains(playlistId);
 	}
 
-	// 플레이리스트 id별(플레이리스트 내에 존재하는) 콘텐츠 리스트 조회
+	// 여러 플레이리스트에 포함된 콘텐츠 조회 흐, 콘텐츠별 태그를 붙여 요약 DTO 구현
 	// TODO: ContentSummary 구현 시 교체
 	// private Map<UUID, List<ContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
 	private Map<UUID, List<PlaylistContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
+		// 조회 대상이 없다면 실행 X
 		if (playlistIds.isEmpty()) {
 			return Map.of();
 		}
 
+		// 여러 플레이리스트에 포함된 콘텐츠 일괄 조회
 		List<PlaylistContentRow> rows = playlistContentRepository.findAllContentsByPlaylistIds(playlistIds);
+
+		// 태그 조회에 필요한 콘텐츠 id만 중복 없이 추출
 		List<UUID> contentIds = rows.stream()
 			.map(row -> row.content().getId())
 			.distinct()
 			.toList();
 
+		// 포함된 콘텐츠가 없다면 빈 결과 반환
 		if (contentIds.isEmpty()) {
 			return Map.of();
 		}
 
-		// contentId에 따른 tagName 조회
+		// 콘텐츠별 태그명을 한 번에 조회 후 콘텐츠 id 기준으로 그룹화
 		Map<UUID, List<String>> tagNameMap = contentTagRepository
 			.findTagNamesByContentIds(contentIds)
 			.stream()
@@ -216,6 +231,7 @@ public class PlaylistService {
 				)
 			);
 
+		// 플레이리스트 id별로 콘텐츠 요약 정보를 묶음
 		return rows.stream()
 			.collect(groupingBy(
 					row -> row.playlistId(),
@@ -224,13 +240,16 @@ public class PlaylistService {
 			);
 	}
 
+	// 단건 조회에서 사용할 콘텐츠 요약 목록을 가져옴
 	// TODO: ContentSummary 구현 시 교체
 	// private ContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
 	private List<PlaylistContentSummary> getContentSummaries(UUID playlistId) {
+		// 포함된 콘텐츠가 없다면 빈 목록 반환
 		return getContentSummariesByPlaylistIds(List.of(playlistId))
 			.getOrDefault(playlistId, List.of());
 	}
 
+	// 콘텐츠와 태그 목록을 이용해 콘텐츠 요약 DTO 생성
 	// TODO: ContentSummary 구현 시 교체
 	// private ContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
 	private PlaylistContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
