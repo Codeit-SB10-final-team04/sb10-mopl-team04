@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "tags")
 @NoArgsConstructor
 public class Tag extends BaseEntity {
-	@Column(nullable = false, length = 100)
+	@Column(nullable = false, length = 100, unique = true)
 	String name;
 
 	public Tag(String name) {
