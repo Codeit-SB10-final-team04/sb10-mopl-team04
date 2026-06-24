@@ -1,8 +1,8 @@
 package com.team04.mopl.follow.controller;
 
-import org.springframework.http.ResponseEntity;
+import java.util.UUID;
 
-import com.team04.mopl.follow.dto.request.FollowRequest;
+import org.springframework.http.ResponseEntity;
 
 public interface FollowControllerDocs {
 	// 팔로우 생성
@@ -10,5 +10,5 @@ public interface FollowControllerDocs {
 	// ResponseEntity<FollowDto> createFollow(FollowRequest followRequest/*, CustomUserDetails userDetails */);
 
 	// 특정 사용자의 팔로우 수 조회
-	ResponseEntity<Long> getFollowerCount(FollowRequest followRequest);
+	ResponseEntity<Long> getFollowerCount(UUID followeeId);
 }
