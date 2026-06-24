@@ -12,6 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -44,8 +45,8 @@ class DbAuthSessionStoreTest {
 	private DbAuthSessionStore authSessionStore;
 
 	@Test
-	@DisplayName("기존 세션이 없으면 사용자 row에 비관적 락을 걸고 새 인증 세션을 저장한다")
-	void replace_saveNewSession_whenExistingSessionDoesNotExist() {
+	@DisplayName("사용자가 존재하면 비관적 락을 걸고 기존 세션 삭제 후 새 인증 세션을 저장한다")
+	void replace_saveNewSession_whenUserExists() {
 		// given
 		UUID userId = UUID.randomUUID();
 		UUID sessionId = UUID.randomUUID();
@@ -56,9 +57,6 @@ class DbAuthSessionStoreTest {
 
 		given(entityManager.find(User.class, userId, LockModeType.PESSIMISTIC_WRITE))
 			.willReturn(user);
-
-		given(authSessionRepository.findByUser(user))
-			.willReturn(Optional.empty());
 
 		given(authSessionRepository.save(any(AuthSession.class)))
 			.willAnswer(invocation -> invocation.getArgument(0));
@@ -81,55 +79,13 @@ class DbAuthSessionStoreTest {
 		assertThat(result.getRefreshExpiresAt()).isEqualTo(refreshExpiresAt);
 		assertThat(result.getUpdatedAt()).isEqualTo(issuedAt);
 
-		verify(entityManager).find(User.class, userId, LockModeType.PESSIMISTIC_WRITE);
-		verify(authSessionRepository).findByUser(user);
-		verify(authSessionRepository, never()).delete(any(AuthSession.class));
-		verify(authSessionRepository).flush();
-		verify(authSessionRepository).save(any(AuthSession.class));
-	}
-
-	@Test
-	@DisplayName("기존 세션이 있으면 삭제 후 새 인증 세션으로 교체한다")
-	void replace_deleteExistingSessionAndSaveNewSession_whenExistingSessionExists() {
-		// given
-		UUID userId = UUID.randomUUID();
-		UUID sessionId = UUID.randomUUID();
-		String refreshTokenHash = "new-refresh-token-hash";
-		Instant issuedAt = Instant.parse("2026-06-24T00:00:00Z");
-		Instant accessExpiresAt = issuedAt.plusSeconds(1800);
-		Instant refreshExpiresAt = issuedAt.plusSeconds(1209600);
-
-		given(entityManager.find(User.class, userId, LockModeType.PESSIMISTIC_WRITE))
-			.willReturn(user);
-
-		given(authSessionRepository.findByUser(user))
-			.willReturn(Optional.of(existingSession));
-
-		given(authSessionRepository.save(any(AuthSession.class)))
-			.willAnswer(invocation -> invocation.getArgument(0));
-
-		// when
-		AuthSession result = authSessionStore.replace(
-			userId,
-			sessionId,
-			refreshTokenHash,
-			accessExpiresAt,
-			refreshExpiresAt,
-			issuedAt
-		);
-
-		// then
-		assertThat(result.getSessionId()).isEqualTo(sessionId);
-		assertThat(result.getUser()).isEqualTo(user);
-		assertThat(result.getRefreshTokenHash()).isEqualTo(refreshTokenHash);
-
-		verify(entityManager).find(User.class, userId, LockModeType.PESSIMISTIC_WRITE);
-		verify(authSessionRepository).findByUser(user);
-		verify(authSessionRepository).delete(existingSession);
-		verify(authSessionRepository).flush();
-
 		ArgumentCaptor<AuthSession> captor = ArgumentCaptor.forClass(AuthSession.class);
-		verify(authSessionRepository).save(captor.capture());
+
+		InOrder inOrder = inOrder(entityManager, authSessionRepository);
+		inOrder.verify(entityManager).find(User.class, userId, LockModeType.PESSIMISTIC_WRITE);
+		inOrder.verify(authSessionRepository).deleteByUser_Id(userId);
+		inOrder.verify(authSessionRepository).flush();
+		inOrder.verify(authSessionRepository).save(captor.capture());
 
 		AuthSession savedSession = captor.getValue();
 
@@ -200,10 +156,7 @@ class DbAuthSessionStoreTest {
 		// given
 		UUID userId = UUID.randomUUID();
 
-		given(entityManager.getReference(User.class, userId))
-			.willReturn(userReference);
-
-		given(authSessionRepository.findByUser(userReference))
+		given(authSessionRepository.findByUser_Id(userId))
 			.willReturn(Optional.of(existingSession));
 
 		// when
@@ -212,8 +165,8 @@ class DbAuthSessionStoreTest {
 		// then
 		assertThat(result).contains(existingSession);
 
-		verify(entityManager).getReference(User.class, userId);
-		verify(authSessionRepository).findByUser(userReference);
+		verify(authSessionRepository).findByUser_Id(userId);
+		verifyNoInteractions(entityManager);
 	}
 
 	@Test
@@ -222,10 +175,7 @@ class DbAuthSessionStoreTest {
 		// given
 		UUID userId = UUID.randomUUID();
 
-		given(entityManager.getReference(User.class, userId))
-			.willReturn(userReference);
-
-		given(authSessionRepository.findByUser(userReference))
+		given(authSessionRepository.findByUser_Id(userId))
 			.willReturn(Optional.empty());
 
 		// when
@@ -234,8 +184,8 @@ class DbAuthSessionStoreTest {
 		// then
 		assertThat(result).isEmpty();
 
-		verify(entityManager).getReference(User.class, userId);
-		verify(authSessionRepository).findByUser(userReference);
+		verify(authSessionRepository).findByUser_Id(userId);
+		verifyNoInteractions(entityManager);
 	}
 
 	@Test
@@ -262,10 +212,7 @@ class DbAuthSessionStoreTest {
 		UUID userId = UUID.randomUUID();
 		UUID sessionId = UUID.randomUUID();
 
-		given(entityManager.getReference(User.class, userId))
-			.willReturn(userReference);
-
-		given(authSessionRepository.existsByUserAndSessionId(userReference, sessionId))
+		given(authSessionRepository.existsByUser_IdAndSessionId(userId, sessionId))
 			.willReturn(true);
 
 		// when
@@ -274,8 +221,8 @@ class DbAuthSessionStoreTest {
 		// then
 		assertThat(result).isTrue();
 
-		verify(entityManager).getReference(User.class, userId);
-		verify(authSessionRepository).existsByUserAndSessionId(userReference, sessionId);
+		verify(authSessionRepository).existsByUser_IdAndSessionId(userId, sessionId);
+		verifyNoInteractions(entityManager);
 	}
 
 	@Test
@@ -285,10 +232,7 @@ class DbAuthSessionStoreTest {
 		UUID userId = UUID.randomUUID();
 		UUID sessionId = UUID.randomUUID();
 
-		given(entityManager.getReference(User.class, userId))
-			.willReturn(userReference);
-
-		given(authSessionRepository.existsByUserAndSessionId(userReference, sessionId))
+		given(authSessionRepository.existsByUser_IdAndSessionId(userId, sessionId))
 			.willReturn(false);
 
 		// when
@@ -297,8 +241,8 @@ class DbAuthSessionStoreTest {
 		// then
 		assertThat(result).isFalse();
 
-		verify(entityManager).getReference(User.class, userId);
-		verify(authSessionRepository).existsByUserAndSessionId(userReference, sessionId);
+		verify(authSessionRepository).existsByUser_IdAndSessionId(userId, sessionId);
+		verifyNoInteractions(entityManager);
 	}
 
 	@Test
@@ -343,10 +287,7 @@ class DbAuthSessionStoreTest {
 		Instant accessExpiresAt = refreshedAt.plusSeconds(1800);
 		Instant refreshExpiresAt = refreshedAt.plusSeconds(1209600);
 
-		given(entityManager.getReference(User.class, userId))
-			.willReturn(userReference);
-
-		given(authSessionRepository.findByUser(userReference))
+		given(authSessionRepository.findByUser_Id(userId))
 			.willReturn(Optional.of(existingSession));
 
 		// when
@@ -361,14 +302,14 @@ class DbAuthSessionStoreTest {
 		// then
 		assertThat(result).contains(existingSession);
 
-		verify(entityManager).getReference(User.class, userId);
-		verify(authSessionRepository).findByUser(userReference);
+		verify(authSessionRepository).findByUser_Id(userId);
 		verify(existingSession).refresh(
 			refreshTokenHash,
 			accessExpiresAt,
 			refreshExpiresAt,
 			refreshedAt
 		);
+		verifyNoInteractions(entityManager);
 	}
 
 	@Test
@@ -378,10 +319,7 @@ class DbAuthSessionStoreTest {
 		UUID userId = UUID.randomUUID();
 		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
 
-		given(entityManager.getReference(User.class, userId))
-			.willReturn(userReference);
-
-		given(authSessionRepository.findByUser(userReference))
+		given(authSessionRepository.findByUser_Id(userId))
 			.willReturn(Optional.empty());
 
 		// when
@@ -396,14 +334,14 @@ class DbAuthSessionStoreTest {
 		// then
 		assertThat(result).isEmpty();
 
-		verify(entityManager).getReference(User.class, userId);
-		verify(authSessionRepository).findByUser(userReference);
+		verify(authSessionRepository).findByUser_Id(userId);
 		verify(existingSession, never()).refresh(
 			any(String.class),
 			any(Instant.class),
 			any(Instant.class),
 			any(Instant.class)
 		);
+		verifyNoInteractions(entityManager);
 	}
 
 	@Test
@@ -431,45 +369,17 @@ class DbAuthSessionStoreTest {
 	}
 
 	@Test
-	@DisplayName("사용자 인증 세션이 있으면 삭제한다")
-	void deleteByUserId_deleteSession_whenSessionExists() {
+	@DisplayName("사용자 인증 세션 삭제를 repository에 위임한다")
+	void deleteByUserId_deleteSession_whenUserIdIsProvided() {
 		// given
 		UUID userId = UUID.randomUUID();
-
-		given(entityManager.getReference(User.class, userId))
-			.willReturn(userReference);
-
-		given(authSessionRepository.findByUser(userReference))
-			.willReturn(Optional.of(existingSession));
 
 		// when
 		authSessionStore.deleteByUserId(userId);
 
 		// then
-		verify(entityManager).getReference(User.class, userId);
-		verify(authSessionRepository).findByUser(userReference);
-		verify(authSessionRepository).delete(existingSession);
-	}
-
-	@Test
-	@DisplayName("사용자 인증 세션이 없어도 삭제 요청은 정상 종료된다")
-	void deleteByUserId_completeWithoutDelete_whenSessionDoesNotExist() {
-		// given
-		UUID userId = UUID.randomUUID();
-
-		given(entityManager.getReference(User.class, userId))
-			.willReturn(userReference);
-
-		given(authSessionRepository.findByUser(userReference))
-			.willReturn(Optional.empty());
-
-		// when
-		authSessionStore.deleteByUserId(userId);
-
-		// then
-		verify(entityManager).getReference(User.class, userId);
-		verify(authSessionRepository).findByUser(userReference);
-		verify(authSessionRepository, never()).delete(any(AuthSession.class));
+		verify(authSessionRepository).deleteByUser_Id(userId);
+		verifyNoInteractions(entityManager);
 	}
 
 	@Test

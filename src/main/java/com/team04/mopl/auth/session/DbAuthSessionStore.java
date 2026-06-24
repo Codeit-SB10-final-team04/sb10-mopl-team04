@@ -41,7 +41,7 @@ public class DbAuthSessionStore implements AuthSessionStore {
 		User user = findUserForUpdate(userId);
 
 		// 사용자당 활성 세션은 하나만 있어야 하므로 기존 세션이 있으면 삭제
-		deleteByUser(user);
+		deleteByUserId(userId);
 
 		// 기존 세션 삭제를 DB에 먼저 반영하여 user_id unique 충돌 방지
 		authSessionRepository.flush();
@@ -62,26 +62,20 @@ public class DbAuthSessionStore implements AuthSessionStore {
 	// 사용자 활성 인증 세션 조회
 	@Override
 	public Optional<AuthSession> findByUserId(UUID userId) {
-		// DB 구현체 내부에서만 userId를 User 프록시 객체로 변환하여 활용
-		User user = getUserReference(userId);
-
-		return authSessionRepository.findByUser(user);
+		Objects.requireNonNull(userId, "userId는 필수입니다.");
+		return authSessionRepository.findByUser_Id(userId);
 	}
 
 	// 사용자(userId + sessionId 조합)가 현재 활성 세션인지 확인
 	@Override
 	public boolean isActive(UUID userId, UUID sessionId) {
-
 		if (userId == null || sessionId == null) {
 			return false;
 		}
 
-		// userId를 User 프록시 객체로 변환
-		User user = getUserReference(userId);
-
 		// DB에 userId + sessionId 조합이 존재 -> 현재 살아있는 세션
 		// 로그아웃, 권한 변경, 계정 잠금으로 세션이 삭제되면 false가 됨
-		return authSessionRepository.existsByUserAndSessionId(user, sessionId);
+		return authSessionRepository.existsByUser_IdAndSessionId(userId, sessionId);
 	}
 
 	// refresh token 재발급 시 인증 세션의 refresh token과 만료시간을 갱신
@@ -94,10 +88,9 @@ public class DbAuthSessionStore implements AuthSessionStore {
 		Instant refreshExpiresAt,
 		Instant refreshedAt
 	) {
-		// refresh token 재발급 시 기존 인증 세션 조회
-		User user = getUserReference(userId);
+		Objects.requireNonNull(userId, "userId는 필수입니다.");
 
-		return authSessionRepository.findByUser(user)
+		return authSessionRepository.findByUser_Id(userId)
 			.map(authSession -> {
 				authSession.refresh(
 					refreshTokenHash,
@@ -114,25 +107,11 @@ public class DbAuthSessionStore implements AuthSessionStore {
 	@Override
 	@Transactional
 	public void deleteByUserId(UUID userId) {
-		User user = getUserReference(userId);
-
-		deleteByUser(user);
-	}
-
-	private void deleteByUser(User user) {
-		Objects.requireNonNull(user, "user는 필수입니다.");
+		Objects.requireNonNull(userId, "userId는 필수입니다.");
 
 		// 세션이 없어도 예외를 던지지 않음
 		// 로그아웃/강제 로그아웃 흐름에서 멱등하게 호출 가능해야 함
-		authSessionRepository.findByUser(user)
-			.ifPresent(authSessionRepository::delete);
-	}
-
-	private User getUserReference(UUID userId) {
-		Objects.requireNonNull(userId, "userId는 필수입니다.");
-
-		// DB 조회를 하지 않고 id만 가진 User 프록시를 만들어서 활용
-		return entityManager.getReference(User.class, userId);
+		authSessionRepository.deleteByUser_Id(userId);
 	}
 
 	private User findUserForUpdate(UUID userId) {
