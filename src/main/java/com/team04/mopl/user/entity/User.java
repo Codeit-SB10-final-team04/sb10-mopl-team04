@@ -7,6 +7,8 @@ import org.hibernate.type.SqlTypes;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.team04.mopl.common.entity.BaseUpdatableEntity;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -67,8 +69,11 @@ public class User extends BaseUpdatableEntity {
 		UserRole role,
 		Boolean locked
 	) {
-		this.name = requireText(name, "사용자 이름");
-		this.email = requireText(email, "이메일");
+		validateName(name);
+		validateEmail(email);
+
+		this.name = name;
+		this.email = email;
 		this.emailType = emailType == null ? EmailType.REAL : emailType;
 		this.passwordHash = passwordHash;
 		this.profileImageUrl = profileImageUrl;
@@ -78,7 +83,8 @@ public class User extends BaseUpdatableEntity {
 
 	// 프로필 이름 변경
 	public void updateName(String name) {
-		this.name = requireText(name, "사용자 이름");
+		validateName(name);
+		this.name = name;
 	}
 
 	// 프로필 이미지 변경
@@ -88,12 +94,14 @@ public class User extends BaseUpdatableEntity {
 
 	// 비밀번호 변경
 	public void updatePasswordHash(String passwordHash) {
-		this.passwordHash = requireText(passwordHash, "비밀번호");
+		validatePasswordHash(passwordHash);
+		this.passwordHash = passwordHash;
 	}
 
 	// 사용자 권한 변경
 	public void updateRole(UserRole role) {
-		this.role = Objects.requireNonNull(role, "권한은 필수입니다.");
+		validateRole(role);
+		this.role = role;
 	}
 
 	// 계정 잠금 상태 변경
@@ -117,11 +125,27 @@ public class User extends BaseUpdatableEntity {
 		return passwordHash;
 	}
 
-	private static String requireText(String value, String fieldName) {
-		if (value == null || value.isBlank()) {
-			throw new IllegalArgumentException(fieldName + "은/는 필수입니다.");
+	private static void validateName(String name) {
+		if (name == null || name.isBlank()) {
+			throw new UserException(UserErrorCode.NAME_REQUIRED);
 		}
+	}
 
-		return value;
+	private static void validateEmail(String email) {
+		if (email == null || email.isBlank()) {
+			throw new UserException(UserErrorCode.EMAIL_REQUIRED);
+		}
+	}
+
+	private static void validatePasswordHash(String passwordHash) {
+		if (passwordHash == null || passwordHash.isBlank()) {
+			throw new UserException(UserErrorCode.PASSWORD_REQUIRED);
+		}
+	}
+
+	private static void validateRole(UserRole role) {
+		if (role == null) {
+			throw new UserException(UserErrorCode.ROLE_REQUIRED);
+		}
 	}
 }

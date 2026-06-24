@@ -1,8 +1,8 @@
 package com.team04.mopl.user.entity;
 
-import java.util.Objects;
-
 import com.team04.mopl.common.entity.BaseEntity;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -62,16 +62,31 @@ public class SocialAccount extends BaseEntity {
 		String providerUserId,
 		String providerEmail
 	) {
-		this.user = Objects.requireNonNull(user, "사용자는 필수입니다.");
-		this.provider = Objects.requireNonNull(provider, "provider는 필수입니다.");
-		this.providerUserId = requireText(providerUserId);
+		validateUser(user);
+		validateProvider(provider);
+		validateProviderUserId(providerUserId);
+
+		this.user = user;
+		this.provider = provider;
+		this.providerUserId = providerUserId;
 		this.providerEmail = providerEmail;
 	}
 
-	private static String requireText(String value) {
-		if (value == null || value.isBlank()) {
-			throw new IllegalArgumentException("소셜 사용자 ID는 필수입니다.");
+	private static void validateUser(User user) {
+		if (user == null) {
+			throw new UserException(UserErrorCode.SOCIAL_ACCOUNT_USER_REQUIRED);
 		}
-		return value;
+	}
+
+	private static void validateProvider(SocialProvider provider) {
+		if (provider == null) {
+			throw new UserException(UserErrorCode.SOCIAL_PROVIDER_REQUIRED);
+		}
+	}
+
+	private static void validateProviderUserId(String providerUserId) {
+		if (providerUserId == null || providerUserId.isBlank()) {
+			throw new UserException(UserErrorCode.SOCIAL_PROVIDER_USER_ID_REQUIRED);
+		}
 	}
 }

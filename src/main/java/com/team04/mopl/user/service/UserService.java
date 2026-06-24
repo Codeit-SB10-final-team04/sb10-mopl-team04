@@ -63,7 +63,6 @@ public class UserService {
 			// 이미 사용 중인 이메일 예외
 			throw new UserException(
 				UserErrorCode.EMAIL_ALREADY_EXISTS,
-				exception,
 				Map.of("email", request.email())
 			);
 		}
