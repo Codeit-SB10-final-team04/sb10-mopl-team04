@@ -17,13 +17,16 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-public class UserController {
+public class UserController implements UserControllerDocs {
 
 	private final UserService userService;
 
 	// 회원가입
+	@Override
 	@PostMapping
-	public ResponseEntity<UserDto> create(@Valid @RequestBody UserCreateRequest request) {
+	public ResponseEntity<UserDto> create(
+		@Valid @RequestBody UserCreateRequest request
+	) {
 		UserDto response = userService.create(request);
 
 		return ResponseEntity
