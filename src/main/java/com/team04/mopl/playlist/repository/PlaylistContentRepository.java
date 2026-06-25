@@ -17,6 +17,8 @@ public interface PlaylistContentRepository extends JpaRepository<PlaylistContent
 		FROM PlaylistContent AS pc
 		LEFT JOIN pc.content AS c
 		WHERE pc.playlist.id IN :playlistIds
+			AND c.deletedAt IS NULL 
 		""")
-	List<PlaylistContentRow> findAllContentsByPlaylistIds(@Param("playlistIds") List<UUID> playlistIds);
+	List<PlaylistContentRow> findAllContentsByPlaylistIdsWithDeletedAtNull(
+		@Param("playlistIds") List<UUID> playlistIds);
 }

@@ -269,7 +269,8 @@ public class PlaylistService {
 		}
 
 		// 여러 플레이리스트에 포함된 콘텐츠 일괄 조회
-		List<PlaylistContentRow> rows = playlistContentRepository.findAllContentsByPlaylistIds(playlistIds);
+		List<PlaylistContentRow> rows = playlistContentRepository.findAllContentsByPlaylistIdsWithDeletedAtNull(
+			playlistIds);
 
 		// 태그 조회에 필요한 콘텐츠 id만 중복 없이 추출
 		List<UUID> contentIds = rows.stream()
