@@ -39,11 +39,11 @@ public class FollowService {
 		User followeeUser = getUserEntityOrThrow(followRequest.followeeId());
 		User followerUser = getUserEntityOrThrow(currentUserId);
 
-		// 2. 유효성 검증: 중복 팔로우 검사
-		validateDuplicateFollow(followeeUser.getId(), followerUser.getId());
-
-		// 3. 유효성 검증: 본인 팔로우 검사
+		// 2. 유효성 검증: 본인 팔로우 검사
 		validateSelfFollow(followeeUser.getId(), followerUser.getId());
+
+		// 3. 유효성 검증: 중복 팔로우 검사
+		validateDuplicateFollow(followeeUser.getId(), followerUser.getId());
 
 		// 4. 팔로우 생성 및 저장
 		Follow newFollow = followMapper.toEntity(followeeUser, followerUser);
