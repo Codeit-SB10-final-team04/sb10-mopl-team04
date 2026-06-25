@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.service.PlaylistService;
@@ -151,6 +152,59 @@ class PlaylistControllerTest {
 		mockMvc.perform(get("/api/playlists/{playlistId}", "UUID")
 				.header("X-MOPL-USER-ID", currentUserId)
 				.contentType(MediaType.APPLICATION_JSON))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("플레이리스트 수정 요청에 성공하면 200 OK와 플레이리스트 DTO를 반환한다.")
+	void updatePlaylist_returnOK_whenValidRequest() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+
+		PlaylistUpdateRequest request = new PlaylistUpdateRequest("수정 title", "수정 description");
+		PlaylistDto response = new PlaylistDto(
+			playlistId,
+			// TODO: UserSummary 구현 후 변경
+			// new UserSummary(currentUserId, "테스트 사용자", null),
+			new PlaylistUserSummary(currentUserId, "테스트 사용자", null),
+			"수정 title",
+			"수정 description",
+			Instant.parse("2026-06-24T01:00:00Z"),
+			0L,
+			false,
+			List.of()
+		);
+
+		when(playlistService.updatePlaylist(playlistId, request, currentUserId))
+			.thenReturn(response);
+
+		// when, then
+		mockMvc.perform(patch("/api/playlists/{playlistId}", playlistId)
+				.header("X-MOPL-USER-ID", currentUserId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(request)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(playlistId.toString()))
+			.andExpect(jsonPath("$.owner.userId").value(currentUserId.toString()))
+			.andExpect(jsonPath("$.title").value(request.title()))
+			.andExpect(jsonPath("$.description").value(request.description()));
+	}
+
+	@Test
+	@DisplayName("플레이리스트 수정 시 제목이 100 글자를 초과하면 400 Bad Request로 실패한다.")
+	void updatePlaylist_returnBadRequest_whenTitleIsOver() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+
+		PlaylistUpdateRequest request = new PlaylistUpdateRequest("t".repeat(101), "수정 description");
+
+		// when, then
+		mockMvc.perform(patch("/api/playlists/{playlistId}", playlistId)
+				.header("X-MOPL-USER-ID", currentUserId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(request)))
 			.andExpect(status().isBadRequest());
 	}
 }
