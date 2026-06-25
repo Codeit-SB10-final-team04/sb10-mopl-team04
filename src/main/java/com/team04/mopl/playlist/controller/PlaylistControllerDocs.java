@@ -19,4 +19,11 @@ public interface PlaylistControllerDocs {
 		UUID currentUserId
 		// MoplUserDetails moplUserDetails
 	);
+
+	@Operation(summary = "플레이리스트 단건 조회")
+	ResponseEntity<PlaylistDto> findPlaylist(
+		UUID playlistId,
+		UUID currentUserId
+		// MoplUserDetails moplUserDetails
+	);
 }
