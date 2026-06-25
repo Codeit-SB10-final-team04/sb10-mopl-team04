@@ -3,6 +3,10 @@ package com.team04.mopl.follow.controller;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestHeader;
+
+import com.team04.mopl.follow.dto.request.FollowRequest;
+import com.team04.mopl.follow.dto.response.FollowDto;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,7 +15,15 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public interface FollowControllerDocs {
 	// 팔로우 생성
 	// TODO: 메서드를 요청한 사용자 정보가 필요 -> 임시로 CustomUserDetails로 구현하되, 주석 처리함
-	// ResponseEntity<FollowDto> createFollow(FollowRequest followRequest/*, MoplUserDetails moplUserDetails */);
+	@Operation(
+		summary = "팔로우 생성",
+		description = "사용자가 특정 사용자를 팔로우합니다."
+	)
+	ResponseEntity<FollowDto> createFollow(
+		FollowRequest followRequest,
+		@RequestHeader("X-MOPL-USER-ID") UUID currentUserId
+		// @AuthenticationPrincipal MoplUserDetails moplUserDetails
+	);
 
 	// 특정 사용자의 팔로우 수 조회
 	@Operation(
