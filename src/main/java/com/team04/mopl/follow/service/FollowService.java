@@ -98,6 +98,20 @@ public class FollowService {
 		return followCount;
 	}
 
+	// 팔로우 취소
+	@Transactional
+	public void deleteFollow(UUID followId, UUID currentUserId) {
+		log.info("[FOLLOW_DELETE] 팔로우 취소 시작: followId={}, followerId={}", followId, currentUserId);
+
+		// 1. 유효성 검증: 팔로우 존재
+		Follow targetFollow = getFollowEntityOrThrow(followId);
+
+		// 2. 유효성 검증: 팔로우 소유자
+		validateSelfFollow(followId, targetFollow.getId());
+
+		// 3. 팔로우 삭제 (Hard Delete)
+	}
+
 	// 유효성 검증: 팔로우 중복 검사
 	private void validateDuplicateFollow(UUID followeeId, UUID followerId) {
 		if (followRepository.existsByFolloweeIdAndFollowerId(followeeId, followerId)) {
@@ -116,6 +130,15 @@ public class FollowService {
 		}
 	}
 
+	// 유효성 검증: 팔로우 소유자
+	private void validateFollowOwner(UUID followId, UUID followerId) {
+		if (followRepository.existsByIdAndFollowerId(followId, followerId)) {
+			throw new FollowException(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED)
+				.addDetail("followId", followId)
+				.addDetail("followerId", followerId);
+		}
+	}
+
 	// 사용자 엔티티 반환
 	private User getUserEntityOrThrow(UUID userId) {
 		return userRepository.findById(userId)
@@ -123,6 +146,12 @@ public class FollowService {
 			.orElseThrow(/*() -> new Userxception(
 				UserErrorCode
 			)*/);
+	}
+
+	// 팔로우 엔티티 반환 (팔로우 Id)
+	private Follow getFollowEntityOrThrow(UUID followId) {
+		return followRepository.findById(followId)
+			.orElseThrow(() -> new FollowException(FollowErrorCode.FOLLOW_NOT_FOUND));
 	}
 
 	// 팔로우 엔티티 반환 (팔로위 Id, 팔로워 Id)
