@@ -41,4 +41,14 @@ public interface FollowControllerDocs {
 		description = "특정 사용자를 팔로우 하고 있는 사용자의 수를 반환합니다."
 	)
 	ResponseEntity<Long> getFollowerCount(UUID followeeId);
+
+	@Operation(
+		summary = "팔로우 취소",
+		description = "특정 사용자에 대한 팔로우를 취소합니다."
+	)
+	ResponseEntity<Void> deleteFollow(
+		UUID followId,
+		@RequestHeader("X-MOPL-USER-ID") UUID currentUserId
+		// @AuthenticationPrincipal MoplUserDetails moplUserDetails
+	);
 }
