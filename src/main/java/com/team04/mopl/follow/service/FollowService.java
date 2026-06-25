@@ -54,11 +54,17 @@ public class FollowService {
 
 	// 특정 유저의 팔로우 수 조회
 	public Long getFollowerCount(UUID followeeId) {
+		log.debug("[FOLLOW_FIND_COUNT] 특정 사용자의 팔로우 수 조회 시작: followeeId={}", followeeId);
+
 		// 1. 유효성 검증: 특정 사용자 존재 확인
 		User targetUser = getUserEntityOrThrow(followeeId);
 
-		// 2. 특정 사용자의 팔로우 수 조회 및 반환
-		return followRepository.countByFolloweeId(targetUser.getId());
+		// 2. 특정 사용자의 팔로우 수 조회
+		Long followCount = followRepository.countByFolloweeId(targetUser.getId());
+
+		log.debug("[FOLLOW_FIND_COUNT] 특정 사용자의 팔로우 수 조회 완료: followeeId={}, followCount={}", followeeId, followCount);
+
+		return followCount;
 	}
 
 	// 유효성 검증: 팔로우 중복 검사 여부
