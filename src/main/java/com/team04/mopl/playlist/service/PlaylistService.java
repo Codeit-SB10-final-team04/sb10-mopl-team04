@@ -232,7 +232,7 @@ public class PlaylistService {
 			.contains(playlistId);
 	}
 
-	// 여러 플레이리스트에 포함된 콘텐츠 조회 흐, 콘텐츠별 태그를 붙여 요약 DTO 구현
+	// 여러 플레이리스트에 포함된 콘텐츠 조회 후, 콘텐츠별 태그를 붙여 요약 DTO 구현
 	// TODO: ContentSummary 구현 시 교체
 	// private Map<UUID, List<ContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
 	private Map<UUID, List<PlaylistContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
