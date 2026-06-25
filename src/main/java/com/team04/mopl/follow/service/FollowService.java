@@ -6,6 +6,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.auth.repository.AuthSessionRepository;
+import com.team04.mopl.follow.dto.request.FollowRequest;
+import com.team04.mopl.follow.dto.response.FollowDto;
+import com.team04.mopl.follow.entity.Follow;
 import com.team04.mopl.follow.exception.FollowErrorCode;
 import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
@@ -29,28 +32,29 @@ public class FollowService {
 	private final FollowMapper followMapper;
 
 	// 팔로우 생성
-	// @Transactional
-	// public FollowDto createFollow(UUID sessionId, FollowRequest followRequest) {
-	// 	// 1. 유효성 검증: 중복 검사
-	// 	validateDuplicateFollow(followRequest.followeeId(), sessionId);
-	//
-	// 	// 3. 로그인 한 사용자 정보 조회 (Follower)
-	// 	AuthSession session =
-	//
-	// 	// 2. 유효성 검증: 팔로우 대상 존재 여부
-	// 	User targetFolloweeUser = getUserEntityOrThrow(followRequest.followeeId());
-	//
-	// 	// 4. 팔로우 생성
-	// 	Follow newFollow = followMapper.toEntity(targetFolloweeUser, followerUser);
-	//
-	// 	// 5. 팔로워 저장
-	// 	followRepository.save(newFollow);
-	//
-	// 	// 6. 로그 기록
-	// 	log.info("Created follow with id: {}", newFollow.getId());
-	//
-	// 	return followMapper.toDto(newFollow);
-	// }
+	@Transactional
+	public FollowDto createFollow(FollowRequest followRequest, UUID currentUserId) {
+		log.info("[FOLLOW_CREATE] 팔로우 생성 시작: followeeId={}, followerId={}",
+			followRequest.followeeId(), currentUserId);
+
+		// 1. 유효성 검증: 로그인 사용자 및 팔로우 대상 존재 여부
+		User followeeUser = getUserEntityOrThrow(followRequest.followeeId());
+		User followerUser = getUserEntityOrThrow(currentUserId);
+
+		// 2. 유효성 검증: 중복 팔로우 검사
+		validateDuplicateFollow(followRequest.followeeId(), currentUserId);
+
+		// 3. 팔로우 생성
+		Follow newFollow = followMapper.toEntity(followeeUser, followerUser);
+
+		// 5. 팔로워 저장
+		followRepository.save(newFollow);
+
+		log.info("[FOLLOW_CREATE] 팔로우 생성 완료: followId={}, followeeId={}, followerId={}",
+			newFollow.getId(), followeeUser.getId(), followerUser.getId());
+
+		return followMapper.toDto(newFollow);
+	}
 
 	// 특정 유저의 팔로우 수 조회
 	public Long getFollowerCount(UUID followeeId) {
