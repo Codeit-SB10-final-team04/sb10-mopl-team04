@@ -123,22 +123,24 @@ class FollowServiceTest {
 	}
 
 	@Test
-	@DisplayName("실패: 본인을 팔로우하려고 하면 FollowException이 발생한다.")
+	@DisplayName("실패: 본인을 팔로우하려고 하면 중복 조회 및 저장 없이 FollowException이 발생한다.")
 	void createFollow_SelfFollow_Fail() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
-		User user = mock(User.class);
-		given(user.getId()).willReturn(currentUserId);
-
 		FollowRequest request = new FollowRequest(currentUserId);
+		User user = mock(User.class);
 
-		// 두 조회 모두 같은 유저를 반환하도록 모킹
+		given(user.getId()).willReturn(currentUserId);
 		given(userRepository.findById(currentUserId)).willReturn(Optional.of(user));
 
 		// when & then
 		assertThatThrownBy(() -> followService.createFollow(request, currentUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED.getMessage());
+
+		// DB 중복 조회 및 저장 미발생 확인
+		verify(followRepository, never()).existsByFolloweeIdAndFollowerId(any(), any());
+		verify(followRepository, never()).save(any(Follow.class));
 	}
 
 	/*
