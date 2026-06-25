@@ -19,6 +19,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
+import com.team04.mopl.follow.exception.FollowErrorCode;
+import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.service.FollowService;
 
 @WebMvcTest(FollowController.class)
@@ -94,6 +96,66 @@ class FollowControllerTest {
 
 	/*
 	==============================
+		특정 사용자의 팔로우 여부 조회
+	==============================
+	 */
+	@Test
+	@DisplayName("성공: 올바른 파라미터와 헤더가 주어지면 200 OK와 함께 결과를 반환한다.")
+	void getFollowConnection_Success() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID followeeId = UUID.randomUUID();
+		FollowDto responseDto = mock(FollowDto.class);
+
+		given(followService.getFollowConnection(followeeId, currentUserId)).willReturn(responseDto);
+
+		// when & then
+		mockMvc.perform(get("/api/follows/followed-by-me")
+				.param("followeeId", followeeId.toString())
+				.header("X-MOPL-USER-ID", currentUserId.toString())
+				.accept(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isOk());
+	}
+
+	@Test
+	@DisplayName("실패: 필수 파라미터(followeeId)가 누락되면 400 Bad Request를 반환한다.")
+	void getFollowConnection_MissingParam_Fail() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		// when & then
+		mockMvc.perform(get("/api/follows/followed-by-me")
+				// param("followeeId", ...) 누락
+				.header("X-MOPL-USER-ID", currentUserId.toString())
+				.accept(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("실패: 팔로우 관계가 존재하지 않을 때 404 Not Found를 반환한다.")
+	void getFollowConnection_FollowNotFound_Fail() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID followeeId = UUID.randomUUID();
+
+		given(followService.getFollowConnection(followeeId, currentUserId))
+			.willThrow(new FollowException(FollowErrorCode.FOLLOW_NOT_FOUND));
+
+		// when & then
+		mockMvc.perform(get("/api/follows/followed-by-me")
+				.param("followeeId", followeeId.toString())
+				.header("X-MOPL-USER-ID", currentUserId.toString())
+				.accept(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("FollowException"))
+			.andExpect(jsonPath("$.message").value(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage()));
+	}
+
+	/*
+	==============================
 		특정 사용자의 팔로우 수 조회
 	==============================
 	 */
@@ -109,7 +171,7 @@ class FollowControllerTest {
 
 		// when & then
 		mockMvc.perform(get("/api/follows/count")
-				.param("followeeId", followeeId.toString())) // 👈 param으로 전달
+				.param("followeeId", followeeId.toString()))
 			.andExpect(status().isOk())
 			.andExpect(content().string(String.valueOf(followerCount)));
 	}

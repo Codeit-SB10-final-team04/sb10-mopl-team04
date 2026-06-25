@@ -181,6 +181,87 @@ class FollowServiceTest {
 
 	/*
 	=============================
+		특정 사용자 팔로우 여부 조회
+	=============================
+	 */
+	@Test
+	@DisplayName("성공: 두 사용자가 존재하고 팔로우 관계가 있다면 FollowDto를 반환한다.")
+	void getFollowConnection_Success() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		User requestedUser = mock(User.class);
+		given(requestedUser.getId()).willReturn(currentUserId);
+
+		UUID followeeId = UUID.randomUUID();
+		User targetUser = mock(User.class);
+		given(targetUser.getId()).willReturn(followeeId);
+
+		given(userRepository.findById(followeeId)).willReturn(Optional.of(targetUser));
+		given(userRepository.findById(currentUserId)).willReturn(Optional.of(requestedUser));
+
+		Follow mockFollow = mock(Follow.class);
+		given(mockFollow.getId()).willReturn(UUID.randomUUID());
+		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, currentUserId))
+			.willReturn(Optional.of(mockFollow));
+
+		FollowDto mockDto = mock(FollowDto.class);
+		given(followMapper.toDto(mockFollow)).willReturn(mockDto);
+
+		// when
+		FollowDto result = followService.getFollowConnection(followeeId, currentUserId);
+
+		// then
+		assertThat(result).isNotNull();
+		assertThat(result).isEqualTo(mockDto);
+		verify(followRepository, times(1)).findByFolloweeIdAndFollowerId(followeeId, currentUserId);
+	}
+
+	// @Test
+	// @DisplayName("실패: 팔로우 대상(Followee)이 존재하지 않으면 예외가 발생한다.")
+	// void isFollowing_UserNotFound_Fail() {
+	// 	// given
+	// 	UUID currentUserId = UUID.randomUUID();
+	// 	UUID followeeId = UUID.randomUUID();
+	//
+	// 	// 타겟 유저 조회 시 Optional.empty() 반환
+	// 	given(userRepository.findById(followeeId)).willReturn(Optional.empty());
+	//
+	// 	// when & then
+	// 	// TODO: 향후 User 도메인 예외 도입 시 해당 예외 타입으로 검증 강화
+	// 	assertThatThrownBy(() -> followService.isFollowing(followeeId, currentUserId))
+	// 		.isInstanceOf();
+	//
+	// 	// 유저가 없으면 팔로우 조회 쿼리가 실행되지 않아야 함 (조기 차단 검증)
+	// 	verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
+	// }
+
+	@Test
+	@DisplayName("실패: 팔로우 관계가 존재하지 않으면 FOLLOW_NOT_FOUND 예외가 발생한다.")
+	void getFollowConnection_FollowNotFound_Fail() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		User requestedUser = mock(User.class);
+		given(requestedUser.getId()).willReturn(currentUserId);
+
+		UUID followeeId = UUID.randomUUID();
+		User targetUser = mock(User.class);
+		given(targetUser.getId()).willReturn(followeeId);
+
+		given(userRepository.findById(followeeId)).willReturn(Optional.of(targetUser));
+		given(userRepository.findById(currentUserId)).willReturn(Optional.of(requestedUser));
+
+		// 팔로우 미존재
+		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, currentUserId))
+			.willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, currentUserId))
+			.isInstanceOf(FollowException.class)
+			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
+	}
+
+	/*
+	=============================
 		특정 사용자의 팔로우 수 조회
 	=============================
 	 */
