@@ -19,6 +19,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
+import com.team04.mopl.follow.exception.FollowErrorCode;
+import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.service.FollowService;
 
 @WebMvcTest(FollowController.class)
@@ -129,6 +131,27 @@ class FollowControllerTest {
 				.accept(MediaType.APPLICATION_JSON))
 			.andDo(print())
 			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("실패: 팔로우 관계가 존재하지 않을 때 404 상태코드와 FW03 에러 코드를 반환한다.")
+	void isFollowing_FollowNotFound_Fail() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID followeeId = UUID.randomUUID();
+
+		given(followService.isFollowing(followeeId, currentUserId))
+			.willThrow(new FollowException(FollowErrorCode.FOLLOW_NOT_FOUND));
+
+		// when & then
+		mockMvc.perform(get("/api/follows/followed-by-me")
+				.param("followeeId", followeeId.toString())
+				.header("X-MOPL-USER-ID", currentUserId.toString())
+				.accept(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("FollowException"))
+			.andExpect(jsonPath("$.message").value(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage()));
 	}
 
 	/*
