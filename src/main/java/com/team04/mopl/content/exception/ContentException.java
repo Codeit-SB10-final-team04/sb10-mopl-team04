@@ -18,6 +18,10 @@ public class ContentException extends MoplException {
 			return;
 		}
 
-		details.forEach(this::addDetail);
+		details.forEach((key, value) -> {
+			if (key != null && value != null) {
+				addDetail(key, value);
+			}
+		});
 	}
 }
