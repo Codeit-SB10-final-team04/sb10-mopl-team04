@@ -135,7 +135,8 @@ public class PlaylistService {
 
 		// TODO: Security 추가로 `@PreAuthorize`가 사용 가능해지면 삭제
 		if (!playlist.getOwner().getId().equals(currentUserId)) {
-			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_FORBIDDEN);
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_FORBIDDEN)
+				.addDetail("requestUserId", currentUserId);
 		}
 
 		// 요청과 현재의 title과 description을 비교하고,
