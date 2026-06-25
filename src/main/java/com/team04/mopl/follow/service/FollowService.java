@@ -114,4 +114,10 @@ public class FollowService {
 				UserErrorCode
 			)*/);
 	}
+
+	// 팔로우 엔티티 반환 (팔로위 Id, 팔로워 Id)
+	private Follow getFollowEntityByFolloweeIdAndFollowerIdOrThrow(UUID followeeId, UUID followerId) {
+		return followRepository.findByFolloweeIdAndFollowerId(followeeId, followerId)
+			.orElseThrow(() -> new FollowException(FollowErrorCode.FOLLOW_NOT_FOUND));
+	}
 }
