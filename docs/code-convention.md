@@ -120,10 +120,8 @@ private void validateOwner(Review targetReview, User requestUser) {
 
 ### Custom Error 구조
 
-- DomainErrorCode 형식 통일
-- 코드 4글자 통일
-    - ErrorCode 네이밍: `CM00`, `US00` 형식 (도메인 약어 + 번호)
-- exception 패키지 구성 규칙
+- `ErrorCode` 인터페이스와 도메인별 `*ErrorCode` enum으로 통일
+- 코드 형식은 `CM00`, `US00`처럼 4자리로 통일
 
 ```java
 // 1. ErrorCode 인터페이스
@@ -196,12 +194,12 @@ public class CommentException extends MonewException {
 - 비즈니스 로직 처리 중 상태 추적이 필요한 경우 `Service`에 로그를 남긴다.
     - 서비스 레이어 시작과 끝에 작성
         - 생성/수정/삭제는 `info`, 조회는 `debug`
-        - 도메인→  [ENTITY_메서드] 시작, 종료 param
+        - `[ENTITY_메서드] 시작/종료(완료)`
 - 배치(Batch), 스케줄러(Scheduler) 등 백그라운드 작업은 실행 흐름 파악을 위해 단계별로 로그를 반드시 남긴다.
 
 ### 예시
 
-```
+```text
 log.debug("[PLAYLIST_FIND] 플레이리스트 단건 조회 시작: currentUserId={}, playlistId={}",    currentUserId, playlistId);
 
 // 기능 구현 .....
