@@ -25,12 +25,10 @@ public class UserController implements UserControllerDocs {
 	@Override
 	@PostMapping
 	public ResponseEntity<UserDto> create(
-		@Valid @RequestBody UserCreateRequest request
+		@Valid @RequestBody UserCreateRequest userCreateRequest
 	) {
-		UserDto response = userService.create(request);
+		UserDto userDto = userService.create(userCreateRequest);
 
-		return ResponseEntity
-			.status(HttpStatus.CREATED)
-			.body(response);
+		return ResponseEntity.status(HttpStatus.CREATED).body(userDto);
 	}
 }

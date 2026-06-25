@@ -13,6 +13,6 @@ public interface UserControllerDocs {
 
 	@Operation(summary = "사용자 등록 (회원가입)")
 	ResponseEntity<UserDto> create(
-		UserCreateRequest request
+		UserCreateRequest userCreateRequest
 	);
 }
