@@ -43,6 +43,7 @@ public class FollowController implements FollowControllerDocs {
 	}
 
 	@Override
+	@GetMapping("/followed-by-me")
 	public ResponseEntity<FollowDto> isFollowing(
 		@RequestParam UUID followeeId,
 		@RequestHeader("X-MOPL-USER-ID") UUID currentUserId
