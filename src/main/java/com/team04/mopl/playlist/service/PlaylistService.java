@@ -173,9 +173,6 @@ public class PlaylistService {
 		log.info("[PLAYLIST_SOFT_DELETE] 플레이리스트 논리 삭제 시작: currentUserId={}, playlistId={}",
 			currentUserId, playlistId);
 
-		// 사용자 조회
-		getUserOrThrow(currentUserId);
-
 		// 플레이리스트 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
 
