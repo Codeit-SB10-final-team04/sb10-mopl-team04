@@ -7,7 +7,11 @@ import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
+
 class UserTest {
+
 	@Test
 	@DisplayName("선택값이 null이면 기본값을 적용한다")
 	void builder_applyDefaultValues_whenOptionalValuesAreNull() {
@@ -55,7 +59,7 @@ class UserTest {
 
 	@Test
 	@DisplayName("이름이 null이면 사용자 생성에 실패한다")
-	void builder_throwIllegalArgumentException_whenNameIsNull() {
+	void builder_throwUserException_whenNameIsNull() {
 		// given
 
 		// when
@@ -66,14 +70,12 @@ class UserTest {
 			.build();
 
 		// then
-		assertThatThrownBy(action)
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("사용자 이름은/는 필수입니다.");
+		assertUserException(action, UserErrorCode.NAME_REQUIRED);
 	}
 
 	@Test
 	@DisplayName("이름이 공백이면 사용자 생성에 실패한다")
-	void builder_throwIllegalArgumentException_whenNameIsBlank() {
+	void builder_throwUserException_whenNameIsBlank() {
 		// given
 
 		// when
@@ -84,14 +86,12 @@ class UserTest {
 			.build();
 
 		// then
-		assertThatThrownBy(action)
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("사용자 이름은/는 필수입니다.");
+		assertUserException(action, UserErrorCode.NAME_REQUIRED);
 	}
 
 	@Test
 	@DisplayName("이메일이 null이면 사용자 생성에 실패한다")
-	void builder_throwIllegalArgumentException_whenEmailIsNull() {
+	void builder_throwUserException_whenEmailIsNull() {
 		// given
 
 		// when
@@ -102,14 +102,12 @@ class UserTest {
 			.build();
 
 		// then
-		assertThatThrownBy(action)
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("이메일은/는 필수입니다.");
+		assertUserException(action, UserErrorCode.EMAIL_REQUIRED);
 	}
 
 	@Test
 	@DisplayName("이메일이 공백이면 사용자 생성에 실패한다")
-	void builder_throwIllegalArgumentException_whenEmailIsBlank() {
+	void builder_throwUserException_whenEmailIsBlank() {
 		// given
 
 		// when
@@ -120,9 +118,7 @@ class UserTest {
 			.build();
 
 		// then
-		assertThatThrownBy(action)
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("이메일은/는 필수입니다.");
+		assertUserException(action, UserErrorCode.EMAIL_REQUIRED);
 	}
 
 	@Test
@@ -140,7 +136,7 @@ class UserTest {
 
 	@Test
 	@DisplayName("변경할 이름이 공백이면 이름 변경에 실패한다")
-	void updateName_throwIllegalArgumentException_whenNameIsBlank() {
+	void updateName_throwUserException_whenNameIsBlank() {
 		// given
 		User user = createUser();
 
@@ -148,9 +144,7 @@ class UserTest {
 		ThrowingCallable action = () -> user.updateName("   ");
 
 		// then
-		assertThatThrownBy(action)
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("사용자 이름은/는 필수입니다.");
+		assertUserException(action, UserErrorCode.NAME_REQUIRED);
 	}
 
 	@Test
@@ -182,7 +176,7 @@ class UserTest {
 
 	@Test
 	@DisplayName("비밀번호 해시가 공백이면 비밀번호 변경에 실패한다")
-	void updatePasswordHash_throwIllegalArgumentException_whenPasswordHashIsBlank() {
+	void updatePasswordHash_throwUserException_whenPasswordHashIsBlank() {
 		// given
 		User user = createUser();
 
@@ -190,9 +184,7 @@ class UserTest {
 		ThrowingCallable action = () -> user.updatePasswordHash("   ");
 
 		// then
-		assertThatThrownBy(action)
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("비밀번호은/는 필수입니다.");
+		assertUserException(action, UserErrorCode.PASSWORD_REQUIRED);
 	}
 
 	@Test
@@ -210,7 +202,7 @@ class UserTest {
 
 	@Test
 	@DisplayName("권한이 null이면 권한 변경에 실패한다")
-	void updateRole_throwNullPointerException_whenRoleIsNull() {
+	void updateRole_throwUserException_whenRoleIsNull() {
 		// given
 		User user = createUser();
 
@@ -218,9 +210,7 @@ class UserTest {
 		ThrowingCallable action = () -> user.updateRole(null);
 
 		// then
-		assertThatThrownBy(action)
-			.isInstanceOf(NullPointerException.class)
-			.hasMessage("권한은 필수입니다.");
+		assertUserException(action, UserErrorCode.ROLE_REQUIRED);
 	}
 
 	@Test
@@ -311,6 +301,14 @@ class UserTest {
 
 		// then
 		assertThat(result).isFalse();
+	}
+
+	private static void assertUserException(ThrowingCallable action, UserErrorCode expectedErrorCode) {
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception -> {
+				assertThat(exception.getErrorCode()).isEqualTo(expectedErrorCode);
+				assertThat(exception).hasMessage(expectedErrorCode.getMessage());
+			});
 	}
 
 	private User createUser() {
