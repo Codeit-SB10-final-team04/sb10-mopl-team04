@@ -3,6 +3,7 @@ package com.team04.mopl.content.controller;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
@@ -16,5 +17,5 @@ public interface ContentControllerDocs {
 	ResponseEntity<ContentDto> getContent(UUID contentId);
 
 	@Operation(summary = "[어드민] 콘텐츠 생성")
-	ResponseEntity<ContentDto> createContent(ContentCreateRequest contentCreateRequest);
+	ResponseEntity<ContentDto> createContent(ContentCreateRequest contentCreateRequest, MultipartFile thumbnail);
 }
