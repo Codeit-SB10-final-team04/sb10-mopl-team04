@@ -42,10 +42,8 @@ public class FollowService {
 		// 2. 유효성 검증: 중복 팔로우 검사
 		validateDuplicateFollow(followRequest.followeeId(), currentUserId);
 
-		// 3. 팔로우 생성
+		// 3. 팔로우 생성 및 저장
 		Follow newFollow = followMapper.toEntity(followeeUser, followerUser);
-
-		// 5. 팔로워 저장
 		followRepository.save(newFollow);
 
 		log.info("[FOLLOW_CREATE] 팔로우 생성 완료: followId={}, followeeId={}, followerId={}",
