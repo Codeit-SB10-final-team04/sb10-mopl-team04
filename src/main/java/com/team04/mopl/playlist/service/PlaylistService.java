@@ -2,6 +2,7 @@ package com.team04.mopl.playlist.service;
 
 import static java.util.stream.Collectors.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -163,6 +164,32 @@ public class PlaylistService {
 			currentUserId, playlist.getId(), playlist.getTitle(), playlist.getDescription());
 
 		return playlistDto;
+	}
+
+	// TODO: `@PreAuthorize`는 Security 구현 후 추가
+	// @PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
+	@Transactional
+	public void softDeletePlaylist(UUID playlistId, UUID currentUserId) {
+		log.info("[PLAYLIST_SOFT_DELETE] 플레이리스트 논리 삭제 시작: currentUserId={}, playlistId={}",
+			currentUserId, playlistId);
+
+		// 사용자 조회
+		User owner = getUserOrThrow(currentUserId);
+
+		// 플레이리스트 조회
+		Playlist playlist = getPlaylistOrThrow(playlistId);
+
+		// TODO: Security 추가로 `@PreAuthorize`가 사용 가능해지면 삭제
+		if (!playlist.getOwner().getId().equals(currentUserId)) {
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_FORBIDDEN)
+				.addDetail("requestUserId", currentUserId);
+		}
+
+		// 논리 삭제
+		playlist.markDeleted(Instant.now());
+
+		log.info("[PLAYLIST_SOFT_DELETE] 플레이리스트 논리 삭제 완료: currentUserId={}, playlistId={}",
+			currentUserId, playlistId);
 	}
 
 	// 사용자 조회
