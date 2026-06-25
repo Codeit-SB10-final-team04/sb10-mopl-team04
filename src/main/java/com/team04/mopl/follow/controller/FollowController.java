@@ -43,6 +43,18 @@ public class FollowController implements FollowControllerDocs {
 	}
 
 	@Override
+	public ResponseEntity<FollowDto> isFollowing(
+		@RequestParam UUID followeeId,
+		@RequestHeader("X-MOPL-USER-ID") UUID currentUserId
+		// @AuthenticationPrincipal MoplUserDetails moplUserDetails
+	) {
+
+		FollowDto followDto = followService.isFollowing(followeeId, currentUserId);
+
+		return ResponseEntity.status(HttpStatus.OK).body(followDto);
+	}
+
+	@Override
 	@GetMapping("/count")
 	public ResponseEntity<Long> getFollowerCount(@RequestParam UUID followeeId) {
 
