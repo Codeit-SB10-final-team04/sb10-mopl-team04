@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
 
+import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,4 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public interface ContentControllerDocs {
 	@Operation(summary = "콘텐트 단건 조회")
 	ResponseEntity<ContentDto> getContent(UUID contentId);
+
+	@Operation(summary = "[어드민] 콘텐츠 생성")
+	ResponseEntity<ContentDto> createContent(ContentCreateRequest contentCreateRequest);
 }
