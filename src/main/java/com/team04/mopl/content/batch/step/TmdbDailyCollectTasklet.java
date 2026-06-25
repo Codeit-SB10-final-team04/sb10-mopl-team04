@@ -32,26 +32,25 @@ public class TmdbDailyCollectTasklet implements Tasklet {
 		// movie/upcoming 수집, 페이지 당 20건
 		log.info("[TMDB] 개봉 예정 영화 수집 시작");
 		for (int page = 1; page <= MAX_PAGES; page++) {
-			JsonNode root = tmdbClient.getUpcomingMovies(page);
-			for (JsonNode item : tmdbClient.extractResults(root)) {
-				if (tmdbContentCollectService.saveIfNotExists(item, ContentType.movie)) {
-					contribution.incrementWriteCount(1);
-				}
-			}
+			collectPage(tmdbClient.getUpcomingMovies(page), ContentType.movie, contribution);
 		}
 
 		// tv/on_the_air 수집
 		log.info("[TMDB] 방영 중 TV 수집 시작");
 		for (int page = 1; page <= MAX_PAGES; page++) {
-			JsonNode root = tmdbClient.getOnAirTv(page);
-			for (JsonNode item : tmdbClient.extractResults(root)) {
-				if (tmdbContentCollectService.saveIfNotExists(item, ContentType.tv_series)) {
-					contribution.incrementWriteCount(1);
-				}
-			}
+			collectPage(tmdbClient.getOnAirTv(page), ContentType.tv_series, contribution);
 		}
 
 		log.info("[TMDB] ===== 주기 수집 완료: 저장 {}건 =====", contribution.getWriteCount());
 		return RepeatStatus.FINISHED;
+	}
+
+	// results 순회 → saveIfNotExists → writeCount 증가 패턴을 공통 헬퍼로 추출
+	private void collectPage(JsonNode root, ContentType type, StepContribution contribution) {
+		for (JsonNode item : tmdbClient.extractResults(root)) {
+			if (tmdbContentCollectService.saveIfNotExists(item, type)) {
+				contribution.incrementWriteCount(1);
+			}
+		}
 	}
 }

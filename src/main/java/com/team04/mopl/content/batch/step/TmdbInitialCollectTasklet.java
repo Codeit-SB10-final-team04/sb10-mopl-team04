@@ -49,17 +49,9 @@ public class TmdbInitialCollectTasklet implements Tasklet {
 		int movieTotalPages = Math.min(tmdbClient.extractTotalPages(movieFirstPage), MAX_PAGES);
 		log.info("[TMDB] 총 페이지: {} (movie)", movieTotalPages);
 
-		for (JsonNode item : tmdbClient.extractResults(movieFirstPage)) {
-			if (tmdbContentCollectService.saveIfNotExists(item, ContentType.movie)) {
-				contribution.incrementWriteCount(1);
-			}
-		}
+		collectPage(movieFirstPage, ContentType.movie, contribution);
 		for (int page = 2; page <= movieTotalPages; page++) {
-			for (JsonNode item : tmdbClient.extractResults(tmdbClient.getNowPlayingMovies(page))) {
-				if (tmdbContentCollectService.saveIfNotExists(item, ContentType.movie)) {
-					contribution.incrementWriteCount(1);
-				}
-			}
+			collectPage(tmdbClient.getNowPlayingMovies(page), ContentType.movie, contribution);
 		}
 
 		// tv/on_the_air 전체 수집
@@ -68,20 +60,21 @@ public class TmdbInitialCollectTasklet implements Tasklet {
 		int tvTotalPages = Math.min(tmdbClient.extractTotalPages(tvFirstPage), MAX_PAGES);
 		log.info("[TMDB] 총 페이지: {} (tv_series)", tvTotalPages);
 
-		for (JsonNode item : tmdbClient.extractResults(tvFirstPage)) {
-			if (tmdbContentCollectService.saveIfNotExists(item, ContentType.tv_series)) {
-				contribution.incrementWriteCount(1);
-			}
-		}
+		collectPage(tvFirstPage, ContentType.tv_series, contribution);
 		for (int page = 2; page <= tvTotalPages; page++) {
-			for (JsonNode item : tmdbClient.extractResults(tmdbClient.getOnAirTv(page))) {
-				if (tmdbContentCollectService.saveIfNotExists(item, ContentType.tv_series)) {
-					contribution.incrementWriteCount(1);
-				}
-			}
+			collectPage(tmdbClient.getOnAirTv(page), ContentType.tv_series, contribution);
 		}
 
 		log.info("[TMDB] ===== 초기 수집 완료: 저장 {}건 =====", contribution.getWriteCount());
 		return RepeatStatus.FINISHED;
+	}
+
+	// results 순회 → saveIfNotExists → writeCount 증가 패턴을 공통 헬퍼로 추출
+	private void collectPage(JsonNode root, ContentType type, StepContribution contribution) {
+		for (JsonNode item : tmdbClient.extractResults(root)) {
+			if (tmdbContentCollectService.saveIfNotExists(item, type)) {
+				contribution.incrementWriteCount(1);
+			}
+		}
 	}
 }
