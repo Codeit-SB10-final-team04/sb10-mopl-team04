@@ -2,10 +2,13 @@ package com.team04.mopl.follow.service;
 
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.team04.mopl.auth.repository.AuthSessionRepository;
+import com.team04.mopl.follow.dto.request.FollowRequest;
+import com.team04.mopl.follow.dto.response.FollowDto;
+import com.team04.mopl.follow.entity.Follow;
 import com.team04.mopl.follow.exception.FollowErrorCode;
 import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
@@ -23,34 +26,44 @@ import lombok.extern.slf4j.Slf4j;
 public class FollowService {
 
 	private final UserRepository userRepository;
-	private final AuthSessionRepository authSessionRepository;
 	private final FollowRepository followRepository;
 
 	private final FollowMapper followMapper;
 
 	// 팔로우 생성
-	// @Transactional
-	// public FollowDto createFollow(UUID sessionId, FollowRequest followRequest) {
-	// 	// 1. 유효성 검증: 중복 검사
-	// 	validateDuplicateFollow(followRequest.followeeId(), sessionId);
-	//
-	// 	// 3. 로그인 한 사용자 정보 조회 (Follower)
-	// 	AuthSession session =
-	//
-	// 	// 2. 유효성 검증: 팔로우 대상 존재 여부
-	// 	User targetFolloweeUser = getUserEntityOrThrow(followRequest.followeeId());
-	//
-	// 	// 4. 팔로우 생성
-	// 	Follow newFollow = followMapper.toEntity(targetFolloweeUser, followerUser);
-	//
-	// 	// 5. 팔로워 저장
-	// 	followRepository.save(newFollow);
-	//
-	// 	// 6. 로그 기록
-	// 	log.info("Created follow with id: {}", newFollow.getId());
-	//
-	// 	return followMapper.toDto(newFollow);
-	// }
+	@Transactional
+	public FollowDto createFollow(FollowRequest followRequest, UUID currentUserId) {
+		log.info("[FOLLOW_CREATE] 팔로우 생성 시작: followeeId={}, followerId={}",
+			followRequest.followeeId(), currentUserId);
+
+		// 1. 유효성 검증: 로그인 사용자(팔로워) 및 팔로우 대상 존재 여부
+		User followeeUser = getUserEntityOrThrow(followRequest.followeeId());
+		User followerUser = getUserEntityOrThrow(currentUserId);
+
+		// 2. 유효성 검증: 본인 팔로우 검사
+		validateSelfFollow(followeeUser.getId(), followerUser.getId());
+
+		// 3. 유효성 검증: 중복 팔로우 검사
+		validateDuplicateFollow(followeeUser.getId(), followerUser.getId());
+
+		// 4. 팔로우 생성 및 저장
+		// TODO: 분산 환경에서의 동시성 이슈를 해결하기 위한 Redis 분산 락(Redisson 등) 적용 예정 (심화)
+		// 분산 락 적용 시, DB 제약조건 예외를 잡는 현재의 catch 블록은 제거 후 로직 개선
+		try {
+			Follow newFollow = followMapper.toEntity(followeeUser, followerUser);
+			followRepository.save(newFollow);
+
+			log.info("[FOLLOW_CREATE] 팔로우 생성 완료: followId={}, followeeId={}, followerId={}",
+				newFollow.getId(), followeeUser.getId(), followerUser.getId());
+
+			return followMapper.toDto(newFollow);
+		} catch (DataIntegrityViolationException e) {
+			// DB 제약조건 위반 시, 이미 중복인 상황으로 간주
+			throw new FollowException(FollowErrorCode.FOLLOW_ALREADY_CONCURRENT)
+				.addDetail("followeeId", followeeUser.getId())
+				.addDetail("followerId", followerUser.getId());
+		}
+	}
 
 	// 특정 유저의 팔로우 수 조회
 	public Long getFollowerCount(UUID followeeId) {
@@ -67,10 +80,19 @@ public class FollowService {
 		return followCount;
 	}
 
-	// 유효성 검증: 팔로우 중복 검사 여부
+	// 유효성 검증: 팔로우 중복 검사
 	private void validateDuplicateFollow(UUID followeeId, UUID followerId) {
 		if (followRepository.existsByFolloweeIdAndFollowerId(followeeId, followerId)) {
 			throw new FollowException(FollowErrorCode.FOLLOW_ALREADY)
+				.addDetail("followeeId", followeeId)
+				.addDetail("followerId", followerId);
+		}
+	}
+
+	// 유효성 검증: 본인 팔로우 검사
+	private void validateSelfFollow(UUID followeeId, UUID followerId) {
+		if (followerId.equals(followeeId)) {
+			throw new FollowException(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED)
 				.addDetail("followeeId", followeeId)
 				.addDetail("followerId", followerId);
 		}
