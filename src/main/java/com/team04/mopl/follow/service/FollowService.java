@@ -5,7 +5,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.team04.mopl.auth.repository.AuthSessionRepository;
 import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
 import com.team04.mopl.follow.entity.Follow;
@@ -26,7 +25,6 @@ import lombok.extern.slf4j.Slf4j;
 public class FollowService {
 
 	private final UserRepository userRepository;
-	private final AuthSessionRepository authSessionRepository;
 	private final FollowRepository followRepository;
 
 	private final FollowMapper followMapper;
