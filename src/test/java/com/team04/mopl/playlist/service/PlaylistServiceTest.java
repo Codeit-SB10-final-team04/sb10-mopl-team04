@@ -23,6 +23,7 @@ import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
@@ -313,6 +314,184 @@ class PlaylistServiceTest {
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
 		verify(playlistContentRepository, never()).findAllContentsByPlaylistIds(anyList());
+		verify(playlistMapper, never()).toDto(
+			any(Playlist.class),
+			// TODO: UserSummary 구현 후 변경
+			// any(UserSummary.class),
+			any(PlaylistUserSummary.class),
+			anyLong(),
+			anyBoolean(),
+			anyList()
+		);
+	}
+
+	@Test
+	@DisplayName("플레이리스트 수정에 성공하면 수정된 플레이리스트 DTO를 반환한다.")
+	void updatePlaylist_returnPlaylistDto_whenValidRequest() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+		Instant updatedAt = Instant.parse("2026-06-24T01:00:00Z");
+
+		PlaylistUpdateRequest request = new PlaylistUpdateRequest("수정 title", "수정 description");
+		User owner = createUser(currentUserId);
+		Playlist playlist = createPlaylist(owner, playlistId);
+
+		// TODO: UserSummary 구현 후 변경
+		// UserSummary ownerSummary = new UserSummary(owner.getId(), owner.getName(), owner.getProfileImageUrl());
+		PlaylistUserSummary ownerSummary = new PlaylistUserSummary(owner.getId(), owner.getName(),
+			owner.getProfileImageUrl());
+
+		PlaylistDto mapperResult = new PlaylistDto(
+			playlistId,
+			ownerSummary,
+			request.title(),
+			request.description(),
+			updatedAt,
+			0L,
+			false,
+			List.of()
+		);
+
+		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
+			.thenReturn(Optional.of(playlist));
+		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
+			.thenReturn(Optional.of(playlist));
+		when(playlistSubscriptionRepository.countAllSubscribersByPlaylistIds(List.of(playlistId)))
+			.thenReturn(List.of(new PlaylistSubscriberCountRow(playlistId, 0L)));
+		when(playlistSubscriptionRepository.findSubscribedPlaylistIds(List.of(playlistId), currentUserId))
+			.thenReturn(Set.of());
+		when(playlistContentRepository.findAllContentsByPlaylistIds(List.of(playlistId)))
+			.thenReturn(List.of());
+		when(playlistMapper.toDto(
+				any(Playlist.class),
+				// TODO: UserSummary 구현 후 변경
+				// any(UserSummary.class),
+				any(PlaylistUserSummary.class),
+				anyLong(),
+				anyBoolean(),
+				anyList()
+			)
+		).thenReturn(mapperResult);
+
+		// when
+		PlaylistDto result = playlistService.updatePlaylist(playlistId, request, currentUserId);
+
+		// then
+		assertEquals(mapperResult, result);
+
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
+		verify(playlistSubscriptionRepository).countAllSubscribersByPlaylistIds(anyList());
+		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(anyList(), any(UUID.class));
+		verify(playlistContentRepository).findAllContentsByPlaylistIds(anyList());
+
+		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
+		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
+		ArgumentCaptor<List<PlaylistContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
+
+		verify(playlistMapper).toDto(
+			eq(playlist),
+			// TODO: UserSummary 구현 후 변경
+			// any(UserSummary.class),
+			any(PlaylistUserSummary.class),
+			subscriberCountCaptor.capture(),
+			subscribedByMeCaptor.capture(),
+			contentCaptor.capture()
+		);
+
+		assertEquals(0L, subscriberCountCaptor.getValue());
+		assertEquals(false, subscribedByMeCaptor.getValue());
+		assertEquals(0, contentCaptor.getValue().size());
+	}
+
+	@Test
+	@DisplayName("플레이리스트 수정 시에 플레이리스트 제목이나 설명이 공백이면 예외가 발생한다.")
+	void updatePlaylist_returnException_whenTitleOrDescriptionIsBlank() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+
+		PlaylistUpdateRequest request = new PlaylistUpdateRequest(" ", "수정 description");
+
+		// when, then
+		assertThrows(PlaylistException.class,
+			() -> playlistService.updatePlaylist(playlistId, request, currentUserId));
+
+		verify(playlistRepository, never()).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
+		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
+		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
+		verify(playlistContentRepository, never()).findAllContentsByPlaylistIds(anyList());
+
+		verify(playlistMapper, never()).toDto(
+			any(Playlist.class),
+			// TODO: UserSummary 구현 후 변경
+			// any(UserSummary.class),
+			any(PlaylistUserSummary.class),
+			anyLong(),
+			anyBoolean(),
+			anyList()
+		);
+	}
+
+	@Test
+	@DisplayName("플레이리스트 수정 시에 플레이리스트 소유자가 아니면 예외가 발생한다.")
+	void updatePlaylist_returnException_whenCurrentUserIsNotOwner() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+
+		PlaylistUpdateRequest request = new PlaylistUpdateRequest("수정 title", "수정 description");
+		User owner = createUser(ownerId);
+		Playlist playlist = createPlaylist(owner, playlistId);
+
+		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
+			.thenReturn(Optional.of(playlist));
+
+		// when, then
+		assertThrows(PlaylistException.class,
+			() -> playlistService.updatePlaylist(playlistId, request, currentUserId));
+
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
+		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
+		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
+		verify(playlistContentRepository, never()).findAllContentsByPlaylistIds(anyList());
+
+		verify(playlistMapper, never()).toDto(
+			any(Playlist.class),
+			// TODO: UserSummary 구현 후 변경
+			// any(UserSummary.class),
+			any(PlaylistUserSummary.class),
+			anyLong(),
+			anyBoolean(),
+			anyList()
+		);
+	}
+
+	@Test
+	@DisplayName("플레이리스트 수정 시에 플레이리스트 제목과 설명에 변경사항이 없다면 예외가 발생한다.")
+	void updatePlaylist_returnException_whenNotChange() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+
+		PlaylistUpdateRequest request = new PlaylistUpdateRequest("테스트 제목", "테스트 설명");
+		User owner = createUser(ownerId);
+		Playlist playlist = createPlaylist(owner, playlistId);
+
+		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
+			.thenReturn(Optional.of(playlist));
+
+		// when, then
+		assertThrows(PlaylistException.class,
+			() -> playlistService.updatePlaylist(playlistId, request, currentUserId));
+
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
+		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
+		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
+		verify(playlistContentRepository, never()).findAllContentsByPlaylistIds(anyList());
+
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
 			// TODO: UserSummary 구현 후 변경
