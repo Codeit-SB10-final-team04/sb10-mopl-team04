@@ -55,6 +55,24 @@ public class FollowService {
 		return followMapper.toDto(newFollow);
 	}
 
+	// 사용자의 특정 사용자 팔로우 여부 조회
+	public FollowDto isFollowing(UUID followeeId, UUID currentUserId) {
+		log.debug("[FOLLOW_FIND_IS_FOLLWING] 특정 사용자 팔로우 여부 조회 시작: followeeId={}, userId={}",
+			followeeId, currentUserId);
+
+		// 1. 유효성 검증: 요청자와 특정 사용자 존재 여부
+		User targetUser = getUserEntityOrThrow(followeeId);          // 특정 사용자
+		User requestedUser = getUserEntityOrThrow(currentUserId);    // 요청자
+
+		// 2. 팔로우 여부 조회
+		Follow isFollow = getFollowEntityByFolloweeIdAndFollowerIdOrThrow(targetUser.getId(), requestedUser.getId());
+
+		log.debug("[FOLLOW_FIND_IS_FOLLWING] 특정 사용자 팔로우 여부 조회 완료: followId={}. followeeId={}, userId={}",
+			isFollow.getId(), followeeId, currentUserId);
+
+		return followMapper.toDto(isFollow);
+	}
+
 	// 특정 유저의 팔로우 수 조회
 	public Long getFollowerCount(UUID followeeId) {
 		log.debug("[FOLLOW_FIND_COUNT] 특정 사용자의 팔로우 수 조회 시작: followeeId={}", followeeId);
