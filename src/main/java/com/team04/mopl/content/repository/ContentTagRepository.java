@@ -20,4 +20,7 @@ public interface ContentTagRepository extends JpaRepository<ContentTag, UUID> {
 		WHERE ct.content.id IN :contentIds
 		""")
 	List<TagRow> findTagNamesByContentIds(@Param("contentIds") List<UUID> contentIds);
+
+	@Query("SELECT t.name FROM ContentTag ct JOIN ct.tag t WHERE ct.content.id = :contentId")
+	List<String> findTagNamesByContentId(@Param("contentId") UUID contentId);
 }
