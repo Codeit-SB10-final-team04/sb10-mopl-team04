@@ -174,7 +174,7 @@ public class PlaylistService {
 			currentUserId, playlistId);
 
 		// 사용자 조회
-		User owner = getUserOrThrow(currentUserId);
+		getUserOrThrow(currentUserId);
 
 		// 플레이리스트 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
