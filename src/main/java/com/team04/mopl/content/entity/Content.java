@@ -4,8 +4,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 import com.team04.mopl.common.entity.BaseUpdatableEntity;
-import com.team04.mopl.content.exception.ContentErrorCode;
-import com.team04.mopl.content.exception.ContentException;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
