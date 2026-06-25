@@ -1,5 +1,6 @@
 package com.team04.mopl.content.repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,4 +15,6 @@ public interface ContentRepository extends JpaRepository<Content, UUID> {
 	 * 배치 수집 시 중복 저장 방지에 사용
 	 */
 	boolean existsByTitleAndType(String title, ContentType type);
+
+	Optional<Content> findByIdAndDeletedAtIsNull(UUID contentId);
 }

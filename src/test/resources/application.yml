@@ -1,4 +1,7 @@
 spring:
+  batch:
+    job:
+      enabled: false
   sql:
     init:
       mode: never
@@ -30,3 +33,7 @@ spring:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+# 더미 값 추가
+tmdb:
+  api:
+    key: test-dummy-key
