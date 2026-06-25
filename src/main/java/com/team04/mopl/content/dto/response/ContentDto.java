@@ -13,7 +13,7 @@ public record ContentDto(
 	String description,
 	String thumbnailUrl,
 	List<String> tags,
-	BigDecimal averageRatings,
+	BigDecimal averageRating,
 	Long reviewCount,
 	Long watcherCount
 ) {
