@@ -35,14 +35,17 @@ public class FollowService {
 		log.info("[FOLLOW_CREATE] 팔로우 생성 시작: followeeId={}, followerId={}",
 			followRequest.followeeId(), currentUserId);
 
-		// 1. 유효성 검증: 로그인 사용자 및 팔로우 대상 존재 여부
+		// 1. 유효성 검증: 로그인 사용자(팔로워) 및 팔로우 대상 존재 여부
 		User followeeUser = getUserEntityOrThrow(followRequest.followeeId());
 		User followerUser = getUserEntityOrThrow(currentUserId);
 
 		// 2. 유효성 검증: 중복 팔로우 검사
-		validateDuplicateFollow(followRequest.followeeId(), currentUserId);
+		validateDuplicateFollow(followeeUser.getId(), followerUser.getId());
 
-		// 3. 팔로우 생성 및 저장
+		// 3. 유효성 검증: 본인 팔로우 검사
+		validateSelfFollow(followeeUser.getId(), followerUser.getId());
+
+		// 4. 팔로우 생성 및 저장
 		Follow newFollow = followMapper.toEntity(followeeUser, followerUser);
 		followRepository.save(newFollow);
 
@@ -67,10 +70,19 @@ public class FollowService {
 		return followCount;
 	}
 
-	// 유효성 검증: 팔로우 중복 검사 여부
+	// 유효성 검증: 팔로우 중복 검사
 	private void validateDuplicateFollow(UUID followeeId, UUID followerId) {
 		if (followRepository.existsByFolloweeIdAndFollowerId(followeeId, followerId)) {
 			throw new FollowException(FollowErrorCode.FOLLOW_ALREADY)
+				.addDetail("followeeId", followeeId)
+				.addDetail("followerId", followerId);
+		}
+	}
+
+	// 유효성 검증: 본인 팔로우 검사
+	private void validateSelfFollow(UUID followeeId, UUID followerId) {
+		if (followerId.equals(followeeId)) {
+			throw new FollowException(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED)
 				.addDetail("followeeId", followeeId)
 				.addDetail("followerId", followerId);
 		}
