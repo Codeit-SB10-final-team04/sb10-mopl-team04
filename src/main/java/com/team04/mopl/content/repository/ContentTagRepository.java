@@ -21,6 +21,7 @@ public interface ContentTagRepository extends JpaRepository<ContentTag, UUID> {
 		""")
 	List<TagRow> findTagNamesByContentIds(@Param("contentIds") List<UUID> contentIds);
 
+	// contentId로 관련 태그명들 조회하는 메서드
 	@Query("SELECT t.name FROM ContentTag ct JOIN ct.tag t WHERE ct.content.id = :contentId")
 	List<String> findTagNamesByContentId(@Param("contentId") UUID contentId);
 }
