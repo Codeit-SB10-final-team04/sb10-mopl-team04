@@ -2,6 +2,7 @@ package com.team04.mopl.follow.service;
 
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,13 +47,22 @@ public class FollowService {
 		validateDuplicateFollow(followeeUser.getId(), followerUser.getId());
 
 		// 4. 팔로우 생성 및 저장
-		Follow newFollow = followMapper.toEntity(followeeUser, followerUser);
-		followRepository.save(newFollow);
+		// TODO: 분산 환경에서의 동시성 이슈를 해결하기 위한 Redis 분산 락(Redisson 등) 적용 예정 (심화)
+		// 분산 락 적용 시, DB 제약조건 예외를 잡는 현재의 catch 블록은 제거 후 로직 개선
+		try {
+			Follow newFollow = followMapper.toEntity(followeeUser, followerUser);
+			followRepository.save(newFollow);
 
-		log.info("[FOLLOW_CREATE] 팔로우 생성 완료: followId={}, followeeId={}, followerId={}",
-			newFollow.getId(), followeeUser.getId(), followerUser.getId());
+			log.info("[FOLLOW_CREATE] 팔로우 생성 완료: followId={}, followeeId={}, followerId={}",
+				newFollow.getId(), followeeUser.getId(), followerUser.getId());
 
-		return followMapper.toDto(newFollow);
+			return followMapper.toDto(newFollow);
+		} catch (DataIntegrityViolationException e) {
+			// DB 제약조건 위반 시, 이미 중복인 상황으로 간주
+			throw new FollowException(FollowErrorCode.FOLLOW_ALREADY_CONCURRENT)
+				.addDetail("followeeId", followeeUser.getId())
+				.addDetail("followerId", followerUser.getId());
+		}
 	}
 
 	// 사용자의 특정 사용자 팔로우 여부 조회
