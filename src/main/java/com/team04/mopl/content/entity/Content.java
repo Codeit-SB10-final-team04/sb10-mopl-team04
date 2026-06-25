@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 import com.team04.mopl.common.entity.BaseUpdatableEntity;
+import com.team04.mopl.content.exception.ContentErrorCode;
+import com.team04.mopl.content.exception.ContentException;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -43,7 +45,7 @@ public class Content extends BaseUpdatableEntity {
 
 	// 리뷰 개수
 	@Column(nullable = false)
-	private long reviewerCount;
+	private long reviewCount;
 
 	// 시청자 수
 	@Column(nullable = false)
@@ -65,7 +67,7 @@ public class Content extends BaseUpdatableEntity {
 		this.description = description;
 		this.thumbnailUrl = thumbnailUrl;
 		this.averageRating = BigDecimal.ZERO;
-		this.reviewerCount = 0L;
+		this.reviewCount = 0L;
 		this.watcherCount = 0L;
 		this.deletedAt = null;
 	}
