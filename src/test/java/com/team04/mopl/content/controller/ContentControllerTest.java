@@ -19,6 +19,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.entity.ContentType;
+import com.team04.mopl.content.exception.ContentErrorCode;
+import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.service.ContentService;
 
 @WebMvcTest(ContentController.class)
@@ -70,5 +72,18 @@ class ContentControllerTest {
 		// when & then: @PathVariable UUID 바인딩 실패 → 400
 		mockMvc.perform(get("/api/contents/{contentId}", invalidId))
 			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 콘텐츠를 조회하면 404 Not Found를 반환한다.")
+	void getContent_returnNotFound_whenContentNotExists() throws Exception {
+		UUID contentId = UUID.randomUUID();
+		when(contentService.getContent(contentId))
+			.thenThrow(new ContentException(ContentErrorCode.CONTENT_NOT_FOUND));
+
+		mockMvc.perform(get("/api/contents/{contentId}", contentId))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("ContentException"))
+			.andExpect(jsonPath("$.message").value("콘텐츠를 찾을 수 없습니다."));
 	}
 }
