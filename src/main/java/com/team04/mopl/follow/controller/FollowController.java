@@ -25,7 +25,7 @@ public class FollowController implements FollowControllerDocs {
 	// public ResponseEntity<FollowDto> createFollow(
 	// 	@Valid @RequestBody FollowRequest followRequest/*t,
 	// 	TODO: 메서드를 요청한 사용자 정보가 필요 -> 임시로 CustomUserDetails로 구현하되, 주석 처리함
-	// 	@AuthenticationPrincipal CustomUserDetails userDetails*/
+	// 	@AuthenticationPrincipal MoplUserDetails moplUserDetails*/
 	// ) {
 	// 	FollowDto response = followService.createFollow(followRequest/*, userDetails*/);
 	//
