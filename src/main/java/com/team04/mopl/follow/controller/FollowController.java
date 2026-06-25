@@ -2,6 +2,7 @@ package com.team04.mopl.follow.controller;
 
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,8 +36,8 @@ public class FollowController implements FollowControllerDocs {
 	@GetMapping("/count")
 	public ResponseEntity<Long> getFollowerCount(@RequestParam UUID followeeId) {
 
-		Long response = followService.getFollowerCount(followeeId);
+		Long followerCount = followService.getFollowerCount(followeeId);
 
-		return ResponseEntity.ok(response);
+		return ResponseEntity.status(HttpStatus.OK).body(followerCount);
 	}
 }
