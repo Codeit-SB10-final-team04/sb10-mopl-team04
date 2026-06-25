@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -35,7 +36,8 @@ public class Playlist extends BaseUpdatableEntity {
 	@Column(name = "deleted_at", nullable = true)
 	private Instant deletedAt;
 
-	public Playlist(User owner, String title, String description) {
+	@Builder
+	protected Playlist(User owner, String title, String description) {
 		this.owner = owner;
 		this.title = title;
 		this.description = description;

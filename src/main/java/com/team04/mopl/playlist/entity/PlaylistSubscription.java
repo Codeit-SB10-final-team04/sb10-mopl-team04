@@ -10,6 +10,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -35,7 +36,8 @@ public class PlaylistSubscription extends BaseEntity {
 	@JoinColumn(name = "playlist_id", nullable = false)
 	private Playlist playlist;
 
-	public PlaylistSubscription(User subscriber, Playlist playlist) {
+	@Builder
+	protected PlaylistSubscription(User subscriber, Playlist playlist) {
 		this.subscriber = subscriber;
 		this.playlist = playlist;
 	}

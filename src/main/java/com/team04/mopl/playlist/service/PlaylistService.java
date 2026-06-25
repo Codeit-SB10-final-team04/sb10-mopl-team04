@@ -1,0 +1,267 @@
+package com.team04.mopl.playlist.service;
+
+import static java.util.stream.Collectors.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.team04.mopl.content.entity.Content;
+import com.team04.mopl.content.repository.ContentTagRepository;
+import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
+import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
+import com.team04.mopl.playlist.dto.response.PlaylistDto;
+import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
+import com.team04.mopl.playlist.dto.row.PlaylistContentRow;
+import com.team04.mopl.playlist.entity.Playlist;
+import com.team04.mopl.playlist.exception.PlaylistErrorCode;
+import com.team04.mopl.playlist.exception.PlaylistException;
+import com.team04.mopl.playlist.mapper.PlaylistMapper;
+import com.team04.mopl.playlist.repository.PlaylistContentRepository;
+import com.team04.mopl.playlist.repository.PlaylistRepository;
+import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
+import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class PlaylistService {
+
+	private final UserRepository userRepository;
+	private final ContentTagRepository contentTagRepository;
+	private final PlaylistRepository playlistRepository;
+	private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
+	private final PlaylistContentRepository playlistContentRepository;
+	private final PlaylistMapper playlistMapper;
+
+	@Transactional
+	public PlaylistDto createPlaylist(PlaylistCreateRequest request, UUID currentUserId) {
+		log.info("[PLAYLIST_CREATE] 플레이리스트 생성 시작: currentUserId={}, title={}",
+			currentUserId, request.title());
+
+		// 현재 로그인한 인증된 사용자 조회
+		User owner = getUserOrThrow(currentUserId);
+
+		// 플레이리스트 생성
+		Playlist playlist = Playlist.builder()
+			.owner(owner)
+			.title(request.title())
+			.description(request.description())
+			.build();
+
+		// 플레이리스트 저장
+		playlistRepository.save(playlist);
+
+		// 플레이리스트 소유자 summary
+		// TODO: UserSummary 구현 후 변경
+		// UserSummary ownerSummary = getUserSummary(owner);
+		PlaylistUserSummary ownerSummary = getUserSummary(owner);
+
+		// 플레이리스트 구독자 조회 (생성이라 존재 X)
+		long subscriberCount = 0L;
+
+		// 플레이리스트 구독 여부 조회 (생성이라 존재 X)
+		boolean subscribedByMe = false;
+
+		// 플레이리스트 내 콘텐츠 조회 (생성이라 존재 X)
+		// TODO: ContentSummary 구현 후 변경
+		// List<ContentSummary> contentSummaries = List.of();
+		List<PlaylistContentSummary> contentSummaries = List.of();
+
+		PlaylistDto playlistDto = playlistMapper.toDto(
+			playlist,
+			ownerSummary,
+			subscriberCount,
+			subscribedByMe,
+			contentSummaries
+		);
+
+		log.info("[PLAYLIST_CREATE] 플레이리스트 생성 완료: currentUserId={}, playlistId={}, title={}",
+			currentUserId, playlist.getId(), playlist.getTitle());
+
+		return playlistDto;
+	}
+
+	@Transactional(readOnly = true)
+	public PlaylistDto findPlaylist(UUID playlistId, UUID currentUserId) {
+		log.debug("[PLAYLIST_FIND] 플레이리스트 단건 조회 시작: currentUserId={}, playlistId={}",
+			currentUserId, playlistId);
+
+		// 현재 로그인한 인증된 사용자 조회
+		getUserOrThrow(currentUserId);
+
+		// 삭제되지 않은 플레이리스트를 소유자 정보와 함께 조회
+		Playlist playlist = getPlaylistOrThrow(playlistId);
+
+		// 플레이리스트 소유자 summary
+		// TODO: UserSummary 구현 후 변경
+		// UserSummary ownerSummary = getUserSummary(owner);
+		PlaylistUserSummary ownerSummary = getUserSummary(playlist.getOwner());
+
+		// 플레이리스트 구독자 조회
+		long subscriberCount = getSubscriberCount(playlistId);
+
+		// 플레이리스트 구독 여부 조회
+		boolean subscribedByMe = isSubscribedByMe(playlistId, currentUserId);
+
+		// 플레이리스트 내 콘텐츠 조회
+		// TODO: ContentSummary 구현 후 변경
+		// List<ContentSummary> contentSummaries = List.of();
+		List<PlaylistContentSummary> contentSummaries = getContentSummaries(playlistId);
+
+		PlaylistDto playlistDto = playlistMapper.toDto(
+			playlist,
+			ownerSummary,
+			subscriberCount,
+			subscribedByMe,
+			contentSummaries
+		);
+
+		log.debug("[PLAYLIST_FIND] 플레이리스트 단건 조회 완료: currentUserId={}, playlistId={}, title={}, description={}",
+			currentUserId, playlist.getId(), playlist.getTitle(), playlist.getDescription());
+
+		return playlistDto;
+	}
+
+	// 사용자 조회
+	// TODO: `USER_NOT_FOUND` 같은 사용자 커스텀 예외 추가 시 `.orElseThrow(...)` 교체
+	private User getUserOrThrow(UUID userId) {
+		return userRepository.findById(userId)
+			.orElseThrow(() -> new IllegalArgumentException("User not found!"));
+	}
+
+	// 플레이리스트 응답에 포함할 소유자 요약 정보를 만듦
+	// TODO: UserSummary 구현 후 변경
+	// private UserSummary getUserSummary(User user) {
+	private PlaylistUserSummary getUserSummary(User user) {
+		// 	return new UserSummary(
+		return new PlaylistUserSummary(
+			user.getId(),
+			user.getName(),
+			user.getProfileImageUrl()
+		);
+	}
+
+	// 삭제되지 않은 플레이리스트를 소유자 정보와 함께 조회
+	private Playlist getPlaylistOrThrow(UUID playlistId) {
+		// UserSummary를 만들기 위해서 owner 정보가 필요
+		return playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId)
+			.orElseThrow(() -> new PlaylistException(PlaylistErrorCode.PLAYLIST_NOT_FOUND));
+	}
+
+	// 여러 플레이리스트의 구독자 수를 한 번에 조회한 후, playlistId 기준 Map으로 변환
+	private Map<UUID, Long> getSubscriberCountsByPlaylistIds(List<UUID> playlistIds) {
+		// 조회 대상이 없으면 실행 X
+		if (playlistIds.isEmpty()) {
+			return Map.of();
+		}
+
+		// 목록 조회에서도 사용할 수 있도록 playlistId별 구독자 수 Map을 만듦
+		return playlistSubscriptionRepository.countAllSubscribersByPlaylistIds(playlistIds)
+			.stream()
+			.collect(
+				toMap(
+					row -> row.playlistId(),
+					row -> row.subscriberCount()
+				)
+			);
+	}
+
+	// 단건 조회에서 사용할 구독자 수 조회
+	private long getSubscriberCount(UUID playlistId) {
+		// 구독자가 없을 경우 기본값 0 반환
+		return getSubscriberCountsByPlaylistIds(List.of(playlistId))
+			.getOrDefault(playlistId, 0L);
+	}
+
+	// 현재 사용자가 구독 중인 플레이리스트 id 조회
+	private Set<UUID> getSubscribedPlaylistIds(List<UUID> playlistIds, UUID currentUserId) {
+		// 조회 대상이 없다면 실행 X
+		if (playlistIds.isEmpty()) {
+			return Set.of();
+		}
+
+		return playlistSubscriptionRepository.findSubscribedPlaylistIds(playlistIds, currentUserId);
+	}
+
+	// 현재의 사용자가 해당 플레이리스트를 구독했는지 확인
+	private boolean isSubscribedByMe(UUID playlistId, UUID currentUserId) {
+		return getSubscribedPlaylistIds(List.of(playlistId), currentUserId)
+			.contains(playlistId);
+	}
+
+	// 여러 플레이리스트에 포함된 콘텐츠 조회 흐, 콘텐츠별 태그를 붙여 요약 DTO 구현
+	// TODO: ContentSummary 구현 시 교체
+	// private Map<UUID, List<ContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
+	private Map<UUID, List<PlaylistContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
+		// 조회 대상이 없다면 실행 X
+		if (playlistIds.isEmpty()) {
+			return Map.of();
+		}
+
+		// 여러 플레이리스트에 포함된 콘텐츠 일괄 조회
+		List<PlaylistContentRow> rows = playlistContentRepository.findAllContentsByPlaylistIds(playlistIds);
+
+		// 태그 조회에 필요한 콘텐츠 id만 중복 없이 추출
+		List<UUID> contentIds = rows.stream()
+			.map(row -> row.content().getId())
+			.distinct()
+			.toList();
+
+		// 포함된 콘텐츠가 없다면 빈 결과 반환
+		if (contentIds.isEmpty()) {
+			return Map.of();
+		}
+
+		// 콘텐츠별 태그명을 한 번에 조회 후 콘텐츠 id 기준으로 그룹화
+		Map<UUID, List<String>> tagNameMap = contentTagRepository
+			.findTagNamesByContentIds(contentIds)
+			.stream()
+			.collect(groupingBy(
+					tagRow -> tagRow.contentId(),
+					mapping(tagRow -> tagRow.tagName(), toList())
+				)
+			);
+
+		// 플레이리스트 id별로 콘텐츠 요약 정보를 묶음
+		return rows.stream()
+			.collect(groupingBy(
+					row -> row.playlistId(),
+					mapping(row -> toContentSummary(row.content(), tagNameMap), toList())
+				)
+			);
+	}
+
+	// 단건 조회에서 사용할 콘텐츠 요약 목록을 가져옴
+	// TODO: ContentSummary 구현 시 교체
+	// private ContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
+	private List<PlaylistContentSummary> getContentSummaries(UUID playlistId) {
+		// 포함된 콘텐츠가 없다면 빈 목록 반환
+		return getContentSummariesByPlaylistIds(List.of(playlistId))
+			.getOrDefault(playlistId, List.of());
+	}
+
+	// 콘텐츠와 태그 목록을 이용해 콘텐츠 요약 DTO 생성
+	// TODO: ContentSummary 구현 시 교체
+	// private ContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
+	private PlaylistContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
+		return new PlaylistContentSummary(
+			content.getId(),
+			content.getType(),
+			content.getTitle(),
+			content.getDescription(),
+			content.getThumbnailUrl(),
+			tagNameMap.getOrDefault(content.getId(), List.of()),
+			content.getAverageRating(),
+			content.getReviewerCount()
+		);
+	}
+}
