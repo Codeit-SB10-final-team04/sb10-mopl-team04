@@ -72,6 +72,9 @@ public class PlaylistController implements PlaylistControllerDocs {
 		// Security 구현 완료 전까지 임시 헤더로 받기
 		// TODO: Security 구현 완료 후 주석 해제
 		// UUID currentUserId = moplUserDetails.getId();
-		return null;
+
+		PlaylistDto playlistDto = playlistService.updatePlaylist(playlistId, request, currentUserId);
+
+		return ResponseEntity.status(HttpStatus.OK).body(playlistDto);
 	}
 }
