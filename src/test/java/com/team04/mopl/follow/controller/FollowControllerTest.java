@@ -101,13 +101,13 @@ class FollowControllerTest {
 	 */
 	@Test
 	@DisplayName("성공: 올바른 파라미터와 헤더가 주어지면 200 OK와 함께 결과를 반환한다.")
-	void isFollowing_Success() throws Exception {
+	void getFollowConnection_Success() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 		UUID followeeId = UUID.randomUUID();
 		FollowDto responseDto = mock(FollowDto.class);
 
-		given(followService.isFollowing(followeeId, currentUserId)).willReturn(responseDto);
+		given(followService.getFollowConnection(followeeId, currentUserId)).willReturn(responseDto);
 
 		// when & then
 		mockMvc.perform(get("/api/follows/followed-by-me")
@@ -120,7 +120,7 @@ class FollowControllerTest {
 
 	@Test
 	@DisplayName("실패: 필수 파라미터(followeeId)가 누락되면 400 Bad Request를 반환한다.")
-	void isFollowing_MissingParam_Fail() throws Exception {
+	void getFollowConnection_MissingParam_Fail() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 
@@ -135,12 +135,12 @@ class FollowControllerTest {
 
 	@Test
 	@DisplayName("실패: 팔로우 관계가 존재하지 않을 때 404 Not Found를 반환한다.")
-	void isFollowing_FollowNotFound_Fail() throws Exception {
+	void getFollowConnection_FollowNotFound_Fail() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 		UUID followeeId = UUID.randomUUID();
 
-		given(followService.isFollowing(followeeId, currentUserId))
+		given(followService.getFollowConnection(followeeId, currentUserId))
 			.willThrow(new FollowException(FollowErrorCode.FOLLOW_NOT_FOUND));
 
 		// when & then
