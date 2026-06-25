@@ -81,9 +81,9 @@ tasks.named('test') {
 // ---------------------------------------------------------------------------
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    options.compilerArgs << "-parameters" // 파라미터 이름 인식용
-    options.compilerArgs << "-Amapstruct.defaultComponentModel=spring" // 컴포넌트 자동 생성
-    options.annotationProcessorPath = configurations.annotationProcessor
+    options.compilerArgs << "-parameters"
+    options.compilerArgs << "-Amapstruct.defaultComponentModel=spring"
+    options.compilerArgs << "-Amapstruct.suppressGeneratorTimestamp=true"
 }
 
 // ---------------------------------------------------------------------------
