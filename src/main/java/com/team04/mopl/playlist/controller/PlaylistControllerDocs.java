@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,6 +24,14 @@ public interface PlaylistControllerDocs {
 	@Operation(summary = "플레이리스트 단건 조회")
 	ResponseEntity<PlaylistDto> findPlaylist(
 		UUID playlistId,
+		UUID currentUserId
+		// MoplUserDetails moplUserDetails
+	);
+
+	@Operation(summary = "플레이리스트 수정", description = "플레이리스트 소유자만 수정할 수 있습니다.")
+	ResponseEntity<PlaylistDto> updatePlaylist(
+		UUID playlistId,
+		PlaylistUpdateRequest request,
 		UUID currentUserId
 		// MoplUserDetails moplUserDetails
 	);
