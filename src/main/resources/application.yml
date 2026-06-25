@@ -9,4 +9,4 @@ server:
 
 tmdb:
   api:
-    key: ${TMD_API_KEY}
+    key: ${TMDB_API_KEY}
