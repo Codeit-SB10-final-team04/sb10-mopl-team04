@@ -211,7 +211,7 @@ class PlaylistServiceTest {
 			.thenReturn(List.of(new PlaylistSubscriberCountRow(playlistId, 5L)));
 		when(playlistSubscriptionRepository.findSubscribedPlaylistIds(List.of(playlistId), currentUserId))
 			.thenReturn(Set.of(playlistId));
-		when(playlistContentRepository.findAllContentsByPlaylistIds(List.of(playlistId)))
+		when(playlistContentRepository.findAllContentsByPlaylistIdsWithDeletedAtNull(List.of(playlistId)))
 			.thenReturn(List.of(new PlaylistContentRow(playlistId, content)));
 		when(playlistMapper.toDto(
 				any(Playlist.class),
@@ -234,7 +234,7 @@ class PlaylistServiceTest {
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository).findAllContentsByPlaylistIds(anyList());
+		verify(playlistContentRepository).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
 
 		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
@@ -276,7 +276,7 @@ class PlaylistServiceTest {
 		verify(playlistRepository, never()).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository, never()).findAllContentsByPlaylistIds(anyList());
+		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
 			// TODO: UserSummary 구현 후 변경
@@ -313,7 +313,7 @@ class PlaylistServiceTest {
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository, never()).findAllContentsByPlaylistIds(anyList());
+		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
 			// TODO: UserSummary 구현 후 변경
@@ -361,7 +361,7 @@ class PlaylistServiceTest {
 			.thenReturn(List.of(new PlaylistSubscriberCountRow(playlistId, 0L)));
 		when(playlistSubscriptionRepository.findSubscribedPlaylistIds(List.of(playlistId), currentUserId))
 			.thenReturn(Set.of());
-		when(playlistContentRepository.findAllContentsByPlaylistIds(List.of(playlistId)))
+		when(playlistContentRepository.findAllContentsByPlaylistIdsWithDeletedAtNull(List.of(playlistId)))
 			.thenReturn(List.of());
 		when(playlistMapper.toDto(
 				any(Playlist.class),
@@ -383,7 +383,7 @@ class PlaylistServiceTest {
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository).findAllContentsByPlaylistIds(anyList());
+		verify(playlistContentRepository).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
 
 		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
@@ -420,7 +420,7 @@ class PlaylistServiceTest {
 		verify(playlistRepository, never()).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository, never()).findAllContentsByPlaylistIds(anyList());
+		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
 
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
@@ -455,7 +455,7 @@ class PlaylistServiceTest {
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository, never()).findAllContentsByPlaylistIds(anyList());
+		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
 
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
@@ -490,7 +490,7 @@ class PlaylistServiceTest {
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository, never()).findAllContentsByPlaylistIds(anyList());
+		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
 
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
