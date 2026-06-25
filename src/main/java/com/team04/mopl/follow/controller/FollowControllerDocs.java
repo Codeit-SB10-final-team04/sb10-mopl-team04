@@ -35,7 +35,6 @@ public interface FollowControllerDocs {
 		// @AuthenticationPrincipal MoplUserDetails moplUserDetails
 	);
 
-	// 특정 사용자의 팔로우 수 조회
 	@Operation(
 		summary = "특정 사용자의 팔로우 수 조회",
 		description = "특정 사용자를 팔로우 하고 있는 사용자의 수를 반환합니다."
