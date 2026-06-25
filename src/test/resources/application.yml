@@ -37,3 +37,8 @@ spring:
 tmdb:
   api:
     key: test-dummy-key
+
+playlist:
+  hard-delete:
+    cron: "0 1 0 * * *"
+    retention-months: 1
