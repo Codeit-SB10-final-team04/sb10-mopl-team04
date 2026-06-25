@@ -1,5 +1,7 @@
 package com.team04.mopl.content.scheduler;
 
+import java.util.concurrent.CompletableFuture;
+
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
@@ -48,39 +50,45 @@ public class DataCollectScheduler {
 	 *
 	 * <p>{@link ApplicationReadyEvent}: 애플리케이션이 완전히 기동된 후 발생.
 	 *
-	 * <p>{@link JobExplorer}로 {@code BATCH_JOB_EXECUTION} 테이블의 COMPLETED 이력 확인:
+	 * <p>기동 스레드 블로킹 방지: {@link CompletableFuture#runAsync}로 별도 스레드에서 실행.
+	 * 초기 수집은 수만 건 처리로 오래 걸릴 수 있어 메인 스레드와 분리.
+	 *
+	 * <p>{@link JobExplorer}로 전체 실행 이력 중 COMPLETED 여부 확인:
 	 * <ul>
-	 *   <li>이력 있음 → skip</li>
+	 *   <li>이력 있음 → skip (한 번이라도 성공했으면 영구 skip)</li>
 	 *   <li>이력 없음 → 최초 실행으로 판단, 전체 수집 실행</li>
 	 * </ul>
 	 */
 	@EventListener(ApplicationReadyEvent.class)
 	public void runTmdbInitialCollectIfNeeded() {
-		// tmdbInitialCollectJob 이력 가져와서 COMPLETED 여부 확인
-		boolean hasCompleted = jobExplorer.getJobInstances("tmdbInitialCollectJob", 0, 1)
-			.stream()
-			.flatMap(instance -> jobExplorer.getJobExecutions(instance).stream())
-			.anyMatch(execution -> execution.getStatus() == BatchStatus.COMPLETED);
+		CompletableFuture.runAsync(() -> {
+			// 전체 이력 조회: timestamp로 매 실행마다 새 인스턴스가 생기므로
+			// 최신 1개만 보면 과거 성공 이력을 놓칠 수 있음 → Integer.MAX_VALUE로 전체 확인
+			boolean hasCompleted = jobExplorer.getJobInstances("tmdbInitialCollectJob", 0, Integer.MAX_VALUE)
+				.stream()
+				.flatMap(instance -> jobExplorer.getJobExecutions(instance).stream())
+				.anyMatch(execution -> execution.getStatus() == BatchStatus.COMPLETED);
 
-		if (hasCompleted) {
-			log.info("[Scheduler] TMDB 초기 수집 이미 완료된 이력 있음 → skip");
-			return;
-		}
+			if (hasCompleted) {
+				log.info("[Scheduler] TMDB 초기 수집 이미 완료된 이력 있음 → skip");
+				return;
+			}
 
-		log.info("[Scheduler] TMDB 초기 수집 시작 (최초 실행)");
-		try {
-			JobParameters params = new JobParametersBuilder()
-				.addLong("timestamp", System.currentTimeMillis())
-				.toJobParameters();
+			log.info("[Scheduler] TMDB 초기 수집 시작 (최초 실행)");
+			try {
+				JobParameters params = new JobParametersBuilder()
+					.addLong("timestamp", System.currentTimeMillis())
+					.toJobParameters();
 
-			JobExecution jobExecution = jobLauncher.run(tmdbInitialCollectJob, params);
-			log.info("[Scheduler] TMDB 초기 수집 완료 - status: {}, exitCode: {}, jobId: {}",
-				jobExecution.getStatus(),
-				jobExecution.getExitStatus().getExitCode(),
-				jobExecution.getJobId());
-		} catch (Exception e) {
-			log.error("[Scheduler] TMDB 초기 수집 실패: {}", e.getMessage(), e);
-		}
+				JobExecution jobExecution = jobLauncher.run(tmdbInitialCollectJob, params);
+				log.info("[Scheduler] TMDB 초기 수집 완료 - status: {}, exitCode: {}, jobId: {}",
+					jobExecution.getStatus(),
+					jobExecution.getExitStatus().getExitCode(),
+					jobExecution.getJobId());
+			} catch (Exception e) {
+				log.error("[Scheduler] TMDB 초기 수집 실패: {}", e.getMessage(), e);
+			}
+		});
 	}
 
 	/**

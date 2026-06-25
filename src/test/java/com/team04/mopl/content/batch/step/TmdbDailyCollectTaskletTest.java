@@ -171,4 +171,17 @@ class TmdbDailyCollectTaskletTest {
 		verify(tmdbContentCollectService).saveIfNotExists(movieItem, ContentType.movie);
 		verify(tmdbContentCollectService).saveIfNotExists(tvItem, ContentType.tv_series);
 	}
+
+	@Test
+	@DisplayName("MAX_PAGES(10)까지 각 엔드포인트를 호출한다")
+	void execute_callsApiUpToMaxPages() throws Exception {
+		// given: 기본 세팅(빈 리스트)으로 충분 → 저장 없이 루프만 검증
+
+		// when
+		tmdbDailyCollectTasklet.execute(contribution, chunkContext);
+
+		// then: movie/upcoming, tv/on_the_air 각각 10번씩 호출
+		verify(tmdbClient, times(10)).getUpcomingMovies(anyInt());
+		verify(tmdbClient, times(10)).getOnAirTv(anyInt());
+	}
 }
