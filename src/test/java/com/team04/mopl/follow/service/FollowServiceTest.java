@@ -52,13 +52,13 @@ class FollowServiceTest {
 	void createFollow_Success() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
-		UUID followeeId = UUID.randomUUID();
-		FollowRequest request = new FollowRequest(followeeId);
-
 		User follower = mock(User.class);
-		User followee = mock(User.class);
 		given(follower.getId()).willReturn(currentUserId);
+
+		UUID followeeId = UUID.randomUUID();
+		User followee = mock(User.class);
 		given(followee.getId()).willReturn(followeeId);
+		FollowRequest request = new FollowRequest(followeeId);
 
 		// 사용자 조회 모킹
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
@@ -102,11 +102,13 @@ class FollowServiceTest {
 	void createFollow_DuplicateFollow_Fail() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
-		UUID followeeId = UUID.randomUUID();
-		FollowRequest request = new FollowRequest(followeeId);
-
 		User follower = mock(User.class);
+		given(follower.getId()).willReturn(currentUserId);
+
+		UUID followeeId = UUID.randomUUID();
 		User followee = mock(User.class);
+		given(followee.getId()).willReturn(followeeId);
+		FollowRequest request = new FollowRequest(followeeId);
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
 		given(userRepository.findById(currentUserId)).willReturn(Optional.of(follower));
@@ -118,6 +120,25 @@ class FollowServiceTest {
 		assertThatThrownBy(() -> followService.createFollow(request, currentUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_ALREADY.getMessage());
+	}
+
+	@Test
+	@DisplayName("실패: 본인을 팔로우하려고 하면 FollowException이 발생한다.")
+	void createFollow_SelfFollow_Fail() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		User user = mock(User.class);
+		given(user.getId()).willReturn(currentUserId);
+
+		FollowRequest request = new FollowRequest(currentUserId);
+
+		// 두 조회 모두 같은 유저를 반환하도록 모킹
+		given(userRepository.findById(currentUserId)).willReturn(Optional.of(user));
+
+		// when & then
+		assertThatThrownBy(() -> followService.createFollow(request, currentUserId))
+			.isInstanceOf(FollowException.class)
+			.hasMessageContaining(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED.getMessage());
 	}
 
 	/*
