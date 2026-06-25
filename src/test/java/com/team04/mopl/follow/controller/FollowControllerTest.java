@@ -134,7 +134,7 @@ class FollowControllerTest {
 	}
 
 	@Test
-	@DisplayName("실패: 팔로우 관계가 존재하지 않을 때 404 상태코드와 FW03 에러 코드를 반환한다.")
+	@DisplayName("실패: 팔로우 관계가 존재하지 않을 때 404 Not Found를 반환한다.")
 	void isFollowing_FollowNotFound_Fail() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
@@ -171,7 +171,7 @@ class FollowControllerTest {
 
 		// when & then
 		mockMvc.perform(get("/api/follows/count")
-				.param("followeeId", followeeId.toString())) // 👈 param으로 전달
+				.param("followeeId", followeeId.toString()))
 			.andExpect(status().isOk())
 			.andExpect(content().string(String.valueOf(followerCount)));
 	}
