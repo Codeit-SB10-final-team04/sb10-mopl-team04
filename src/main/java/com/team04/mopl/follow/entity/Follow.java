@@ -4,6 +4,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 import com.team04.mopl.common.entity.BaseEntity;
+import com.team04.mopl.follow.exception.FollowErrorCode;
+import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.user.entity.User;
 
 import jakarta.persistence.Entity;
@@ -53,10 +55,9 @@ public class Follow extends BaseEntity {
 	// 유효성 검증: 본인 팔로우 제외
 	private void validateSelfFollow(UUID followeeId, UUID followerId) {
 		if (followeeId.equals(followerId)) {
-			// TODO: 팔로우 생성 브랜치에서 해당 예외 구현 완료 -> 이후 PR에서 주석 제거 및 병합 예정
-			// throw new FollowException(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED)
-			// 	.addDetail("followeeId", followeeId)
-			// 	.addDetail("followerId", followerId);
+			throw new FollowException(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED)
+				.addDetail("followeeId", followeeId)
+				.addDetail("followerId", followerId);
 		}
 	}
 

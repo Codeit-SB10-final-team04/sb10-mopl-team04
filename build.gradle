@@ -42,15 +42,14 @@ dependencies {
     // event message (kafka)
     implementation 'org.springframework.kafka:spring-kafka'
 
-    // Spring Batch (스포츠 데이터 수집 배치)
+    // Spring Batch
     implementation 'org.springframework.boot:spring-boot-starter-batch'
-    // Spring Retry (@Retryable - TheSportsDB Rate Limit 429 재시도)
     implementation 'org.springframework.retry:spring-retry'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
 
     // Querydsl
-    implementation 'io.github.openfeign.querydsl:querydsl-jpa:6.10.1'
-    annotationProcessor 'io.github.openfeign.querydsl:querydsl-apt:6.10.1:jpa'
+    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
     annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
     annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
 
@@ -78,14 +77,21 @@ tasks.named('test') {
 }
 
 // ---------------------------------------------------------------------------
+// 컴파일 및 프로세서 설정 (핵심: -parameters 및 MapStruct 조율)
+// ---------------------------------------------------------------------------
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << "-parameters" // 파라미터 이름 인식용
+    options.compilerArgs << "-Amapstruct.defaultComponentModel=spring" // 컴포넌트 자동 생성
+    options.annotationProcessorPath = configurations.annotationProcessor
+}
+
+// ---------------------------------------------------------------------------
 // Checkstyle 설정
 // ---------------------------------------------------------------------------
-compileJava.options.encoding = 'UTF-8'
-compileTestJava.options.encoding = 'UTF-8'
-
 checkstyle {
-    maxWarnings = 0         // 경고 발생 시, 기록
-    ignoreFailures = true   // 빌드 자체는 성공하도록 설정
+    maxWarnings = 0
+    ignoreFailures = true
     toolVersion = "8.24"
     configFile = file("${rootDir}/naver-checkstyle-rules.xml")
     configProperties = ["suppressionFile": "${rootDir}/naver-checkstyle-suppressions.xml"]
@@ -104,16 +110,13 @@ tasks.withType(Checkstyle) {
 def querydslDir = layout.buildDirectory.dir("generated/querydsl")
 
 sourceSets {
-    // 인텔리제이가 QClass를 소스 코드로 인식하게 설정
     main.java.srcDirs += [querydslDir]
 }
 
 tasks.withType(JavaCompile).configureEach {
-    // AnnotationProcessor가 QClass를 생성할 디렉토리 지정
     options.getGeneratedSourceOutputDirectory().set(file(querydslDir))
 }
 
 clean {
-    // clean 실행 시 생성된 QClass 삭제
     delete layout.buildDirectory.dir("generated/querydsl")
 }
