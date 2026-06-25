@@ -1,5 +1,6 @@
 package com.team04.mopl.user.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -7,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -14,17 +16,22 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.team04.mopl.common.exception.GlobalExceptionHandler;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.response.UserDto;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.service.UserService;
 
 @WebMvcTest(UserController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(GlobalExceptionHandler.class)
 class UserControllerTest {
 
 	@Autowired
@@ -59,7 +66,13 @@ class UserControllerTest {
 		// when & then
 		mockMvc.perform(post("/api/users")
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"name\":\"사용자\",\"email\":\"test@test.com\",\"password\":\"password123\"}"))
+				.content("""
+					{
+						"name": "사용자",
+						"email": "test@test.com",
+						"password": "password123"
+					}
+					"""))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.id").value(userId.toString()))
 			.andExpect(jsonPath("$.email").value("test@test.com"))
@@ -70,6 +83,32 @@ class UserControllerTest {
 	}
 
 	@Test
+	@DisplayName("이미 사용 중인 이메일이면 400과 에러 응답을 반환한다")
+	void create_returnBadRequest_whenEmailAlreadyExists() throws Exception {
+		// given
+		given(userService.create(any(UserCreateRequest.class)))
+			.willThrow(new UserException(
+				UserErrorCode.EMAIL_ALREADY_EXISTS,
+				Map.of("email", "test@test.com")
+			));
+
+		// when & then
+		mockMvc.perform(post("/api/users")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"name": "사용자",
+						"email": "test@test.com",
+						"password": "password123"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.exceptionName").value("UserException"))
+			.andExpect(jsonPath("$.message").value("이미 사용 중인 이메일입니다."))
+			.andExpect(jsonPath("$.details.email").value("test@test.com"));
+	}
+
+	@Test
 	@DisplayName("이메일 형식이 올바르지 않으면 400을 반환한다")
 	void create_returnBadRequest_whenEmailIsInvalid() throws Exception {
 		// given
@@ -77,7 +116,13 @@ class UserControllerTest {
 		// when & then
 		mockMvc.perform(post("/api/users")
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"name\":\"사용자\",\"email\":\"invalid-email\",\"password\":\"password123\"}"))
+				.content("""
+					{
+						"name": "사용자",
+						"email": "invalid-email",
+						"password": "password123"
+					}
+					"""))
 			.andExpect(status().isBadRequest());
 
 		verifyNoInteractions(userService);
@@ -91,7 +136,13 @@ class UserControllerTest {
 		// when & then
 		mockMvc.perform(post("/api/users")
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"name\":\"사용자\",\"email\":\"test@test.com\",\"password\":\"1234567\"}"))
+				.content("""
+					{
+						"name": "사용자",
+						"email": "test@test.com",
+						"password": "1234567"
+					}
+					"""))
 			.andExpect(status().isBadRequest());
 
 		verifyNoInteractions(userService);
@@ -105,7 +156,13 @@ class UserControllerTest {
 		// when & then
 		mockMvc.perform(post("/api/users")
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"name\":\"   \",\"email\":\"test@test.com\",\"password\":\"password123\"}"))
+				.content("""
+					{
+						"name": "   ",
+						"email": "test@test.com",
+						"password": "password123"
+					}
+					"""))
 			.andExpect(status().isBadRequest());
 
 		verifyNoInteractions(userService);
@@ -119,7 +176,13 @@ class UserControllerTest {
 		// when & then
 		mockMvc.perform(post("/api/users")
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"name\":\"사용자\",\"email\":\"   \",\"password\":\"password123\"}"))
+				.content("""
+					{
+						"name": "사용자",
+						"email": "   ",
+						"password": "password123"
+					}
+					"""))
 			.andExpect(status().isBadRequest());
 
 		verifyNoInteractions(userService);
@@ -133,7 +196,13 @@ class UserControllerTest {
 		// when & then
 		mockMvc.perform(post("/api/users")
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"name\":\"사용자\",\"email\":\"test@test.com\",\"password\":\"   \"}"))
+				.content("""
+					{
+						"name": "사용자",
+						"email": "test@test.com",
+						"password": "   "
+					}
+					"""))
 			.andExpect(status().isBadRequest());
 
 		verifyNoInteractions(userService);
