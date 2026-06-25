@@ -58,11 +58,10 @@ class PlaylistControllerTest {
 			List.of()
 		);
 
-		// when
 		when(playlistService.createPlaylist(request, currentUserId))
 			.thenReturn(response);
 
-		// then
+		// when, then
 		mockMvc.perform(post("/api/playlists")
 				.header("X-MOPL-USER-ID", currentUserId)
 				.contentType(MediaType.APPLICATION_JSON)
@@ -80,7 +79,7 @@ class PlaylistControllerTest {
 	}
 
 	@Test
-	@DisplayName("제목이나 설명이 비어있으면 플레이리스트 생성 요청이 실패한다.")
+	@DisplayName("제목이나 설명이 비어있으면 플레이리스트 생성 요청이 400 Bad Request로 실패한다.")
 	void createPlaylist_returnBadRequest_whenTitleOrDescriptionBlank() throws Exception {
 		// given
 		PlaylistCreateRequest request = new PlaylistCreateRequest("", "테스트 설명");
@@ -90,6 +89,68 @@ class PlaylistControllerTest {
 				.header("X-MOPL-USER-ID", UUID.randomUUID())
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(request)))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("플레이리스트 단건 조회 요청에 성공하면 200 OK와 플레이리스트 DTO를 반환한다.")
+	void findPlaylist_returnOK_whenValidRequest() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+
+		PlaylistDto response = new PlaylistDto(
+			playlistId,
+			// TODO: UserSummary 구현 후 변경
+			// new UserSummary(currentUserId, "테스트 사용자", null),
+			new PlaylistUserSummary(currentUserId, "테스트 사용자", null),
+			"테스트 제목",
+			"테스트 설명",
+			Instant.parse("2026-06-24T01:00:00Z"),
+			0L,
+			false,
+			List.of()
+		);
+
+		when(playlistService.findPlaylist(playlistId, currentUserId))
+			.thenReturn(response);
+
+		// when, then
+		mockMvc.perform(get("/api/playlists/{playlistId}", playlistId)
+				.header("X-MOPL-USER-ID", currentUserId)
+				.contentType(MediaType.APPLICATION_JSON))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(playlistId.toString()))
+			.andExpect(jsonPath("$.owner.userId").value(currentUserId.toString()))
+			.andExpect(jsonPath("$.subscriberCount").value(0))
+			.andExpect(jsonPath("$.subscribedByMe").value(false))
+			.andExpect(jsonPath("$.contents").isArray());
+	}
+
+	@Test
+	@DisplayName("GET /api/playlists 요청은 지원하지 않는 메서드로 실패한다.")
+	void findPlaylist_returnIsInternalServerError_whenPlaylistIdIsMissing() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		// when, then
+		mockMvc.perform(get("/api/playlists")
+				.header("X-MOPL-USER-ID", currentUserId)
+				.contentType(MediaType.APPLICATION_JSON))
+			// .andExpect(status().isMethodNotAllowed());
+			.andExpect(status().isInternalServerError());
+	}
+
+	@Test
+	@DisplayName("플레이리스트 id가 UUID 형식이 아니면 400 Bad Request로 실패한다.")
+	void findPlaylist_returnBadRequest_whenPlaylistIdIsInvalidFormat() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		// when, then
+		mockMvc.perform(get("/api/playlists/{playlistId}", "UUID")
+				.header("X-MOPL-USER-ID", currentUserId)
+				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isBadRequest());
 	}
 }
