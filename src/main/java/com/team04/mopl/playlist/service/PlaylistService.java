@@ -261,7 +261,7 @@ public class PlaylistService {
 			content.getThumbnailUrl(),
 			tagNameMap.getOrDefault(content.getId(), List.of()),
 			content.getAverageRating(),
-			content.getReviewerCount()
+			content.getReviewCount()
 		);
 	}
 }
