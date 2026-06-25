@@ -66,18 +66,23 @@ class FollowTest {
 	}
 
 	@Test
-	@DisplayName("실패: 본인을 팔로우하려고 하면 FollowException이 발생한다.")
-	void createFollow_SelfFollow_Fail() {
+	@DisplayName("실패: 객체는 다르지만 ID가 동일한 경우 본인 팔로우로 간주하여 예외가 발생한다.")
+	void createFollow_DifferentObjectsSameId_Fail() {
 		// given
 		UUID sameId = UUID.randomUUID();
 
-		User user = mock(User.class);
-		given(user.getId()).willReturn(sameId); // 동일한 ID를 반환하도록 모킹
+		// 1. 첫 번째 유저 객체
+		User user1 = mock(User.class);
+		given(user1.getId()).willReturn(sameId);
+
+		// 2. 두 번째 유저 객체 (user1과 인스턴스는 다르지만 ID는 동일)
+		User user2 = mock(User.class);
+		given(user2.getId()).willReturn(sameId);
 
 		// when & then
 		assertThatThrownBy(() -> Follow.builder()
-			.followee(user)
-			.follower(user)
+			.followee(user1)
+			.follower(user2)
 			.build())
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED.getMessage());
