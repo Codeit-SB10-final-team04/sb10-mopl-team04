@@ -29,13 +29,12 @@ public interface FollowControllerDocs {
 		summary = "사용자의 특정 사용자 팔로우 여부 조회",
 		description = "사용자가 특정 사용자에 대한 팔로우 여부를 반환합니다."
 	)
-	ResponseEntity<FollowDto> isFollowing(
+	ResponseEntity<FollowDto> getFollowConnection(
 		UUID followeeId,
 		@RequestHeader("X-MOPL-USER-ID") UUID currentUserId
 		// @AuthenticationPrincipal MoplUserDetails moplUserDetails
 	);
 
-	// 특정 사용자의 팔로우 수 조회
 	@Operation(
 		summary = "특정 사용자의 팔로우 수 조회",
 		description = "특정 사용자를 팔로우 하고 있는 사용자의 수를 반환합니다."

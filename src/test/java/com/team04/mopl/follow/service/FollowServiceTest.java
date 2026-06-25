@@ -186,7 +186,7 @@ class FollowServiceTest {
 	 */
 	@Test
 	@DisplayName("성공: 두 사용자가 존재하고 팔로우 관계가 있다면 FollowDto를 반환한다.")
-	void isFollowing_Success() {
+	void getFollowConnection_Success() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 		User requestedUser = mock(User.class);
@@ -208,7 +208,7 @@ class FollowServiceTest {
 		given(followMapper.toDto(mockFollow)).willReturn(mockDto);
 
 		// when
-		FollowDto result = followService.isFollowing(followeeId, currentUserId);
+		FollowDto result = followService.getFollowConnection(followeeId, currentUserId);
 
 		// then
 		assertThat(result).isNotNull();
@@ -237,7 +237,7 @@ class FollowServiceTest {
 
 	@Test
 	@DisplayName("실패: 팔로우 관계가 존재하지 않으면 FOLLOW_NOT_FOUND 예외가 발생한다.")
-	void isFollowing_FollowNotFound_Fail() {
+	void getFollowConnection_FollowNotFound_Fail() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 		User requestedUser = mock(User.class);
@@ -255,7 +255,7 @@ class FollowServiceTest {
 			.willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> followService.isFollowing(followeeId, currentUserId))
+		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, currentUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
 	}

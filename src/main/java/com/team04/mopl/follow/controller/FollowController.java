@@ -45,13 +45,13 @@ public class FollowController implements FollowControllerDocs {
 
 	@Override
 	@GetMapping("/followed-by-me")
-	public ResponseEntity<FollowDto> isFollowing(
+	public ResponseEntity<FollowDto> getFollowConnection(
 		@RequestParam UUID followeeId,
 		@RequestHeader("X-MOPL-USER-ID") UUID currentUserId
 		// @AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		FollowDto followDto = followService.isFollowing(followeeId, currentUserId);
+		FollowDto followDto = followService.getFollowConnection(followeeId, currentUserId);
 
 		return ResponseEntity.status(HttpStatus.OK).body(followDto);
 	}
