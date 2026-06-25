@@ -40,25 +40,6 @@ class DirectMessageTest {
 	}
 
 	@Test
-	@DisplayName("성공: 메시지를 읽음 처리하면 상태와 시간이 업데이트된다.")
-	void markAsRead_Success() {
-		// given
-		DirectMessage dm = DirectMessage.builder()
-			.sender(mock(User.class))
-			.receiver(mock(User.class))
-			.conversation(mock(Conversation.class))
-			.content("테스트 메시지")
-			.build();
-
-		// when
-		dm.markAsRead();
-
-		// then
-		assertThat(dm.isRead()).isTrue();
-		assertThat(dm.getReadAt()).isNotNull();
-	}
-
-	@Test
 	@DisplayName("실패: 메시지 내용이 null이면 예외가 발생한다.")
 	void createDirectMessage_NullContent_Fail() {
 		// when & then
@@ -85,5 +66,24 @@ class DirectMessageTest {
 			.build())
 			.isInstanceOf(DirectMessageException.class)
 			.hasMessageContaining(DirectMessageErrorCode.DM_BLANK.getMessage());
+	}
+
+	@Test
+	@DisplayName("성공: 메시지를 읽음 처리하면 상태와 시간이 업데이트된다.")
+	void markAsRead_Success() {
+		// given
+		DirectMessage dm = DirectMessage.builder()
+			.sender(mock(User.class))
+			.receiver(mock(User.class))
+			.conversation(mock(Conversation.class))
+			.content("테스트 메시지")
+			.build();
+
+		// when
+		dm.markAsRead();
+
+		// then
+		assertThat(dm.isRead()).isTrue();
+		assertThat(dm.getReadAt()).isNotNull();
 	}
 }
