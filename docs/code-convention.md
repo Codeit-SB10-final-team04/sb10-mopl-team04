@@ -52,22 +52,22 @@ Order
 
 ### 기본 네이밍
 
-| 대상 | 규칙 | 예시 |
-|------|------|------|
-| 클래스 / 인터페이스 | PascalCase | `UserService`, `OrderController` |
-| 메서드 / 변수 | camelCase | `findById`, `totalAmount` |
-| 상수 | UPPER_SNAKE_CASE | `MAX_RETRIES` |
-| 테스트 메서드 | 메소드명_기대결과_테스트상태 | `isAdult_False_AgeLessThan18` |
+| 대상          | 규칙               | 예시                               |
+|-------------|------------------|----------------------------------|
+| 클래스 / 인터페이스 | PascalCase       | `UserService`, `OrderController` |
+| 메서드 / 변수    | camelCase        | `findById`, `totalAmount`        |
+| 상수          | UPPER_SNAKE_CASE | `MAX_RETRIES`                    |
+| 테스트 메서드     | 메소드명_기대결과_테스트상태  | `isAdult_False_AgeLessThan18`    |
 
 ### 메서드 접두사 약속
 
-| 접두사 | 의미 | 반환 타입 |
-|--------|------|-----------|
-| `find...` | 단건 조회 | Entity 또는 DTO |
-| `findAll...` / `search...` | 목록 조회 | List 또는 Page |
-| `exists...` | 존재 여부 확인 | 반드시 `boolean` |
-| `get...` | 없으면 예외를 던진다 (팀 내 약속) | Entity |
-| `validate...` | 유효성 검증, 위반 시 예외 던짐 | `void` |
+| 접두사                        | 의미                   | 반환 타입         |
+|----------------------------|----------------------|---------------|
+| `find...`                  | 단건 조회                | Entity 또는 DTO |
+| `findAll...` / `search...` | 목록 조회                | List 또는 Page  |
+| `exists...`                | 존재 여부 확인             | 반드시 `boolean` |
+| `get...`                   | 없으면 예외를 던진다 (팀 내 약속) | Entity        |
+| `validate...`              | 유효성 검증, 위반 시 예외 던짐   | `void`        |
 
 ### 메서드 네이밍 예시
 
@@ -75,29 +75,29 @@ Order
 // 외부 비즈니스 메서드
 @Transactional(readOnly = true)
 public UserResponse getUserProfile(UUID userId) {
-    UserEntity user = getUserEntityOrThrow(userId);
-    return UserResponse.from(user);
+	UserEntity user = getUserEntityOrThrow(userId);
+	return UserResponse.from(user);
 }
 
 // 내부 헬퍼 - 없으면 예외
 private UserEntity getUserEntityOrThrow(UUID userId) {
-    return userRepository.findById(userId)
-            .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+	return userRepository.findById(userId)
+		.orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
 }
 
 // 유효성 검증 - 중복 검사
 private void validateDuplicateReview(UUID bookId, UUID userId) {
-    if (reviewRepository.existsByBookIdAndUserIdAndStatus(bookId, userId, ReviewStatus.ACTIVE)) {
-        throw new DuplicateReviewException(bookId, userId);
-    }
+	if (reviewRepository.existsByBookIdAndUserIdAndStatus(bookId, userId, ReviewStatus.ACTIVE)) {
+		throw new DuplicateReviewException(bookId, userId);
+	}
 }
 
 // 유효성 검증 - 권한 확인
 private void validateOwner(Review targetReview, User requestUser) {
-    boolean isOwner = targetReview.getUser().getId().equals(requestUser.getId());
-    if (!isOwner) {
-        throw new ReviewAuthorMismatchException(targetReview.getUser().getId(), requestUser.getId());
-    }
+	boolean isOwner = targetReview.getUser().getId().equals(requestUser.getId());
+	if (!isOwner) {
+		throw new ReviewAuthorMismatchException(targetReview.getUser().getId(), requestUser.getId());
+	}
 }
 ```
 
@@ -114,43 +114,51 @@ private void validateOwner(Review targetReview, User requestUser) {
 - 모든 에러 응답은 공통 에러 객체 포맷(`ErrorResponse`)으로 감싸서 반환한다.
 - 메서드 반환 값으로 `null`을 절대 반환하지 않는다. 값이 없을 가능성이 있다면 반드시 `Optional`을 사용한다.
 
+### Controller 응답 포맷
+
+- ResponseEntity는 `ResponseEntity.status(HttpStatus.OK).body(...)` 형식으로 통일한다.
+
 ### Custom Error 구조
 
-ErrorCode 네이밍: `CM00`, `US00` 형식 (도메인 약어 + 번호)
+- `ErrorCode` 인터페이스와 도메인별 `*ErrorCode` enum으로 통일
+- 코드 형식은 `CM00`, `US00`처럼 4자리로 통일
 
 ```java
 // 1. ErrorCode 인터페이스
 public interface ErrorCode {
-    HttpStatus getHttpStatus();
-    String getCode();
-    String getMessage();
+	HttpStatus getHttpStatus();
+
+	String getCode();
+
+	String getMessage();
 }
 
 // 2. 도메인별 ErrorCode enum
 public enum CommentErrorCode implements ErrorCode {
-    COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CM01", "댓글을 찾을 수 없습니다."),
-    COMMENT_NOT_OWNED_BY_USER(HttpStatus.FORBIDDEN, "CM02", "본인의 댓글이 아닙니다."),
-    COMMENT_LIKE_ALREADY_EXISTS(HttpStatus.CONFLICT, "CM03", "이미 좋아요를 눌렀습니다."),
-    COMMENT_LIKE_NOT_FOUND(HttpStatus.NOT_FOUND, "CM04", "좋아요를 누르지 않았습니다."),
-    COMMENT_ALREADY_DELETED(HttpStatus.BAD_REQUEST, "CM05", "이미 삭제한 댓글입니다.");
+	COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CM01", "댓글을 찾을 수 없습니다."),
+	COMMENT_NOT_OWNED_BY_USER(HttpStatus.FORBIDDEN, "CM02", "본인의 댓글이 아닙니다."),
+	COMMENT_LIKE_ALREADY_EXISTS(HttpStatus.CONFLICT, "CM03", "이미 좋아요를 눌렀습니다."),
+	COMMENT_LIKE_NOT_FOUND(HttpStatus.NOT_FOUND, "CM04", "좋아요를 누르지 않았습니다."),
+	COMMENT_ALREADY_DELETED(HttpStatus.BAD_REQUEST, "CM05", "이미 삭제한 댓글입니다.");
 }
 
 // 3. 추상 기반 예외
 @Getter
 public abstract class MonewException extends RuntimeException {
-    private final Instant timestamp;
-    private final ErrorCode errorCode;
-    private final Map<String, Object> details;
+	private final Instant timestamp;
+	private final ErrorCode errorCode;
+	private final Map<String, Object> details;
 }
 
 // 4. 도메인별 Exception
 public class CommentException extends MonewException {
-    public CommentException(ErrorCode errorCode, Map<String, Object> details) {
-        super(errorCode, details);
-    }
-    public CommentException(ErrorCode errorCode, UUID id) {
-        super(errorCode, id);
-    }
+	public CommentException(ErrorCode errorCode, Map<String, Object> details) {
+		super(errorCode, details);
+	}
+
+	public CommentException(ErrorCode errorCode, UUID id) {
+		super(errorCode, id);
+	}
 }
 ```
 
@@ -169,19 +177,43 @@ public class CommentException extends MonewException {
 - 단순 조회 메서드에는 `@Transactional(readOnly = true)`를 명시하여 성능을 최적화한다.
 - 데이터 쓰기/수정이 일어나는 메서드에만 `@Transactional`을 부여한다.
 
+### JPQL 작성 규칙
+
+- JPQL alias는 짧은 약어를 사용한다.
+- 예: `SELECT p FROM Playlist AS p`
+
 ### BaseEntity
 
 - `JPAAuditingConfig` 설정을 사용한다.
 
-### 로깅
+---
+
+## 5. 로깅 규칙
 
 - `Controller`에는 로그를 남기지 않는다.
 - 비즈니스 로직 처리 중 상태 추적이 필요한 경우 `Service`에 로그를 남긴다.
+    - 서비스 레이어 시작과 끝에 작성
+        - 생성/수정/삭제는 `info`, 조회는 `debug`
+        - `[ENTITY_메서드] 시작/종료(완료)`
 - 배치(Batch), 스케줄러(Scheduler) 등 백그라운드 작업은 실행 흐름 파악을 위해 단계별로 로그를 반드시 남긴다.
+
+### 예시
+
+```text
+log.debug("[PLAYLIST_FIND] 플레이리스트 단건 조회 시작: currentUserId={}, playlistId={}",    currentUserId, playlistId);
+
+// 기능 구현 .....
+
+log.debug("[PLAYLIST_FIND] 플레이리스트 단건 조회 완료: currentUserId={}, playlistId={}, title={}, description={}",
+            currentUserId, playlist.getId(), playlist.getTitle(), playlist.getDescription());
+            
+// `.log`
+2026-06-24 10:41:05.478 [http-nio-8080-exec-1] DEBUG c.t.m.p.service.PlaylistService - [351cdf4033384ecc8249d240492d8d3e] [PLAYLIST_FIND] 플레이리스트 단건 조회 시작: currentUserId=506a74ce-564a-4890-9f12-c2ffd3ef4c4b, playlistId=6d9657ea-03dc-4d39-ac17-a3b025ff6c7c
+```
 
 ---
 
-## 5. 테스트 코드 작성 규칙
+## 6. 테스트 코드 작성 규칙
 
 > CodeRabbit에게 "어떤 테스트가 누락되었는지 지적해 달라"고 요구하기 위한 명시적 기준입니다.
 
@@ -202,12 +234,13 @@ isAdult_False_AgeLessThan18
 // 방법 2: @DisplayName 사용 (권장)
 @Test
 @DisplayName("존재하지 않는 회원 ID로 조회 시 예외가 발생한다")
-void getUserEntityOrThrow_throwsException_whenUserNotFound() { ... }
+
+void getUserEntityOrThrow_throwsException_whenUserNotFound() { ...}
 ```
 
 ---
 
-## 6. 기타 개발 규칙
+## 7. 기타 개발 규칙
 
 > 팀 내에서 합의한 개발 규칙들입니다. 애매한 케이스는 PR 본문에 이유를 명시해주세요.
 

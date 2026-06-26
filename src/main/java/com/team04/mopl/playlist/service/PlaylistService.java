@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
@@ -101,31 +102,64 @@ public class PlaylistService {
 		// 삭제되지 않은 플레이리스트를 소유자 정보와 함께 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
 
-		// 플레이리스트 소유자 summary
-		// TODO: UserSummary 구현 후 변경
-		// UserSummary ownerSummary = getUserSummary(owner);
-		PlaylistUserSummary ownerSummary = getUserSummary(playlist.getOwner());
-
-		// 플레이리스트 구독자 조회
-		long subscriberCount = getSubscriberCount(playlistId);
-
-		// 플레이리스트 구독 여부 조회
-		boolean subscribedByMe = isSubscribedByMe(playlistId, currentUserId);
-
-		// 플레이리스트 내 콘텐츠 조회
-		// TODO: ContentSummary 구현 후 변경
-		// List<ContentSummary> contentSummaries = List.of();
-		List<PlaylistContentSummary> contentSummaries = getContentSummaries(playlistId);
-
-		PlaylistDto playlistDto = playlistMapper.toDto(
-			playlist,
-			ownerSummary,
-			subscriberCount,
-			subscribedByMe,
-			contentSummaries
-		);
+		// PlaylistDto 생성
+		PlaylistDto playlistDto = toPlaylistDto(playlist, currentUserId);
 
 		log.debug("[PLAYLIST_FIND] 플레이리스트 단건 조회 완료: currentUserId={}, playlistId={}, title={}, description={}",
+			currentUserId, playlist.getId(), playlist.getTitle(), playlist.getDescription());
+
+		return playlistDto;
+	}
+
+	// TODO: `@PreAuthorize`는 Security 구현 후 추가
+	// @PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
+	@Transactional
+	public PlaylistDto updatePlaylist(
+		UUID playlistId,
+		PlaylistUpdateRequest request,
+		UUID currentUserId
+	) {
+		String requestTitle = request.title();
+		String requestDescription = request.description();
+
+		log.info(
+			"[PLAYLIST_UPDATE] 플레이리스트 수정 시작: currentUserId={}, playlistId={}, requestTitle={}, requestDescription={}",
+			currentUserId, playlistId, requestTitle, requestDescription);
+
+		// title과 description이 `isBlank` 인지 확인
+		validateNotBlank("title", requestTitle);
+		validateNotBlank("description", requestDescription);
+
+		// 플레이리스트 조회
+		Playlist playlist = getPlaylistOrThrow(playlistId);
+
+		// TODO: Security 추가로 `@PreAuthorize`가 사용 가능해지면 삭제
+		if (!playlist.getOwner().getId().equals(currentUserId)) {
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_FORBIDDEN)
+				.addDetail("requestUserId", currentUserId);
+		}
+
+		// 요청과 현재의 title과 description을 비교하고,
+		// 같으면 `null` / 다르면 요청값
+		String normalizedTitle = normalizeString(
+			requestTitle,
+			playlist.getTitle()
+		);
+		String normalizedDescription = normalizeString(
+			requestDescription,
+			playlist.getDescription()
+		);
+
+		// 전부 `null` 일 경우(입력값 X 거나 전부 현재값과 동일할 경우)
+		validateAllRequestExistingOrNull(normalizedTitle, normalizedDescription);
+
+		// Playlist 변경사항 수정
+		playlist.update(normalizedTitle, normalizedDescription);
+
+		// PlaylistDto 생성
+		PlaylistDto playlistDto = toPlaylistDto(playlist, currentUserId);
+
+		log.info("[PLAYLIST_UPDATE] 플레이리스트 수정 완료: currentUserId={}, playlistId={}, title={}, description={}",
 			currentUserId, playlist.getId(), playlist.getTitle(), playlist.getDescription());
 
 		return playlistDto;
@@ -261,7 +295,64 @@ public class PlaylistService {
 			content.getThumbnailUrl(),
 			tagNameMap.getOrDefault(content.getId(), List.of()),
 			content.getAverageRating(),
-			content.getReviewerCount()
+			content.getReviewCount()
 		);
+	}
+
+	// 플레이리스트 구독자 수, 구독 여부, 콘텐츠 조회 후 PlaylistDto 조립 메서드
+	private PlaylistDto toPlaylistDto(Playlist playlist, UUID currentUserId) {
+		UUID playlistId = playlist.getId();
+
+		// 플레이리스트 소유자 summary
+		// TODO: UserSummary 구현 후 변경
+		// UserSummary ownerSummary = getUserSummary(owner);
+		PlaylistUserSummary ownerSummary = getUserSummary(playlist.getOwner());
+
+		// 플레이리스트 구독자 조회
+		long subscriberCount = getSubscriberCount(playlistId);
+
+		// 플레이리스트 구독 여부 조회
+		boolean subscribedByMe = isSubscribedByMe(playlistId, currentUserId);
+
+		// 플레이리스트 내 콘텐츠 조회
+		// TODO: ContentSummary 구현 후 변경
+		// List<ContentSummary> contentSummaries = List.of();
+		List<PlaylistContentSummary> contentSummaries = getContentSummaries(playlistId);
+
+		return playlistMapper.toDto(
+			playlist,
+			ownerSummary,
+			subscriberCount,
+			subscribedByMe,
+			contentSummaries
+		);
+	}
+
+	private String normalizeString(String requestValue, String currentValue) {
+		if (requestValue == null) {
+			return null;
+		}
+
+		// 좌/우 공백 제거
+		requestValue = requestValue.strip();
+
+		return requestValue.equals(currentValue)
+			? null
+			: requestValue;
+	}
+
+	// ===== 검증(validate) 메서드 =====
+	// blank가 아님을 검증
+	private void validateNotBlank(String fieldName, String value) {
+		if (value != null && value.isBlank()) {
+			throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT)
+				.addDetail(fieldName, value);
+		}
+	}
+
+	private void validateAllRequestExistingOrNull(String normalizedTitle, String normalizedDescription) {
+		if (normalizedTitle == null && normalizedDescription == null) {
+			throw new PlaylistException(PlaylistErrorCode.NO_CHANGE_VALUE);
+		}
 	}
 }
