@@ -315,17 +315,14 @@ class FollowServiceTest {
 	void deleteFollow_Success() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
-		User mockUser = mock(User.class);
-		given(mockUser.getId()).willReturn(currentUserId);
+		User follower = mock(User.class);
+		given(follower.getId()).willReturn(currentUserId);
 
 		UUID followId = UUID.randomUUID();
 		Follow targetFollow = mock(Follow.class);
-		given(targetFollow.getId()).willReturn(followId);
+		given(targetFollow.getFollower()).willReturn(follower);
 
 		given(followRepository.findById(followId)).willReturn(Optional.of(targetFollow));
-		given(userRepository.findById(currentUserId)).willReturn(Optional.of(mockUser));
-
-		given(followRepository.existsByIdAndFollowerId(followId, currentUserId)).willReturn(true);
 
 		// when
 		followService.deleteFollow(followId, currentUserId);
@@ -351,21 +348,19 @@ class FollowServiceTest {
 	void deleteFollow_AccessDenied_Fail() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
-		User mockUser = mock(User.class);
-		given(mockUser.getId()).willReturn(currentUserId);
 
-		UUID followId = UUID.randomUUID();
+		UUID wrongOwnerId = UUID.randomUUID();
+		User otherUser = mock(User.class);
+
 		Follow targetFollow = mock(Follow.class);
-		given(targetFollow.getId()).willReturn(followId);
 
-		given(followRepository.findById(followId)).willReturn(Optional.of(targetFollow));
-		given(userRepository.findById(currentUserId)).willReturn(Optional.of(mockUser));
+		given(otherUser.getId()).willReturn(wrongOwnerId);
+		given(targetFollow.getFollower()).willReturn(otherUser);
 
-		// 요청자가 팔로우의 소유자가 아니도록 설정
-		given(followRepository.existsByIdAndFollowerId(followId, currentUserId)).willReturn(false);
+		given(followRepository.findById(any())).willReturn(Optional.of(targetFollow));
 
 		// when & then
-		assertThatThrownBy(() -> followService.deleteFollow(followId, currentUserId))
+		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), currentUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_ACCESS_DENIED.getMessage());
 	}
