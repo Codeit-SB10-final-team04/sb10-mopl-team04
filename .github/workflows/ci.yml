@@ -1,5 +1,9 @@
 name: ci
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   # [dev] 브랜치에 PR을 올리거나, [dev,main] 브랜치에 push 할 시 워크플로우 트리거
   pull_request:
