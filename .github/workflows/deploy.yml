@@ -72,7 +72,7 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
-          container-name: deokhugam-app
+          container-name: mopl-app
           image: ${{ steps.build-image.outputs.image }}
           environment-variables: |
             SPRING_PROFILES_ACTIVE=prod
@@ -87,7 +87,7 @@ jobs:
             SPRING_DATA_REDIS_HOST=${{ secrets.SPRING_DATA_REDIS_HOST }}
             SPRING_DATA_REDIS_PORT=${{ secrets.SPRING_DATA_REDIS_PORT || '6379' }}
             SPRING_DATA_REDIS_PASSWORD=${{ secrets.SPRING_DATA_REDIS_PASSWORD }}
-            SPRING_KAFKA_BOOTSTRAP_SERVERS=${{ secrets.SPRING_KAFKA_BOOTSTRAP_SERVERS || '29092'}}
+            SPRING_KAFKA_BOOTSTRAP_SERVERS=${{ secrets.SPRING_KAFKA_BOOTSTRAP_SERVERS || 'localhost:29092'}}
             SPRING_KAFKA_CONSUMER_GROUP_ID=${{ secrets.SPRING_KAFKA_CONSUMER_GROUP_ID}}
             SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=${{ secrets.SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}} 
 
