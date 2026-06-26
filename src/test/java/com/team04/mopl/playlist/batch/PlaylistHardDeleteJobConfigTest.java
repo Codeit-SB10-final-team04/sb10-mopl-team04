@@ -41,4 +41,18 @@ class PlaylistHardDeleteJobConfigTest {
 		// then
 		verify(playlistRepository).deleteAllByPlaylistIds(List.of(playlistId1, playlistId2));
 	}
+
+	@Test
+	@DisplayName("Writer가 Chunk로 전달 받은 플레이리스트 id 목록이 비었다면 물리 삭제 메서드가 동작하지 않는다.")
+	void playlistHardDeleteItemWriter_NotDeletePlaylist_whenEmptyChunkReceived() throws Exception {
+		// given
+		ItemWriter<UUID> writer = playlistHardDeleteJobConfig.playlistHardDeleteItemWriter();
+		Chunk<UUID> chunk = new Chunk<>();
+
+		// when
+		writer.write(chunk);
+
+		// then
+		verify(playlistRepository, never()).deleteAllByPlaylistIds(anyList());
+	}
 }
