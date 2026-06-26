@@ -3,15 +3,23 @@ package com.team04.mopl.content.controller;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.service.ContentService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -28,5 +36,18 @@ public class ContentController implements ContentControllerDocs {
 		ContentDto contentDto = contentService.getContent(contentId);
 
 		return ResponseEntity.status(HttpStatus.OK).body(contentDto);
+	}
+
+	@Override
+	@PreAuthorize("hasRole('ADMIN')")
+	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<ContentDto> createContent(
+		@Valid @RequestPart ContentCreateRequest contentCreateRequest,
+		@RequestPart MultipartFile thumbnail // thumbnail은 필수
+	) {
+
+		ContentDto contentDto = contentService.createContent(contentCreateRequest, thumbnail);
+
+		return ResponseEntity.status(HttpStatus.CREATED).body(contentDto);
 	}
 }
