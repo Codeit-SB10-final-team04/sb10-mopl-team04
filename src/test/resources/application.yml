@@ -42,4 +42,4 @@ thumbnail:
   storage:
     type: local
     local:
-      path: thumbnails/
+      path: ${java.io.tmpdir}/mopl-test-thumbnails/
