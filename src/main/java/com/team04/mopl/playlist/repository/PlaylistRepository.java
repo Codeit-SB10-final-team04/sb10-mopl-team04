@@ -26,5 +26,5 @@ public interface PlaylistRepository extends JpaRepository<Playlist, UUID> {
 		DELETE FROM Playlist AS p
 		WHERE p.id IN :playlistIds
 		""")
-	void deleteAllByIdIn(@Param("playlistIds") List<UUID> playlistIds);
+	void deleteAllByPlaylistIds(@Param("playlistIds") List<UUID> playlistIds);
 }
