@@ -1,5 +1,7 @@
 package com.team04.mopl.conversation.controller;
 
+import java.util.UUID;
+
 import org.springframework.http.ResponseEntity;
 
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
@@ -15,5 +17,9 @@ public interface ConversationControllerDocs {
 		summary = "대화 생성",
 		description = "특정 사용자와의 대화방을 생성합니다."
 	)
-	ResponseEntity<ConversationDto> createConversation(ConversationCreateRequest conversationCreateRequest);
+	ResponseEntity<ConversationDto> createConversation(
+		ConversationCreateRequest conversationCreateRequest,
+		UUID currentUserId
+		// MoplUserDetails moplUserDetails
+	);
 }
