@@ -10,3 +10,8 @@ server:
 tmdb:
   api:
     key: ${TMDB_API_KEY}
+
+playlist:
+  hard-delete:
+    cron: "0 1 0 * * *"
+    retention-months: 1
