@@ -3,7 +3,6 @@ package com.team04.mopl.playlist.batch;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -75,7 +74,7 @@ public class PlaylistHardDeleteJobConfig {
 		@Value("#{jobParameters['deleteDate']}") LocalDate deleteDate
 	) {
 		// 한국 시간 기준 deleteDate를 물리 삭제 기준 시간으로 변환
-		Instant deletedAtBefore = deleteDate.atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant();
+		Instant deletedAtBefore = deleteDate.atStartOfDay(PlaylistBatchTimeZone.KST).toInstant();
 
 		// JDBC Cursor ItemReader Builder 생성
 		return new JdbcCursorItemReaderBuilder<UUID>()
