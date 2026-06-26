@@ -44,6 +44,7 @@ public class ContentService {
 		return contentMapper.toDto(content, tags);
 	}
 
+	// 파일 저장, DB 저장은 한 트랜잭션에 묶일 수 없음
 	@Transactional
 	public ContentDto createContent(ContentCreateRequest contentCreateRequest, MultipartFile thumbnail) {
 		// 로컬에 썸네일 저장 후 Url 리턴
@@ -57,33 +58,38 @@ public class ContentService {
 			.thumbnailUrl(thumbnailUrl)
 			.build();
 
-		contentRepository.save(content);
+		try {
+			// 콘텐츠 저장
+			contentRepository.save(content);
 
-		List<String> tagNames = List.of();
+			// 태그명
+			List<String> tagNames = List.of();
 
-		// 요청 Dto에서 tags 있을 경우 실행
-		if (contentCreateRequest.tags() != null && !contentCreateRequest.tags().isEmpty()) {
-			// tag 생성 or 기존 것 가져옴
-			List<Tag> tags = contentCreateRequest.tags().stream()
-				.map(name -> tagRepository.findByName(name)
-					.orElseGet(() -> tagRepository.save(Tag.builder().name(name).build()))
-				)
-				.toList();
+			if (contentCreateRequest.tags() != null && !contentCreateRequest.tags().isEmpty()) {
+				List<Tag> tags = contentCreateRequest.tags().stream()
+					.map(name -> tagRepository.findByName(name)
+						.orElseGet(() -> tagRepository.save(Tag.builder().name(name).build())))
+					.toList();
 
-			// 중간 테이블 생성 및 저장
-			List<ContentTag> contentTags = tags.stream()
-				.map(tag -> ContentTag.builder().content(content).tag(tag).build())
-				.toList();
+				List<ContentTag> contentTags = tags.stream()
+					.map(tag -> ContentTag.builder().content(content).tag(tag).build())
+					.toList();
 
-			contentTagRepository.saveAll(contentTags);
+				contentTagRepository.saveAll(contentTags);
 
-			// Dto 변환을 위해 tagName으로 반환
-			tagNames = tags.stream()
-				.map(Tag::getName)
-				.toList();
+				tagNames = tags.stream().map(Tag::getName).toList();
+			}
+
+			return contentMapper.toDto(content, tagNames);
+
+		} catch (Exception e) { // DB 저장 실패 시 파일을 삭제
+			try {
+				thumbnailStorage.delete(thumbnailUrl);
+			} catch (Exception deleteEx) { // 파일 마저 삭제 실패 시 로그로 기록
+				log.error("파일 삭제 실패, 배치 정리 필요. url={}", thumbnailUrl, deleteEx);
+			}
+			throw e;
 		}
-
-		return contentMapper.toDto(content, tagNames);
 	}
 
 	// content 조회 메서드
