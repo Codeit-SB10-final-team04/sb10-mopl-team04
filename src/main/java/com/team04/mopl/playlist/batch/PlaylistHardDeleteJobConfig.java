@@ -27,9 +27,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 // Spring Batch Job/Step Bean 설정
 @Configuration
+@Slf4j
 @RequiredArgsConstructor
 public class PlaylistHardDeleteJobConfig {
 
@@ -108,10 +110,14 @@ public class PlaylistHardDeleteJobConfig {
 		return chunk -> {
 			// 현재 Chunk에 포함된 플레이리스트 id 목록 추출
 			List<UUID> playlistIds = new ArrayList<>(chunk.getItems());
+			if (playlistIds.isEmpty()) {
+				return;
+			}
 
 			// 해당 id의 플레이리스트를 DB에서 물리 삭제
-			playlistRepository.deleteAllByIdIn(playlistIds);
+			playlistRepository.deleteAllByPlaylistIds(playlistIds);
+
+			log.info("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 chunk 물리 삭제: count={}", playlistIds.size());
 		};
 	}
-
 }
