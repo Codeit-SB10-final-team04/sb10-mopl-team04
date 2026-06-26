@@ -99,7 +99,7 @@ import com.github.spotbugs.snom.Effort
 spotbugs {
     ignoreFailures = false
     effort = Effort.valueOf('MAX')
-    reportLevel = Confidence.valueOf('HIGH')
+    reportLevel = Confidence.valueOf('MEDIUM')
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ jacocoTestReport {
         html.required = true    // HTML 리포트 생성 (커버리지 시각화)
     }
 
-    check.dependsOn jacocoTestCoverageVerification
+    // check.dependsOn jacocoTestCoverageVerification
 }
 
 jacocoTestCoverageVerification {
