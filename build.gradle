@@ -143,6 +143,7 @@ jacoco {
 
 jacocoTestReport {
     dependsOn test              // 의존성 설정 (리포트 생성)
+    enabled = false
 
     reports {
         xml.required = true     // XML 리포트 생성 (커버리지 수치화)
@@ -170,11 +171,6 @@ jacocoTestCoverageVerification {
             }
         }
     }
-}
-
-// check 태스크가 자동으로 커버리지 검증을 실패시키지 않도록 분리
-tasks.named('check') {
-    dependsOn.remove(tasks.named('jacocoTestCoverageVerification'))
 }
 
 // ---------------------------------------------------------------------------
