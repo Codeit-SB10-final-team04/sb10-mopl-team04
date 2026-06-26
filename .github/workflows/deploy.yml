@@ -1,5 +1,8 @@
 name: 자바 CD (Gradle & ECS)
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 on:
   # [release] 브랜치에 push 할 시 워크플로우 트리거
