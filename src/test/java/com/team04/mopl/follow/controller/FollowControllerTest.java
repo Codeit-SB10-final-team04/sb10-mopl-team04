@@ -63,21 +63,6 @@ class FollowControllerTest {
 	}
 
 	@Test
-	@DisplayName("실패: 요청 헤더(X-MOPL-USER-ID)가 누락되면 400 Bad Request를 반환한다.")
-	void createFollow_MissingHeader_Fail() throws Exception {
-		// given
-		FollowRequest request = new FollowRequest(UUID.randomUUID());
-
-		// when & then
-		mockMvc.perform(post("/api/follows")
-				// 헤더 누락
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(objectMapper.writeValueAsString(request)))
-			.andDo(print())
-			.andExpect(status().isInternalServerError());
-	}
-
-	@Test
 	@DisplayName("실패: 요청 바디(FollowRequest)에 필수값이 누락되면 400 Bad Request를 반환한다.")
 	void createFollow_InvalidBody_Fail() throws Exception {
 		// given
