@@ -10,7 +10,7 @@ import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.stereotype.Component;
 
-import com.team04.mopl.playlist.exception.PlaylistHardDeleteBatchException;
+import com.team04.mopl.common.exception.BatchException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +52,7 @@ public class PlaylistHardDeleteBatchRunner {
 		} catch (Exception e) {
 			log.error("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 물리 삭제 배치 실패: deleteDate={}",
 				deleteDate, e);
-			throw new PlaylistHardDeleteBatchException("플레이리스트 물리 삭제 배치에 실패했습니다.", e);
+			throw new BatchException("플레이리스트 물리 삭제 배치에 실패했습니다.", e);
 		}
 	}
 }
