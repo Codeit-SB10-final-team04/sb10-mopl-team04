@@ -26,8 +26,28 @@ public interface FollowControllerDocs {
 	);
 
 	@Operation(
+		summary = "사용자의 특정 사용자 팔로우 여부 조회",
+		description = "사용자가 특정 사용자에 대한 팔로우 여부를 반환합니다."
+	)
+	ResponseEntity<FollowDto> getFollowConnection(
+		UUID followeeId,
+		@RequestHeader("X-MOPL-USER-ID") UUID currentUserId
+		// @AuthenticationPrincipal MoplUserDetails moplUserDetails
+	);
+
+	@Operation(
 		summary = "특정 사용자의 팔로우 수 조회",
 		description = "특정 사용자를 팔로우 하고 있는 사용자의 수를 반환합니다."
 	)
 	ResponseEntity<Long> getFollowerCount(UUID followeeId);
+
+	@Operation(
+		summary = "팔로우 취소",
+		description = "특정 사용자에 대한 팔로우를 취소합니다."
+	)
+	ResponseEntity<Void> deleteFollow(
+		UUID followId,
+		@RequestHeader("X-MOPL-USER-ID") UUID currentUserId
+		// @AuthenticationPrincipal MoplUserDetails moplUserDetails
+	);
 }
