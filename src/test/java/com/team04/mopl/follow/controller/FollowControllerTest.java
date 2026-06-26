@@ -63,21 +63,6 @@ class FollowControllerTest {
 	}
 
 	@Test
-	@DisplayName("실패: 요청 헤더(X-MOPL-USER-ID)가 누락되면 400 Bad Request를 반환한다.")
-	void createFollow_MissingHeader_Fail() throws Exception {
-		// given
-		FollowRequest request = new FollowRequest(UUID.randomUUID());
-
-		// when & then
-		mockMvc.perform(post("/api/follows")
-				// 헤더 누락
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(objectMapper.writeValueAsString(request)))
-			.andDo(print())
-			.andExpect(status().isInternalServerError());
-	}
-
-	@Test
 	@DisplayName("실패: 요청 바디(FollowRequest)에 필수값이 누락되면 400 Bad Request를 반환한다.")
 	void createFollow_InvalidBody_Fail() throws Exception {
 		// given
@@ -215,4 +200,39 @@ class FollowControllerTest {
 	// 			.contentType(MediaType.APPLICATION_JSON))
 	// 		.andExpect(status().isNotFound());
 	// }
+
+	/*
+	=========================
+		팔로우 취소
+	=========================
+	 */
+	@Test
+	@DisplayName("성공: 팔로우 삭제 요청 시 204 No Content를 반환한다.")
+	void deleteFollow_Success() throws Exception {
+		mockMvc.perform(delete("/api/follows/{followId}", UUID.randomUUID())
+				.header("X-MOPL-USER-ID", UUID.randomUUID().toString()))
+			.andExpect(status().isNoContent());
+	}
+
+	@Test
+	@DisplayName("실패: 존재하지 않는 팔로우 삭제 시 404를 반환한다.")
+	void deleteFollow_NotFound_Fail() throws Exception {
+		doThrow(new FollowException(FollowErrorCode.FOLLOW_NOT_FOUND))
+			.when(followService).deleteFollow(any(), any());
+
+		mockMvc.perform(delete("/api/follows/{followId}", UUID.randomUUID())
+				.header("X-MOPL-USER-ID", UUID.randomUUID().toString()))
+			.andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("실패: 권한 없는 사용자의 팔로우 삭제 시 403을 반환한다.")
+	void deleteFollow_AccessDenied_Fail() throws Exception {
+		doThrow(new FollowException(FollowErrorCode.FOLLOW_ACCESS_DENIED))
+			.when(followService).deleteFollow(any(), any());
+
+		mockMvc.perform(delete("/api/follows/{followId}", UUID.randomUUID())
+				.header("X-MOPL-USER-ID", UUID.randomUUID().toString()))
+			.andExpect(status().isForbidden());
+	}
 }

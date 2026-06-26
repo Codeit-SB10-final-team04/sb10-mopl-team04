@@ -304,4 +304,64 @@ class FollowServiceTest {
 	// 		.isInstanceOf(UserException.class)
 	// 		.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
 	// }
+
+	/*
+	==================
+		팔로우 취소
+	==================
+	 */
+	@Test
+	@DisplayName("성공: 본인의 팔로우 관계를 정상적으로 삭제한다.")
+	void deleteFollow_Success() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		User follower = mock(User.class);
+		given(follower.getId()).willReturn(currentUserId);
+
+		UUID followId = UUID.randomUUID();
+		Follow targetFollow = mock(Follow.class);
+		given(targetFollow.getFollower()).willReturn(follower);
+
+		given(followRepository.findById(followId)).willReturn(Optional.of(targetFollow));
+
+		// when
+		followService.deleteFollow(followId, currentUserId);
+
+		// then
+		verify(followRepository, times(1)).delete(targetFollow);
+	}
+
+	@Test
+	@DisplayName("실패: 팔로우 관계가 존재하지 않으면 예외가 발생한다.")
+	void deleteFollow_FollowNotFound_Fail() {
+		// given
+		given(followRepository.findById(any())).willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), UUID.randomUUID()))
+			.isInstanceOf(FollowException.class)
+			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
+	}
+
+	@Test
+	@DisplayName("실패: 본인의 팔로우가 아닌 경우 접근 거부 예외가 발생한다.")
+	void deleteFollow_AccessDenied_Fail() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		UUID wrongOwnerId = UUID.randomUUID();
+		User otherUser = mock(User.class);
+
+		Follow targetFollow = mock(Follow.class);
+
+		given(otherUser.getId()).willReturn(wrongOwnerId);
+		given(targetFollow.getFollower()).willReturn(otherUser);
+
+		given(followRepository.findById(any())).willReturn(Optional.of(targetFollow));
+
+		// when & then
+		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), currentUserId))
+			.isInstanceOf(FollowException.class)
+			.hasMessageContaining(FollowErrorCode.FOLLOW_ACCESS_DENIED.getMessage());
+	}
 }
