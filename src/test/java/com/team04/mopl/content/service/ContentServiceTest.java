@@ -169,4 +169,49 @@ class ContentServiceTest {
 
 		verify(contentRepository, never()).save(any());
 	}
+
+	@Test
+	@DisplayName("DB 저장 실패 시 저장된 썸네일 파일을 삭제한다.")
+	void createContent_deleteThumbnail_whenRepositorySaveFails() {
+		// given
+		ContentCreateRequest request = new ContentCreateRequest(
+			"movie", "인터스텔라", "우주를 여행하는 이야기", null
+		);
+		MockMultipartFile thumbnail = new MockMultipartFile(
+			"thumbnail", "thumb.png", "image/png", "image-data".getBytes()
+		);
+		String storedUrl = "http://localhost:8080/thumbnails/thumb.png";
+
+		when(thumbnailStorage.store(thumbnail)).thenReturn(storedUrl);
+		when(contentRepository.save(any(Content.class))).thenThrow(new RuntimeException("DB 저장 실패"));
+
+		// when & then
+		assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
+			.isInstanceOf(RuntimeException.class);
+
+		verify(thumbnailStorage).delete(storedUrl);
+	}
+
+	@Test
+	@DisplayName("태그 저장 실패 시 저장된 썸네일 파일을 삭제한다.")
+	void createContent_deleteThumbnail_whenTagSaveFails() {
+		// given
+		ContentCreateRequest request = new ContentCreateRequest(
+			"movie", "인터스텔라", "우주를 여행하는 이야기", List.of("액션")
+		);
+		MockMultipartFile thumbnail = new MockMultipartFile(
+			"thumbnail", "thumb.png", "image/png", "image-data".getBytes()
+		);
+		String storedUrl = "http://localhost:8080/thumbnails/thumb.png";
+
+		when(thumbnailStorage.store(thumbnail)).thenReturn(storedUrl);
+		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
+		when(tagRepository.findByName(any())).thenThrow(new RuntimeException("태그 저장 실패"));
+
+		// when & then
+		assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
+			.isInstanceOf(RuntimeException.class);
+
+		verify(thumbnailStorage).delete(storedUrl);
+	}
 }
