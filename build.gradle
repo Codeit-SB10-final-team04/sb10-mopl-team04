@@ -113,13 +113,19 @@ checkstyle {
     configProperties = ["suppressionFile": "${rootDir}/checkstyle/naver-checkstyle-suppressions.xml"]
 }
 
-tasks.withType(Checkstyle) {
+tasks.withType(Checkstyle).configureEach {
     source = fileTree('src/main/java')
-    dependsOn 'compileJava'     // QClass 생성 후 Checkstyle 실행
+    include '**/*.java'
+    exclude '**/gen/**'         // 혹시 모를 생성 파일 패턴 제외
+
+    // 의존성 명시
+    dependsOn 'compileJava'
+    mustRunAfter compileJava
+    mustRunAfter compileTestJava
 
     reports {
-        xml.required = true     // XML 리포트 생성 (CI 파이프 연동)
-        html.required = true    // HTML 리포트 생성
+        xml.required = true
+        html.required = true
     }
 }
 
