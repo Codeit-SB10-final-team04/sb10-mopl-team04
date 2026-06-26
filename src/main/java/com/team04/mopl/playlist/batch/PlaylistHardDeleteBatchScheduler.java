@@ -28,10 +28,10 @@ public class PlaylistHardDeleteBatchScheduler {
 	public void runPlaylistHardDeleteBatch() {
 		LocalDate deleteDate = LocalDate.now(PlaylistBatchTimeZone.KST).minusMonths(retentionMonths);
 
-		log.info("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 물리 삭제 스케쥴 시작: deleteDate={}", deleteDate);
+		log.info("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 물리 삭제 스케줄 시작: deleteDate={}", deleteDate);
 
 		playlistHardDeleteBatchRunner.run(deleteDate);
 
-		log.info("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 물리 삭제 스케쥴 완료: deleteDate={}", deleteDate);
+		log.info("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 물리 삭제 스케줄 완료: deleteDate={}", deleteDate);
 	}
 }
