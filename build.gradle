@@ -111,6 +111,7 @@ checkstyle {
 }
 
 tasks.withType(Checkstyle) {
+    source = fileTree('src/main/java')
     dependsOn 'compileJava'     // QClass 생성 후 Checkstyle 실행
 
     reports {
