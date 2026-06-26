@@ -14,9 +14,6 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
 	// 유효성 검증: 중복 검사
 	boolean existsByFolloweeIdAndFollowerId(UUID followeeId, UUID followerId);
 
-	// 유효성 검증: 팔로우 소유자
-	boolean existsByIdAndFollowerId(UUID id, UUID followerId);
-
 	// 단건 조회 (팔로위 Id, 팔로워 Id)
 	Optional<Follow> findByFolloweeIdAndFollowerId(UUID followeeId, UUID followerId);
 
