@@ -39,6 +39,6 @@ class PlaylistHardDeleteJobConfigTest {
 		writer.write(chunk);
 
 		// then
-		verify(playlistRepository).deleteAllByIdIn(List.of(playlistId1, playlistId2));
+		verify(playlistRepository).deleteAllByPlaylistIds(List.of(playlistId1, playlistId2));
 	}
 }
