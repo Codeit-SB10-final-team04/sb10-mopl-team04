@@ -108,7 +108,7 @@ spotbugs {
 checkstyle {
     maxWarnings = 0             // 경고 허용 개수
     ignoreFailures = true       // 초기 단계 설정 (빌드는 통과시키되, 리포트로 경고 확인)
-    toolVersion = "8.24"
+    toolVersion = "10.17.0"
     configFile = file("${rootDir}/checkstyle/naver-checkstyle-rules.xml")
     configProperties = ["suppressionFile": "${rootDir}/checkstyle/naver-checkstyle-suppressions.xml"]
 }
@@ -121,7 +121,7 @@ tasks.withType(Checkstyle) {
     }
     // Gradle이 컴파일을 마친 후에만 Checkstyle이 실행되도록 순서 강제
     mustRunAfter compileJava, compileTestJava
-    
+
     reports {
         xml.required = true
         html.required = true
