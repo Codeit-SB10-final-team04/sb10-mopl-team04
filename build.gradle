@@ -148,29 +148,7 @@ jacocoTestReport {
         xml.required = true     // XML 리포트 생성 (커버리지 수치화)
         html.required = true    // HTML 리포트 생성 (커버리지 시각화)
     }
-
-    // check.dependsOn jacocoTestCoverageVerification
 }
-
-//jacocoTestCoverageVerification {
-//    violationRules {
-//        rule {
-//            element = 'CLASS'   // 측정 단위: 클래스 파일
-//            excludes = [        // 제외된 영역
-//                                '*.dto.*',
-//                                '*.config.*',
-//                                '**.*Q*',                 // QueryDSL QClass 제외
-//                                '**.*MapperImpl',         // MapStruct 생성 코드 제외
-//                                '*.exception.*',          // 예외 클래스 제외
-//                                '*.entity.*',             // 엔티티 순수 데이터 클래스 제외 (필요시)
-//                                '*.MoplApplication'       // 메인 클래스 제외
-//            ]
-//            limit {
-//                minimum = 0.80  // 80% 미만일 경우, 빌드 실패
-//            }
-//        }
-//    }
-//}
 
 // ---------------------------------------------------------------------------
 // QueryDSL QClass 생성 및 빌드 설정
