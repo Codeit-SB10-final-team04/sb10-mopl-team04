@@ -106,8 +106,8 @@ checkstyle {
     maxWarnings = 0             // 경고 허용 개수
     ignoreFailures = true       // 초기 단계 설정 (빌드는 통과시키되, 리포트로 경고 확인)
     toolVersion = "8.24"
-    configFile = file("${rootDir}/naver-checkstyle-rules.xml")
-    configProperties = ["suppressionFile": "${rootDir}/naver-checkstyle-suppressions.xml"]
+    configFile = file("${rootDir}/checkstyle/naver-checkstyle-rules.xml")
+    configProperties = ["suppressionFile": "${rootDir}/checkstyle/naver-checkstyle-suppressions.xml"]
 }
 
 tasks.withType(Checkstyle) {
