@@ -50,6 +50,8 @@ public class PlaylistHardDeleteBatchRunner {
 
 			log.info("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 물리 삭제 배치 성공: deleteDate={}", deleteDate);
 		} catch (Exception e) {
+			log.error("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 물리 삭제 배치 실패: deleteDate={}",
+				deleteDate, e);
 			throw new PlaylistHardDeleteBatchException("플레이리스트 물리 삭제 배치에 실패했습니다.", e);
 		}
 	}
