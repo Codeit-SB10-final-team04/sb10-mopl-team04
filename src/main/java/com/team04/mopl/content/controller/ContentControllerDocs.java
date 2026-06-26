@@ -7,6 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.team04.mopl.common.dto.CursorPageResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
+import com.team04.mopl.content.dto.request.ContentPageRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,5 +22,5 @@ public interface ContentControllerDocs {
 	ResponseEntity<ContentDto> createContent(ContentCreateRequest contentCreateRequest, MultipartFile thumbnail);
 
 	@Operation(summary = "콘텐츠 목록 조회")
-	ResponseEntity<CursorPageResponse<ContentDto>> getContents();
+	ResponseEntity<CursorPageResponse<ContentDto>> getContents(ContentPageRequest contentPageRequest);
 }
