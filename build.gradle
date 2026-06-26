@@ -3,6 +3,8 @@ plugins {
     id 'checkstyle'
     id 'org.springframework.boot' version '3.5.15'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.github.spotbugs' version '6.0.0'
+    id 'jacoco'
 }
 
 group = 'com.team04'
@@ -82,16 +84,27 @@ tasks.named('test') {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs << "-parameters"
+    // MapStruct Spring Bean 등록
     options.compilerArgs << "-Amapstruct.defaultComponentModel=spring"
+    // 생성된 코드에 TimeStamp 제거
     options.compilerArgs << "-Amapstruct.suppressGeneratorTimestamp=true"
+}
+
+// ---------------------------------------------------------------------------
+// Spotbugs 설정
+// ---------------------------------------------------------------------------
+spotbugs {
+    ignoreFailures = false      // 오류 발견 시, 빌드 중단
+    effort = "max"              // 버그 분석 강도
+    reportLevel = "high"        // 심각한 버그만 감지
 }
 
 // ---------------------------------------------------------------------------
 // Checkstyle 설정
 // ---------------------------------------------------------------------------
 checkstyle {
-    maxWarnings = 0
-    ignoreFailures = true
+    maxWarnings = 0             // 경고 허용 개수
+    ignoreFailures = true       // 초기 단계 설정 (빌드는 통과시키되, 리포트로 경고 확인)
     toolVersion = "8.24"
     configFile = file("${rootDir}/naver-checkstyle-rules.xml")
     configProperties = ["suppressionFile": "${rootDir}/naver-checkstyle-suppressions.xml"]
@@ -99,8 +112,38 @@ checkstyle {
 
 tasks.withType(Checkstyle) {
     reports {
-        xml.required = true
-        html.required = true
+        xml.required = true     // XML 리포트 생성 (CI 파이프 연동)
+        html.required = true    // HTML 리포트 생성
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Jacoco 설정
+// ---------------------------------------------------------------------------
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+jacocoTestReport {
+    dependsOn test              // 의존성 설정 (리포트 생성)
+    reports {
+        xml.required = true     // XML 리포트 생성 (커버리지 수치화)
+        html.required = true    // HTML 리포트 생성 (커버리지 시각화)
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            element = 'CLASS'   // 측정 단위: 클래스 파일
+            excludes = [        // 제외된 영역
+                                '*.dto.*',
+                                '*.config.*'
+            ]
+            limit {
+                minimum = 0.80  // 80% 미만일 경우, 빌드 실패
+            }
+        }
     }
 }
 
