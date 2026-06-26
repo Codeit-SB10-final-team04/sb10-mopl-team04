@@ -113,16 +113,15 @@ checkstyle {
     configProperties = ["suppressionFile": "${rootDir}/checkstyle/naver-checkstyle-suppressions.xml"]
 }
 
-tasks.withType(Checkstyle).configureEach {
-    source = fileTree('src/main/java')
-    include '**/*.java'
-    exclude '**/gen/**'         // 혹시 모를 생성 파일 패턴 제외
-
-    // 의존성 명시
-    dependsOn 'compileJava'
-    mustRunAfter compileJava
-    mustRunAfter compileTestJava
-
+tasks.withType(Checkstyle) {
+    source = fileTree('src') {
+        include '**/*.java'
+        exclude '**/generated/**'
+        exclude '**/gen/**'
+    }
+    // Gradle이 컴파일을 마친 후에만 Checkstyle이 실행되도록 순서 강제
+    mustRunAfter compileJava, compileTestJava
+    
     reports {
         xml.required = true
         html.required = true
