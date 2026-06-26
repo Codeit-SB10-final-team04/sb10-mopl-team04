@@ -34,12 +34,21 @@ public class LocalThumbnailStorage implements ThumbnailStorage {
 	@Override
 	public String store(MultipartFile thumbnail) {
 		try {
-			String filename = UUID.randomUUID() + "_" + thumbnail.getOriginalFilename();
-			Path path = Paths.get(uploadDir).resolve(filename);
-			Files.copy(thumbnail.getInputStream(), path);
+			String originalFilename = Paths.get(
+				thumbnail.getOriginalFilename() == null ? "thumbnail" : thumbnail.getOriginalFilename()
+			).getFileName().toString();
+			String filename = UUID.randomUUID() + "_" + originalFilename;
+			Path uploadRoot = Paths.get(uploadDir).toAbsolutePath().normalize();
+			Path path = uploadRoot.resolve(filename).normalize();
+			if (!path.startsWith(uploadRoot)) {
+				throw new FileStorageException("허용되지 않은 파일 경로입니다.");
+			}
+			try (var inputStream = thumbnail.getInputStream()) {
+				Files.copy(inputStream, path);
+			}
 			return "http://localhost:8080/thumbnails/" + filename;
 		} catch (IOException e) {
-			throw new RuntimeException("썸네일 저장 실패", e);
+			throw new FileStorageException("썸네일 저장 실패", e);
 		}
 	}
 
