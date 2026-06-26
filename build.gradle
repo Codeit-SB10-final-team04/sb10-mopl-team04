@@ -93,6 +93,9 @@ tasks.withType(JavaCompile).configureEach {
 // ---------------------------------------------------------------------------
 // Spotbugs 설정
 // ---------------------------------------------------------------------------
+import com.github.spotbugs.snom.Confidence
+import com.github.spotbugs.snom.Effort
+
 spotbugs {
     ignoreFailures = false
     effort = Effort.valueOf('MAX')
