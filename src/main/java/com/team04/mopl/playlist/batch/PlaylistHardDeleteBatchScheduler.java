@@ -34,5 +34,7 @@ public class PlaylistHardDeleteBatchScheduler {
 		log.info("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 물리 삭제 스케쥴 시작: deleteDate={}", deleteDate);
 
 		playlistHardDeleteBatchRunner.run(deleteDate);
+
+		log.info("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 물리 삭제 스케쥴 완료: deleteDate={}", deleteDate);
 	}
 }
