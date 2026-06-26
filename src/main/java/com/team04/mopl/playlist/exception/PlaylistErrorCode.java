@@ -12,7 +12,8 @@ public enum PlaylistErrorCode implements ErrorCode {
 	INVALID_INPUT(HttpStatus.BAD_REQUEST, "PL01", "잘못된 입력값입니다."),
 	NO_CHANGE_VALUE(HttpStatus.BAD_REQUEST, "PL02", "변경사항이 없습니다."),
 	PLAYLIST_FORBIDDEN(HttpStatus.FORBIDDEN, "PL03", "플레이리스트 소유자가 아닙니다."),
-	PLAYLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PL04", "플레이리스트를 찾을 수 없습니다.");
+	PLAYLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PL04", "플레이리스트를 찾을 수 없습니다."),
+	PLAYLIST_HARD_DELETE_BATCH_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PL05", "플레이리스트 물리 삭제 배치를 실패했습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String code;

@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -76,5 +77,22 @@ public class PlaylistController implements PlaylistControllerDocs {
 		PlaylistDto playlistDto = playlistService.updatePlaylist(playlistId, request, currentUserId);
 
 		return ResponseEntity.status(HttpStatus.OK).body(playlistDto);
+	}
+
+	@DeleteMapping(value = "/{playlistId}")
+	@Override
+	public ResponseEntity<Void> softDeletePlaylist(
+		@PathVariable UUID playlistId,
+		@RequestHeader("X-MOPL-USER-ID") UUID currentUserId
+		// @AuthenticationPrincipal MoplUserDetails moplUserDetails
+	) {
+		// TODO: Security 구현 완료 후 @AuthenticationPrincipal 사용
+		// Security 구현 완료 전까지 임시 헤더로 받기
+		// TODO: Security 구현 완료 후 주석 해제
+		// UUID currentUserId = moplUserDetails.getId();
+
+		playlistService.softDeletePlaylist(playlistId, currentUserId);
+
+		return ResponseEntity.status(HttpStatus.OK).body(null);
 	}
 }

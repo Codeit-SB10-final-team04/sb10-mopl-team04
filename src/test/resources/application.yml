@@ -43,3 +43,8 @@ thumbnail:
     type: local
     local:
       path: ${java.io.tmpdir}/mopl-test-thumbnails/
+
+playlist:
+  hard-delete:
+    cron: "0 1 0 * * *"
+    retention-months: 1
