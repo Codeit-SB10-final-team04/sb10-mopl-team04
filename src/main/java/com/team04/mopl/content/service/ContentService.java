@@ -54,7 +54,7 @@ public class ContentService {
 		Content content = Content.builder()
 			.title(contentCreateRequest.title())
 			.type(ContentType.valueOf(contentCreateRequest.type()))
-			.description(contentCreateRequest.descriptions())
+			.description(contentCreateRequest.description())
 			.thumbnailUrl(thumbnailUrl)
 			.build();
 

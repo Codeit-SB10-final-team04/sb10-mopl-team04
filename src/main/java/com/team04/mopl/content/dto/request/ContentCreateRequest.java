@@ -10,7 +10,7 @@ public record ContentCreateRequest(
 	@NotBlank(message = "콘텐츠 제목은 필수입니다.")
 	String title,
 	@NotBlank(message = "콘텐츠 설명은 필수입니다.")
-	String descriptions,
+	String description,
 	List<String> tags
 ) {
 }
