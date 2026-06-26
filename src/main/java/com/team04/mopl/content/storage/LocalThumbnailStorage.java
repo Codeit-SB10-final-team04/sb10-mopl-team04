@@ -7,12 +7,14 @@ import java.nio.file.Paths;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.annotation.PostConstruct;
 
 @Component
+@ConditionalOnProperty(name = "thumbnail.storage.type", havingValue = "local")
 public class LocalThumbnailStorage implements ThumbnailStorage {
 
 	private final String uploadDir;
