@@ -111,6 +111,8 @@ checkstyle {
 }
 
 tasks.withType(Checkstyle) {
+    dependsOn 'compileJava'     // QClass 생성 후 Checkstyle 실행
+
     reports {
         xml.required = true     // XML 리포트 생성 (CI 파이프 연동)
         html.required = true    // HTML 리포트 생성
