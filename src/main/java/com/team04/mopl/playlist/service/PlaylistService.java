@@ -2,6 +2,7 @@ package com.team04.mopl.playlist.service;
 
 import static java.util.stream.Collectors.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -165,6 +166,29 @@ public class PlaylistService {
 		return playlistDto;
 	}
 
+	// TODO: `@PreAuthorize`는 Security 구현 후 추가
+	// @PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
+	@Transactional
+	public void softDeletePlaylist(UUID playlistId, UUID currentUserId) {
+		log.info("[PLAYLIST_SOFT_DELETE] 플레이리스트 논리 삭제 시작: currentUserId={}, playlistId={}",
+			currentUserId, playlistId);
+
+		// 플레이리스트 조회
+		Playlist playlist = getPlaylistOrThrow(playlistId);
+
+		// TODO: Security 추가로 `@PreAuthorize`가 사용 가능해지면 삭제
+		if (!playlist.getOwner().getId().equals(currentUserId)) {
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_FORBIDDEN)
+				.addDetail("requestUserId", currentUserId);
+		}
+
+		// 논리 삭제
+		playlist.markDeleted(Instant.now());
+
+		log.info("[PLAYLIST_SOFT_DELETE] 플레이리스트 논리 삭제 완료: currentUserId={}, playlistId={}",
+			currentUserId, playlistId);
+	}
+
 	// 사용자 조회
 	// TODO: `USER_NOT_FOUND` 같은 사용자 커스텀 예외 추가 시 `.orElseThrow(...)` 교체
 	private User getUserOrThrow(UUID userId) {
@@ -232,7 +256,7 @@ public class PlaylistService {
 			.contains(playlistId);
 	}
 
-	// 여러 플레이리스트에 포함된 콘텐츠 조회 흐, 콘텐츠별 태그를 붙여 요약 DTO 구현
+	// 여러 플레이리스트에 포함된 콘텐츠 조회 후, 콘텐츠별 태그를 붙여 요약 DTO 구현
 	// TODO: ContentSummary 구현 시 교체
 	// private Map<UUID, List<ContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
 	private Map<UUID, List<PlaylistContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
@@ -242,7 +266,8 @@ public class PlaylistService {
 		}
 
 		// 여러 플레이리스트에 포함된 콘텐츠 일괄 조회
-		List<PlaylistContentRow> rows = playlistContentRepository.findAllContentsByPlaylistIds(playlistIds);
+		List<PlaylistContentRow> rows = playlistContentRepository.findAllContentsByPlaylistIdsWithDeletedAtNull(
+			playlistIds);
 
 		// 태그 조회에 필요한 콘텐츠 id만 중복 없이 추출
 		List<UUID> contentIds = rows.stream()

@@ -35,4 +35,11 @@ public interface PlaylistControllerDocs {
 		UUID currentUserId
 		// MoplUserDetails moplUserDetails
 	);
+
+	@Operation(summary = "플레이리스트 삭제", description = "플레이리스트 소유자만 삭제할 수 있습니다.")
+	ResponseEntity<Void> softDeletePlaylist(
+		UUID playlistId,
+		UUID currentUserId
+		// MoplUserDetails moplUserDetails
+	);
 }

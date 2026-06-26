@@ -13,10 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.entity.ContentType;
 import com.team04.mopl.content.exception.ContentErrorCode;
@@ -35,6 +38,8 @@ class ContentControllerTest {
 
 	@MockitoBean
 	private ContentService contentService;
+
+	// ========== getContent ==========
 
 	@Test
 	@DisplayName("콘텐츠 단건 조회 요청에 성공하면 200 OK와 콘텐츠 Dto를 반환한다.")
@@ -85,5 +90,70 @@ class ContentControllerTest {
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.exceptionName").value("ContentException"))
 			.andExpect(jsonPath("$.message").value("콘텐츠를 찾을 수 없습니다."));
+	}
+
+	// ========== createContent ==========
+
+	@Test
+	@DisplayName("콘텐츠 생성 요청에 성공하면 201 Created와 콘텐츠 Dto를 반환한다.")
+	void createContent_returnCreated_whenValidRequest() throws Exception {
+		// given
+		UUID contentId = UUID.randomUUID();
+		ContentCreateRequest request = new ContentCreateRequest(
+			"movie", "인터스텔라", "우주를 여행하는 이야기", List.of("액션", "SF")
+		);
+		ContentDto response = new ContentDto(
+			contentId,
+			ContentType.movie,
+			"인터스텔라",
+			"우주를 여행하는 이야기",
+			"http://localhost:8080/thumbnails/abc.png",
+			List.of("액션", "SF"),
+			BigDecimal.ZERO,
+			0L,
+			0L
+		);
+
+		MockMultipartFile thumbnail = new MockMultipartFile(
+			"thumbnail", "thumb.png", MediaType.IMAGE_PNG_VALUE, "image-data".getBytes()
+		);
+		MockMultipartFile requestPart = new MockMultipartFile(
+			"contentCreateRequest", "", MediaType.APPLICATION_JSON_VALUE,
+			objectMapper.writeValueAsBytes(request)
+		);
+
+		when(contentService.createContent(any(), any())).thenReturn(response);
+
+		// when & then
+		mockMvc.perform(multipart("/api/contents")
+				.file(thumbnail)
+				.file(requestPart))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.id").value(contentId.toString()))
+			.andExpect(jsonPath("$.title").value("인터스텔라"))
+			.andExpect(jsonPath("$.tags[0]").value("액션"));
+	}
+
+	@Test
+	@DisplayName("필수 필드가 누락되면 400 Bad Request를 반환한다.")
+	void createContent_returnBadRequest_whenRequiredFieldMissing() throws Exception {
+		// given: title 누락
+		ContentCreateRequest request = new ContentCreateRequest(
+			"movie", "", "우주를 여행하는 이야기", null
+		);
+
+		MockMultipartFile thumbnail = new MockMultipartFile(
+			"thumbnail", "thumb.png", MediaType.IMAGE_PNG_VALUE, "image-data".getBytes()
+		);
+		MockMultipartFile requestPart = new MockMultipartFile(
+			"contentCreateRequest", "", MediaType.APPLICATION_JSON_VALUE,
+			objectMapper.writeValueAsBytes(request)
+		);
+
+		// when & then
+		mockMvc.perform(multipart("/api/contents")
+				.file(thumbnail)
+				.file(requestPart))
+			.andExpect(status().isBadRequest());
 	}
 }

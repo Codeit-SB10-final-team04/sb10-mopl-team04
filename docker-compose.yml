@@ -5,6 +5,7 @@ services:
     image: mopl:local
     environment:
       SERVER_PORT: ${SERVER_PORT}
+      TMDB_API_KEY: ${TMDB_API_KEY}
 
       MOPL_STORAGE_TYPE: ${MOPL_STORAGE_TYPE}
       PROFILE_STORAGE_LOCAL_ROOT_PATH: ${PROFILE_STORAGE_LOCAL_ROOT_PATH}

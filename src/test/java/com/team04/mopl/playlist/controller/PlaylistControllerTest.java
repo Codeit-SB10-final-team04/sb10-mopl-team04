@@ -207,4 +207,31 @@ class PlaylistControllerTest {
 				.content(objectMapper.writeValueAsString(request)))
 			.andExpect(status().isBadRequest());
 	}
+
+	@Test
+	@DisplayName("플레이리스트 논리 삭제 요청에 성공하면 200 OK를 반환한다.")
+	void softDeletePlaylist_returnOK_whenValidRequest() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+
+		doNothing().when(playlistService).softDeletePlaylist(playlistId, currentUserId);
+
+		// when, then
+		mockMvc.perform(delete("/api/playlists/{playlistId}", playlistId)
+				.header("X-MOPL-USER-ID", currentUserId))
+			.andExpect(status().isOk());
+	}
+
+	@Test
+	@DisplayName("플레이리스트 id가 UUID 형식이 아니라면 400 Bad Request로 실패한다.")
+	void softDeletePlaylist_returnBadRequest_whenPlaylistIdIsInvalidFormat() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		// when, then
+		mockMvc.perform(delete("/api/playlists/{playlistId}", "UUID")
+				.header("X-MOPL-USER-ID", currentUserId))
+			.andExpect(status().isBadRequest());
+	}
 }
