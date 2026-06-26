@@ -133,6 +133,8 @@ jacocoTestReport {
         xml.required = true     // XML 리포트 생성 (커버리지 수치화)
         html.required = true    // HTML 리포트 생성 (커버리지 시각화)
     }
+
+    check.dependsOn jacocoTestCoverageVerification
 }
 
 jacocoTestCoverageVerification {
