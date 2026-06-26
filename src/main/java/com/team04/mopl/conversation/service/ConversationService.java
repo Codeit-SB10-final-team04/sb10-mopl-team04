@@ -1,0 +1,37 @@
+package com.team04.mopl.conversation.service;
+
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
+import com.team04.mopl.conversation.dto.response.ConversationDto;
+import com.team04.mopl.conversation.repository.ConversationRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+@Transactional(readOnly = true)
+@RequiredArgsConstructor
+public class ConversationService {
+
+	private final ConversationRepository conversationRepository;
+
+	public ConversationDto createConversation(ConversationCreateRequest conversationCreateRequest, UUID currentUserId) {
+		log.info("[CONVERSATION CREATE] 대화 생성 시작: requestUserid={}, withUserId={}",
+			currentUserId, conversationCreateRequest.withUserId());
+
+		// 1. 유효성 검증: 요청자 및 사용자 존재 여부
+
+		// 2. 유효성 검증: 개인 채팅방 생성 시도
+
+		// 3. 유효성 검증: 중복 검사
+
+		// 3. 대화 생성 및 저장 (try-catch문으로 동시성 방어)
+
+		return null;
+	}
+}
