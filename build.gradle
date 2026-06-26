@@ -3,6 +3,8 @@ plugins {
     id 'checkstyle'
     id 'org.springframework.boot' version '3.5.15'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.github.spotbugs' version '6.0.0'
+    id 'jacoco'
 }
 
 group = 'com.team04'
@@ -82,25 +84,69 @@ tasks.named('test') {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs << "-parameters"
+    // MapStruct Spring Bean 등록
     options.compilerArgs << "-Amapstruct.defaultComponentModel=spring"
+    // 생성된 코드에 TimeStamp 제거
     options.compilerArgs << "-Amapstruct.suppressGeneratorTimestamp=true"
+}
+
+// ---------------------------------------------------------------------------
+// Spotbugs 설정
+// ---------------------------------------------------------------------------
+import com.github.spotbugs.snom.Confidence
+import com.github.spotbugs.snom.Effort
+import com.github.spotbugs.snom.SpotBugsTask
+
+spotbugs {
+    ignoreFailures = true               // 일단 빌드 통과하도록 설정
+    effort = Effort.valueOf('MAX')
+    reportLevel = Confidence.valueOf('MEDIUM')
+}
+
+tasks.withType(SpotBugsTask).configureEach {
+    // 컴파일이 끝난 뒤에 실행되도록 강제
+    dependsOn compileJava, compileTestJava
+    mustRunAfter compileJava, compileTestJava
 }
 
 // ---------------------------------------------------------------------------
 // Checkstyle 설정
 // ---------------------------------------------------------------------------
 checkstyle {
-    maxWarnings = 0
-    ignoreFailures = true
-    toolVersion = "8.24"
-    configFile = file("${rootDir}/naver-checkstyle-rules.xml")
-    configProperties = ["suppressionFile": "${rootDir}/naver-checkstyle-suppressions.xml"]
+    ignoreFailures = true       // 초기 단계 설정 (빌드는 통과시키되, 리포트로 경고 확인)
+    toolVersion = "10.17.0"
+    configFile = file("${rootDir}/checkstyle/naver-checkstyle-rules.xml")
+    configProperties = ["suppressionFile": "${rootDir}/checkstyle/naver-checkstyle-suppressions.xml"]
 }
 
 tasks.withType(Checkstyle) {
+    source = fileTree('src') {
+        include '**/*.java'
+        exclude '**/generated/**'
+        exclude '**/gen/**'
+    }
+    // Gradle이 컴파일을 마친 후에만 Checkstyle이 실행되도록 순서 강제
+    mustRunAfter compileJava, compileTestJava
+
     reports {
         xml.required = true
         html.required = true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Jacoco 설정
+// ---------------------------------------------------------------------------
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+jacocoTestReport {
+    dependsOn test              // 의존성 설정 (리포트 생성)
+
+    reports {
+        xml.required = true     // XML 리포트 생성 (커버리지 수치화)
+        html.required = true    // HTML 리포트 생성 (커버리지 시각화)
     }
 }
 
