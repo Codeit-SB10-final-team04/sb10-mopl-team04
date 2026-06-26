@@ -94,9 +94,9 @@ tasks.withType(JavaCompile).configureEach {
 // Spotbugs 설정
 // ---------------------------------------------------------------------------
 spotbugs {
-    ignoreFailures = false      // 오류 발견 시, 빌드 중단
-    effort = "max"              // 버그 분석 강도
-    reportLevel = "high"        // 심각한 버그만 감지
+    ignoreFailures = false
+    effort = Effort.valueOf('MAX')
+    reportLevel = Confidence.valueOf('HIGH')
 }
 
 // ---------------------------------------------------------------------------
