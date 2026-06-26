@@ -37,3 +37,9 @@ spring:
 tmdb:
   api:
     key: test-dummy-key
+
+thumbnail:
+  storage:
+    type: local
+    local:
+      path: ${java.io.tmpdir}/mopl-test-thumbnails/
