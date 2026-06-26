@@ -1,4 +1,4 @@
-CREATE TABLE users
+CREATE TABLE IF NOT EXISTS users
 (
     id                UUID                     NOT NULL,
     name              VARCHAR(50)              NOT NULL,
@@ -10,10 +10,10 @@ CREATE TABLE users
     is_locked         BOOLEAN                  NOT NULL,
     created_at        TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at        TIMESTAMP WITH TIME ZONE NOT NULL,
-    PRIMARY KEY (id)
-);
+                                    PRIMARY KEY (id)
+    );
 
-CREATE TABLE playlists
+CREATE TABLE IF NOT EXISTS playlists
 (
     id          UUID                     NOT NULL,
     owner_id    UUID                     NOT NULL,
@@ -22,6 +22,6 @@ CREATE TABLE playlists
     created_at  TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at  TIMESTAMP WITH TIME ZONE NOT NULL,
     deleted_at  TIMESTAMP WITH TIME ZONE,
-    PRIMARY KEY (id),
+                              PRIMARY KEY (id),
     CONSTRAINT fk_playlists_owner FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE
-);
+    );

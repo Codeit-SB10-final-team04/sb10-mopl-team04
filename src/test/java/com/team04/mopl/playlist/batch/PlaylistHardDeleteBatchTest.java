@@ -24,6 +24,7 @@ import com.team04.mopl.playlist.repository.PlaylistRepository;
 
 @SpringBootTest
 @TestPropertySource(properties = {
+	"spring.datasource.url=jdbc:h2:mem:playlist-hard-delete-batch-test:MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
 	"spring.jpa.hibernate.ddl-auto=none",
 	"spring.sql.init.mode=always",
 	"spring.sql.init.schema-locations=classpath:schema-h2-batch-test.sql",
