@@ -61,8 +61,10 @@ jobs:
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: ECS 태스크 정의 다운로드 및 정리
+        env:
+          TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
         run: |
-          aws ecs describe-task-definition --task-definition ${{ vars.ECS_TASK_DEFINITION }} --query taskDefinition > raw-task-def.json
+          aws ecs describe-task-definition --task-definition "$TASK_DEFINITION" --query taskDefinition > raw-task-def.json
           cat raw-task-def.json | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-definition.json
 
       - name: 새 이미지 주소 및 환경 변수로 태스크 정의 렌더링
