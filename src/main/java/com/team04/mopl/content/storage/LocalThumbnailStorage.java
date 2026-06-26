@@ -11,6 +11,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.team04.mopl.content.storage.exception.FileStorageException;
+
 import jakarta.annotation.PostConstruct;
 
 @Component
@@ -38,6 +40,17 @@ public class LocalThumbnailStorage implements ThumbnailStorage {
 			return "http://localhost:8080/thumbnails/" + filename;
 		} catch (IOException e) {
 			throw new RuntimeException("썸네일 저장 실패", e);
+		}
+	}
+
+	@Override
+	public void delete(String thumbnailUrl) {
+		try {
+			String filename = thumbnailUrl.substring(thumbnailUrl.lastIndexOf("/") + 1);
+			Path path = Paths.get(uploadDir).resolve(filename);
+			Files.deleteIfExists(path);
+		} catch (IOException e) {
+			throw new FileStorageException("썸네일 삭제 실패", e);
 		}
 	}
 
