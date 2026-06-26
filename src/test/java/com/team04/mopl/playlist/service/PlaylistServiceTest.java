@@ -30,6 +30,7 @@ import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.dto.row.PlaylistContentRow;
 import com.team04.mopl.playlist.dto.row.PlaylistSubscriberCountRow;
 import com.team04.mopl.playlist.entity.Playlist;
+import com.team04.mopl.playlist.exception.PlaylistErrorCode;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.mapper.PlaylistMapper;
 import com.team04.mopl.playlist.repository.PlaylistContentRepository;
@@ -108,13 +109,13 @@ class PlaylistServiceTest {
 		// then
 		assertEquals(mapperResult, result);
 
-		verify(userRepository).findById(any(UUID.class));
-		verify(playlistRepository).save(any(Playlist.class));
-
 		ArgumentCaptor<Playlist> playlistCaptor = ArgumentCaptor.forClass(Playlist.class);
 		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
 		ArgumentCaptor<List<PlaylistContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
+
+		verify(userRepository).findById(currentUserId);
+		verify(playlistRepository).save(playlistCaptor.capture());
 
 		verify(playlistMapper).toDto(
 			playlistCaptor.capture(),
@@ -147,7 +148,7 @@ class PlaylistServiceTest {
 		assertThrows(IllegalArgumentException.class,
 			() -> playlistService.createPlaylist(request, currentUserId));
 
-		verify(userRepository).findById(any(UUID.class));
+		verify(userRepository).findById(currentUserId);
 		verify(playlistRepository, never()).save(any(Playlist.class));
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
@@ -230,11 +231,11 @@ class PlaylistServiceTest {
 		// then
 		assertEquals(mapperResult, result);
 
-		verify(userRepository).findById(any(UUID.class));
-		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
-		verify(playlistSubscriptionRepository).countAllSubscribersByPlaylistIds(anyList());
-		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
+		verify(userRepository).findById(currentUserId);
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
+		verify(playlistSubscriptionRepository).countAllSubscribersByPlaylistIds(List.of(playlistId));
+		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(List.of(playlistId), currentUserId);
+		verify(playlistContentRepository).findAllContentsByPlaylistIdsWithDeletedAtNull(List.of(playlistId));
 
 		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
@@ -244,7 +245,7 @@ class PlaylistServiceTest {
 			eq(playlist),
 			// TODO: UserSummary 구현 후 변경
 			// any(UserSummary.class),
-			any(PlaylistUserSummary.class),
+			eq(ownerSummary),
 			subscriberCountCaptor.capture(),
 			subscribedByMeCaptor.capture(),
 			contentCaptor.capture()
@@ -272,7 +273,7 @@ class PlaylistServiceTest {
 		assertThrows(IllegalArgumentException.class,
 			() -> playlistService.findPlaylist(playlistId, currentUserId));
 
-		verify(userRepository).findById(any(UUID.class));
+		verify(userRepository).findById(currentUserId);
 		verify(playlistRepository, never()).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
@@ -293,11 +294,9 @@ class PlaylistServiceTest {
 	void findPlaylist_throwException_whenPlaylistNotFound() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
-		UUID ownerId = UUID.randomUUID();
 		UUID playlistId = UUID.randomUUID();
 
 		User currentUser = createUser(currentUserId);
-		User owner = createUser(ownerId);
 
 		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
 		when(userRepository.findById(currentUserId))
@@ -306,11 +305,12 @@ class PlaylistServiceTest {
 			.thenReturn(Optional.empty());
 
 		// when, then
-		assertThrows(PlaylistException.class,
+		PlaylistException exception = assertThrows(PlaylistException.class,
 			() -> playlistService.findPlaylist(playlistId, currentUserId));
+		assertEquals(PlaylistErrorCode.PLAYLIST_NOT_FOUND, exception.getErrorCode());
 
-		verify(userRepository).findById(any(UUID.class));
-		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
+		verify(userRepository).findById(currentUserId);
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
 		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
@@ -380,10 +380,10 @@ class PlaylistServiceTest {
 		// then
 		assertEquals(mapperResult, result);
 
-		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
-		verify(playlistSubscriptionRepository).countAllSubscribersByPlaylistIds(anyList());
-		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
+		verify(playlistSubscriptionRepository).countAllSubscribersByPlaylistIds(List.of(playlistId));
+		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(List.of(playlistId), currentUserId);
+		verify(playlistContentRepository).findAllContentsByPlaylistIdsWithDeletedAtNull(List.of(playlistId));
 
 		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
@@ -414,8 +414,9 @@ class PlaylistServiceTest {
 		PlaylistUpdateRequest request = new PlaylistUpdateRequest(" ", "수정 description");
 
 		// when, then
-		assertThrows(PlaylistException.class,
+		PlaylistException exception = assertThrows(PlaylistException.class,
 			() -> playlistService.updatePlaylist(playlistId, request, currentUserId));
+		assertEquals(PlaylistErrorCode.INVALID_INPUT, exception.getErrorCode());
 
 		verify(playlistRepository, never()).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
@@ -449,10 +450,12 @@ class PlaylistServiceTest {
 			.thenReturn(Optional.of(playlist));
 
 		// when, then
-		assertThrows(PlaylistException.class,
+		PlaylistException exception = assertThrows(PlaylistException.class,
 			() -> playlistService.updatePlaylist(playlistId, request, currentUserId));
 
-		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
+		assertEquals(PlaylistErrorCode.PLAYLIST_FORBIDDEN, exception.getErrorCode());
+
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
 		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
@@ -473,21 +476,21 @@ class PlaylistServiceTest {
 	void updatePlaylist_returnException_whenNotChange() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
-		UUID ownerId = UUID.randomUUID();
 		UUID playlistId = UUID.randomUUID();
 
 		PlaylistUpdateRequest request = new PlaylistUpdateRequest("테스트 제목", "테스트 설명");
-		User owner = createUser(ownerId);
+		User owner = createUser(currentUserId);
 		Playlist playlist = createPlaylist(owner, playlistId);
 
 		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
 			.thenReturn(Optional.of(playlist));
 
 		// when, then
-		assertThrows(PlaylistException.class,
+		PlaylistException exception = assertThrows(PlaylistException.class,
 			() -> playlistService.updatePlaylist(playlistId, request, currentUserId));
+		assertEquals(PlaylistErrorCode.NO_CHANGE_VALUE, exception.getErrorCode());
 
-		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
 		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
@@ -501,6 +504,69 @@ class PlaylistServiceTest {
 			anyBoolean(),
 			anyList()
 		);
+	}
+
+	@Test
+	@DisplayName("플레이리스트 논리 삭제에 성공하면 deletedAt이 기록된다.")
+	void softDeletePlaylist_markDeletedAt_whenValidRequest() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+
+		User owner = createUser(currentUserId);
+		Playlist playlist = createPlaylist(owner, playlistId);
+
+		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
+			.thenReturn(Optional.of(playlist));
+
+		// when
+		playlistService.softDeletePlaylist(playlistId, currentUserId);
+
+		// then
+		assertNotNull(playlist.getDeletedAt());
+
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
+	}
+
+	@Test
+	@DisplayName("플레이리스트 논리 삭제 시 플레이리스트가 존재하지 않으면 예외가 발생한다.")
+	void softDeletePlaylist_throwException_whenPlaylistNotFound() {
+		//given
+		UUID playlistId = UUID.randomUUID();
+		UUID currentUserId = UUID.randomUUID();
+
+		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
+			.thenReturn(Optional.empty());
+
+		// when, then
+		assertThrows(PlaylistException.class,
+			() -> playlistService.softDeletePlaylist(playlistId, currentUserId));
+
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
+	}
+
+	@Test
+	@DisplayName("플레이리스트 논리 삭제 시 플레이리스트 소유자가 아니면 예외가 발생한다.")
+	void softDeletePlaylist_throwException_whenCurrentUserIsNotOwner() {
+		// given
+		UUID playlistId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
+		UUID currentUserId = UUID.randomUUID();
+
+		User owner = createUser(ownerId);
+		Playlist playlist = createPlaylist(owner, playlistId);
+
+		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
+			.thenReturn(Optional.of(playlist));
+
+		// when, then
+		PlaylistException exception = assertThrows(PlaylistException.class,
+			() -> playlistService.softDeletePlaylist(playlistId, currentUserId));
+
+		assertEquals(PlaylistErrorCode.PLAYLIST_FORBIDDEN, exception.getErrorCode());
+		assertNull(playlist.getDeletedAt());
+
+		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 	}
 
 	private User createUser(UUID userId) {
