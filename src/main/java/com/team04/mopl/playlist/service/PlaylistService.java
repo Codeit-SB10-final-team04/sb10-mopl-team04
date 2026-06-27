@@ -11,15 +11,20 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
+import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
+import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.dto.row.PlaylistContentRow;
 import com.team04.mopl.playlist.entity.Playlist;
+import com.team04.mopl.playlist.enums.PlaylistSortBy;
 import com.team04.mopl.playlist.exception.PlaylistErrorCode;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.mapper.PlaylistMapper;
@@ -110,6 +115,88 @@ public class PlaylistService {
 			currentUserId, playlist.getId(), playlist.getTitle(), playlist.getDescription());
 
 		return playlistDto;
+	}
+
+	@Transactional(readOnly = true)
+	public CursorResponsePlaylistDto findAllPlaylists(
+		PlaylistSearchRequest request,
+		UUID currentUserId
+	) {
+		int limit = request.limit();
+		SortDirection sortDirection = request.sortDirection();
+		PlaylistSortBy sortBy = request.sortBy();
+
+		log.debug(
+			"[PLAYLIST_FIND_ALL] 플레이리스트 목록 조회 시작: keyword={}, ownerIdEqual={}, subscriberIdEqual={}, cursor={}, idAfter={}, limit={}, sortDirection={}, sortBy={}",
+			request.normalizedKeyword(), request.ownerIdEqual(), request.subscriberIdEqual(), request.cursor(),
+			request.idAfter(), limit, sortDirection, sortBy);
+
+		// 현재 로그인한 인증된 사용자 조회
+		getUserOrThrow(currentUserId);
+
+		// 조건에 따라 플레이리스트 목록 조회
+		// 정렬 조건에 구독자 수 포함 -> 플레이리스트 조회 시 구독자 수도 같이 조회
+		PlaylistCursorPage playlistCursorPage = playlistRepository.findPlaylists(request);
+
+		List<UUID> playlistIds = playlistCursorPage.playlistRows().stream()
+			.map(row -> row.playlist().getId())
+			.toList();
+
+		// 조회된 플레이리스트 중 현재 사용자가 구독 중인 플레이리스트 id Set 생성
+		Set<UUID> subscribedPlaylistIds = getSubscribedPlaylistIds(playlistIds, currentUserId);
+
+		// 플레이리스트가 가진 콘텐츠의 ContentSummaryMap 생성
+		Map<UUID, List<PlaylistContentSummary>> contentSummaryMap =
+			getContentSummariesByPlaylistIds(playlistIds);
+
+		// PlaylistDto로 조립 (OwnerSummary, 구독 여부, ContentSummary)
+		List<PlaylistDto> playlistDtoList = playlistCursorPage.playlistRows().stream()
+			.map(row -> {
+				Playlist playlist = row.playlist();
+				UUID playlistId = playlist.getId();
+				return playlistMapper.toDto(
+					playlist,
+					new PlaylistUserSummary(row.ownerId(), row.ownerName(), row.ownerProfileImageUrl()),
+					row.subscriberCount(),
+					subscribedPlaylistIds.contains(playlistId),
+					contentSummaryMap.getOrDefault(playlistId, List.of())
+				);
+			})
+			.toList();
+
+		// 조회된 플레이리스트 수
+		int playlistDtoListSize = playlistDtoList.size();
+		Boolean hasNext = playlistCursorPage.hasNext();
+
+		// 마지막 요소
+		PlaylistDto lastPlaylistDto = playlistDtoList.isEmpty()
+			? null
+			: playlistDtoList.get(playlistDtoListSize - 1);
+		// 다음 cursor
+		String nextCursor = hasNext && lastPlaylistDto != null
+			? resolveNextCursor(lastPlaylistDto, sortBy)
+			: null;
+		// 다음 보조 cursor (idAfter)
+		UUID nextIdAfter = hasNext && lastPlaylistDto != null
+			? lastPlaylistDto.id()
+			: null;
+
+		// Cursor 페이지네이션으로 만들기
+		CursorResponsePlaylistDto cursorResponsePlaylistDto
+			= new CursorResponsePlaylistDto(
+			playlistDtoList,
+			nextCursor,
+			nextIdAfter,
+			hasNext,
+			playlistCursorPage.totalCount(),
+			sortBy.toString(),
+			sortDirection
+		);
+
+		log.debug("[PLAYLIST_FIND_ALL] 플레이리스트 목록 조회 완료: size={}, nextCursor={}, nextIdAfter={}",
+			playlistDtoListSize, nextCursor, nextIdAfter);
+
+		return cursorResponsePlaylistDto;
 	}
 
 	// TODO: `@PreAuthorize`는 Security 구현 후 추가
@@ -297,6 +384,12 @@ public class PlaylistService {
 					mapping(row -> toContentSummary(row.content(), tagNameMap), toList())
 				)
 			);
+	}
+
+	private String resolveNextCursor(PlaylistDto lastPlaylistDto, PlaylistSortBy sortBy) {
+		return sortBy.equals(PlaylistSortBy.updatedAt)
+			? lastPlaylistDto.updatedAt().toString()
+			: lastPlaylistDto.subscriberCount().toString();
 	}
 
 	// 단건 조회에서 사용할 콘텐츠 요약 목록을 가져옴
