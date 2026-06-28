@@ -133,7 +133,7 @@ class PlaylistControllerTest {
 	}
 
 	@Test
-	@DisplayName("GET /api/playlists 요청은 지원하지 않는 메서드로 실패한다.")
+	@DisplayName("필수 쿼리 파라미터가 누락된 요청은 지원하지 않는 메서드로 실패한다.")
 	void findPlaylist_returnIsInternalServerError_whenPlaylistIdIsMissing() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
@@ -320,17 +320,6 @@ class PlaylistControllerTest {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
-			"제목",
-			null,
-			null,
-			null,
-			null,
-			null,
-			SortDirection.DESCENDING,
-			PlaylistSortBy.updatedAt
-		);
-
 		// when, then
 		mockMvc.perform(get("/api/playlists")
 				.param("keywordLike", "제목")
@@ -345,18 +334,7 @@ class PlaylistControllerTest {
 	void findAllPlaylists_returnBadRequest_whenSortByOrSortDirectionIsMissing() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
-
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
-			"제목",
-			null,
-			null,
-			null,
-			null,
-			2,
-			null,
-			PlaylistSortBy.updatedAt
-		);
-
+		
 		// when, then
 		mockMvc.perform(get("/api/playlists")
 				.param("keywordLike", "제목")
