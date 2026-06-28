@@ -23,6 +23,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.savedrequest.NullRequestCache;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
@@ -53,6 +54,8 @@ public class SecurityConfig {
 			// 서버 세션을 생성하지 않도록 설정
 			.sessionManagement(session -> session
 				.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+			.requestCache(requestCache -> requestCache
+				.requestCache(new NullRequestCache()))
 
 			// 로그인 요청
 			.formLogin(formLogin -> formLogin
