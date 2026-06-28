@@ -64,6 +64,7 @@ public class PlaylistController implements PlaylistControllerDocs {
 		return ResponseEntity.status(HttpStatus.OK).body(playlistDto);
 	}
 
+	@GetMapping
 	@Override
 	public ResponseEntity<CursorResponsePlaylistDto> findAllPlaylists(
 		@Valid @ModelAttribute PlaylistSearchRequest request,
