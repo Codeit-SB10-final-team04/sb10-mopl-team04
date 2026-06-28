@@ -12,12 +12,14 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
@@ -49,11 +51,7 @@ class JwtTokenProviderTest {
 	);
 
 	private final JwtEncoder jwtEncoder = new NimbusJwtEncoder(new ImmutableSecret<>(secretKey));
-
-	private final JwtDecoder jwtDecoder = NimbusJwtDecoder
-		.withSecretKey(secretKey)
-		.macAlgorithm(MacAlgorithm.HS256)
-		.build();
+	private final JwtDecoder jwtDecoder = createJwtDecoder();
 
 	private final JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(
 		jwtEncoder,
@@ -138,8 +136,8 @@ class JwtTokenProviderTest {
 		// given
 		UUID userId = UUID.randomUUID();
 		UUID sessionId = UUID.randomUUID();
-		Instant issuedAt = Instant.now().minusSeconds(3600);
-		Instant expiresAt = Instant.now().minusSeconds(120);
+		Instant issuedAt = Instant.now().minusSeconds(7200);
+		Instant expiresAt = Instant.now().minusSeconds(3600);
 
 		MoplUserDetails userDetails = MoplUserDetails.authenticated(
 			userId,
@@ -204,6 +202,22 @@ class JwtTokenProviderTest {
 			.isInstanceOf(AuthException.class)
 			.extracting("errorCode")
 			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
+	}
+
+	private JwtDecoder createJwtDecoder() {
+		NimbusJwtDecoder decoder = NimbusJwtDecoder
+			.withSecretKey(secretKey)
+			.macAlgorithm(MacAlgorithm.HS256)
+			.build();
+
+		decoder.setJwtValidator(
+			new DelegatingOAuth2TokenValidator<>(
+				JwtValidators.createDefaultWithIssuer(jwtProperties.issuer()),
+				new JwtExpiredTokenValidator()
+			)
+		);
+
+		return decoder;
 	}
 
 	private String encode(JwtClaimsSet claimsSet) {
