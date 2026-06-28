@@ -22,8 +22,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.team04.mopl.common.dto.ContentSummary;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.common.enums.SortDirection;
+import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
+import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
@@ -52,6 +54,9 @@ class PlaylistServiceTest {
 
 	@Mock
 	private PlaylistRepository playlistRepository;
+
+	@Mock
+	private ContentTagRepository contentTagRepository;
 
 	@Mock
 	private PlaylistSubscriptionRepository playlistSubscriptionRepository;
@@ -205,6 +210,11 @@ class PlaylistServiceTest {
 			.thenReturn(Set.of(playlistId));
 		when(playlistContentRepository.findAllContentsByPlaylistIdsWithDeletedAtNull(List.of(playlistId)))
 			.thenReturn(List.of(new PlaylistContentRow(playlistId, content)));
+		when(contentTagRepository.findTagNamesByContentIds(List.of(contentId)))
+			.thenReturn(List.of(
+				new TagRow(contentId, "액션"),
+				new TagRow(contentId, "드라마")
+			));
 		when(playlistMapper.toDto(
 				any(Playlist.class),
 				any(UserSummary.class),
@@ -650,6 +660,8 @@ class PlaylistServiceTest {
 		when(playlistContentRepository.findAllContentsByPlaylistIdsWithDeletedAtNull(
 			List.of(playlistId1, playlistId2))
 		).thenReturn(List.of(playlistContentRow));
+		when(contentTagRepository.findTagNamesByContentIds(List.of(contentId)))
+			.thenReturn(List.of());
 		when(playlistMapper.toDto(
 				any(Playlist.class),
 				any(UserSummary.class),
@@ -681,6 +693,7 @@ class PlaylistServiceTest {
 		verify(playlistContentRepository).findAllContentsByPlaylistIdsWithDeletedAtNull(
 			List.of(playlistId1, playlistId2)
 		);
+		verify(contentTagRepository).findTagNamesByContentIds(List.of(contentId));
 
 		ArgumentCaptor<Playlist> playlistCaptor = ArgumentCaptor.forClass(Playlist.class);
 		ArgumentCaptor<UserSummary> ownerUserSummary = ArgumentCaptor.forClass(UserSummary.class);
