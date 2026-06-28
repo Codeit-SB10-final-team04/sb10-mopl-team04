@@ -2,7 +2,7 @@
 -- ENUM 타입 정의
 -- ----------------------------------------------------------------
 CREATE TYPE content_type AS ENUM ('movie', 'tv_series', 'sport');
-CREATE TYPE collection_source AS ENUM ('TMDB', 'SPORTS_DB');
+CREATE TYPE collection_source AS ENUM ('TMDB', 'SPORTS_DB', 'MANUAL');
 CREATE TYPE email_type AS ENUM ('REAL', 'VIRTUAL');
 CREATE TYPE user_role AS ENUM ('ADMIN', 'USER');
 CREATE TYPE social_provider AS ENUM ('GOOGLE', 'KAKAO');

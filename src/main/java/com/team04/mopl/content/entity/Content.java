@@ -79,7 +79,7 @@ public class Content extends BaseUpdatableEntity {
 		String thumbnailUrl
 	) {
 		this.externalId = externalId;
-		this.source = source;
+		this.source = source != null ? source : CollectionSource.MANUAL; // 관리자가 수동 등록 시
 		this.title = title;
 		this.type = type;
 		this.description = description;
