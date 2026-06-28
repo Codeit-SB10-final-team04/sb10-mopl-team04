@@ -49,7 +49,7 @@ class LoginSuccessHandlerTest {
 	);
 
 	@Test
-	@DisplayName("로그인 성공 시 토큰을 발급하고 인증 세션을 저장한다")
+	@DisplayName("로그인 성공 시 토큰을 발급하고 동일한 세션 정보로 인증 세션을 저장한다")
 	void onAuthenticationSuccess_writesJwtResponse_whenAuthenticationSucceeds() throws Exception {
 		// given
 		UUID userId = UUID.randomUUID();
@@ -82,30 +82,51 @@ class LoginSuccessHandlerTest {
 
 		when(jwtTokenProvider.calculateAccessExpiresAt(any(Instant.class))).thenReturn(accessExpiresAt);
 		when(jwtTokenProvider.calculateRefreshExpiresAt(any(Instant.class))).thenReturn(refreshExpiresAt);
-		when(jwtTokenProvider.generateAccessToken(eq(userDetails), any(UUID.class), any(Instant.class), eq(accessExpiresAt)))
-			.thenReturn(accessToken);
+		when(jwtTokenProvider.generateAccessToken(
+			eq(userDetails),
+			any(UUID.class),
+			any(Instant.class),
+			eq(accessExpiresAt)
+		)).thenReturn(accessToken);
 
 		when(refreshTokenGenerator.generate()).thenReturn(refreshToken);
 		when(tokenHasher.hash(refreshToken)).thenReturn(refreshTokenHash);
 
+		ArgumentCaptor<UUID> tokenSessionIdCaptor = ArgumentCaptor.forClass(UUID.class);
+		ArgumentCaptor<Instant> tokenIssuedAtCaptor = ArgumentCaptor.forClass(Instant.class);
+		ArgumentCaptor<UUID> storedSessionIdCaptor = ArgumentCaptor.forClass(UUID.class);
+		ArgumentCaptor<Instant> storedIssuedAtCaptor = ArgumentCaptor.forClass(Instant.class);
 		ArgumentCaptor<JwtDto> jwtDtoCaptor = ArgumentCaptor.forClass(JwtDto.class);
 
 		// when
 		loginSuccessHandler.onAuthenticationSuccess(request, response, authentication);
 
 		// then
+		verify(jwtTokenProvider).generateAccessToken(
+			eq(userDetails),
+			tokenSessionIdCaptor.capture(),
+			tokenIssuedAtCaptor.capture(),
+			eq(accessExpiresAt)
+		);
+
 		verify(authSessionStore).replace(
 			eq(userId),
-			any(UUID.class),
+			storedSessionIdCaptor.capture(),
 			eq(refreshTokenHash),
 			eq(accessExpiresAt),
 			eq(refreshExpiresAt),
-			any(Instant.class)
+			storedIssuedAtCaptor.capture()
 		);
 
 		verify(refreshTokenCookieWriter).write(same(response), eq(refreshToken));
 		verify(authResponseWriter).writeJson(same(response), eq(HttpStatus.OK), jwtDtoCaptor.capture());
 
-		assertThat(jwtDtoCaptor.getValue()).isNotNull();
+		assertThat(storedSessionIdCaptor.getValue()).isEqualTo(tokenSessionIdCaptor.getValue());
+		assertThat(storedIssuedAtCaptor.getValue()).isEqualTo(tokenIssuedAtCaptor.getValue());
+
+		JwtDto jwtDto = jwtDtoCaptor.getValue();
+
+		assertThat(jwtDto.userDto()).isEqualTo(userDto);
+		assertThat(jwtDto.accessToken()).isEqualTo(accessToken);
 	}
 }
