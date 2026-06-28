@@ -6,6 +6,7 @@ import org.springframework.util.StringUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.team04.mopl.content.client.TmdbClient;
+import com.team04.mopl.content.entity.CollectionSource;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentTag;
 import com.team04.mopl.content.entity.ContentType;
@@ -56,24 +57,31 @@ public class TmdbContentCollectService {
 	 */
 	@Transactional
 	public boolean saveIfNotExists(JsonNode item, ContentType type) {
-		// type에 따라 title 필드 추출
-		String title = resolveTitle(item, type);
+		String externalId = item.path("id").asText("");
 
+		if (!StringUtils.hasText(externalId)) {
+			log.warn("[TMDB] externalId 없는 item skip: type={}", type);
+			return false;
+		}
+
+		if (contentRepository.existsByExternalIdAndSource(externalId, CollectionSource.TMDB)) {
+			log.debug("[TMDB] 이미 존재, 건너뜀: externalId={}", externalId);
+			return false;
+		}
+
+		String title = resolveTitle(item, type);
 		if (!StringUtils.hasText(title)) {
 			log.warn("[TMDB] 제목 없는 item skip: type={}", type);
 			return false;
 		}
 
-		if (contentRepository.existsByTitleAndType(title, type)) {
-			log.debug("[TMDB] 이미 존재, 건너뜀: {}", title);
-			return false;
-		}
-
 		Content content = contentRepository.save(Content.builder()
+			.externalId(externalId)
+			.source(CollectionSource.TMDB)
 			.title(title)
 			.type(type)
-			.description(item.path("overview").asText("")) // overview 없으면 빈 문자열
-			.thumbnailUrl(tmdbClient.buildThumbnailUrl(item.path("poster_path").asText(""))) // url 경로도 마찬가지
+			.description(item.path("overview").asText(""))
+			.thumbnailUrl(tmdbClient.buildThumbnailUrl(item.path("poster_path").asText("")))
 			.build());
 
 		saveTags(content, type);

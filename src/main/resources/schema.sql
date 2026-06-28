@@ -2,6 +2,7 @@
 -- ENUM 타입 정의
 -- ----------------------------------------------------------------
 CREATE TYPE content_type AS ENUM ('movie', 'tv_series', 'sport');
+CREATE TYPE collection_source AS ENUM ('TMDB', 'SPORTS_DB');
 CREATE TYPE email_type AS ENUM ('REAL', 'VIRTUAL');
 CREATE TYPE user_role AS ENUM ('ADMIN', 'USER');
 CREATE TYPE social_provider AS ENUM ('GOOGLE', 'KAKAO');
@@ -35,19 +36,22 @@ CREATE TABLE tags (
 );
 
 CREATE TABLE contents (
-                          id              UUID            NOT NULL,
-                          title           VARCHAR(200)    NOT NULL,
-                          type            content_type    NOT NULL,
-                          description     TEXT            NOT NULL,
-                          thumbnail_url   VARCHAR(500)    NOT NULL,
-                          average_rating  DECIMAL(3,2)    NOT NULL DEFAULT 0.00,
-                          review_count    BIGINT          NOT NULL DEFAULT 0,
-                          watcher_count   BIGINT          NOT NULL DEFAULT 0,
-                          created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-                          updated_at      TIMESTAMPTZ     NOT NULL,
-                          deleted_at      TIMESTAMPTZ     NULL,
+                          id              UUID                NOT NULL,
+                          external_id     VARCHAR(100)        NULL,
+                          source          collection_source   NULL,
+                          title           VARCHAR(200)        NOT NULL,
+                          type            content_type        NOT NULL,
+                          description     TEXT                NOT NULL,
+                          thumbnail_url   VARCHAR(500)        NOT NULL,
+                          average_rating  DECIMAL(3,2)        NOT NULL DEFAULT 0.00,
+                          review_count    BIGINT              NOT NULL DEFAULT 0,
+                          watcher_count   BIGINT              NOT NULL DEFAULT 0,
+                          created_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
+                          updated_at      TIMESTAMPTZ         NOT NULL,
+                          deleted_at      TIMESTAMPTZ         NULL,
 
-                          CONSTRAINT pk_contents PRIMARY KEY (id)
+                          CONSTRAINT pk_contents PRIMARY KEY (id),
+                          CONSTRAINT uq_contents_external_id_source UNIQUE (external_id, source)
 );
 
 CREATE TABLE conversations (
