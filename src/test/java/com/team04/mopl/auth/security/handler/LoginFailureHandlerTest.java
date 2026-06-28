@@ -11,6 +11,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.LockedException;
 
 import com.team04.mopl.auth.exception.AuthErrorCode;
@@ -62,5 +63,27 @@ class LoginFailureHandlerTest {
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
 			.isEqualTo(AuthErrorCode.INVALID_CREDENTIALS);
+	}
+
+	@Test
+	@DisplayName("인증 서비스 내부 오류이면 AUTHENTICATION_SERVICE_ERROR 에러 응답을 반환한다")
+	void onAuthenticationFailure_writesAuthenticationServiceError_whenExceptionIsInternalServiceException()
+		throws Exception {
+		// given
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		InternalAuthenticationServiceException exception = new InternalAuthenticationServiceException("database error");
+
+		ArgumentCaptor<AuthException> exceptionCaptor = ArgumentCaptor.forClass(AuthException.class);
+
+		// when
+		loginFailureHandler.onAuthenticationFailure(request, response, exception);
+
+		// then
+		verify(authResponseWriter).writeError(same(response), exceptionCaptor.capture());
+
+		assertThat(exceptionCaptor.getValue())
+			.extracting("errorCode")
+			.isEqualTo(AuthErrorCode.AUTHENTICATION_SERVICE_ERROR);
 	}
 }

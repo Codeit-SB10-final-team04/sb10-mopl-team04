@@ -2,8 +2,11 @@ package com.team04.mopl.auth.security.handler;
 
 import java.io.IOException;
 
+import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
 
@@ -40,11 +43,20 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 		authResponseWriter.writeError(response, authException);
 	}
 
+	// 예외 타입에 맞는 인증 에러 코드를 결정
 	private AuthErrorCode resolveErrorCode(AuthenticationException exception) {
 		if (exception instanceof LockedException) {
 			return AuthErrorCode.LOCKED_ACCOUNT;
 		}
 
-		return AuthErrorCode.INVALID_CREDENTIALS;
+		if (exception instanceof BadCredentialsException || exception instanceof UsernameNotFoundException) {
+			return AuthErrorCode.INVALID_CREDENTIALS;
+		}
+
+		if (exception instanceof AuthenticationServiceException) {
+			return AuthErrorCode.AUTHENTICATION_SERVICE_ERROR;
+		}
+
+		return AuthErrorCode.AUTHENTICATION_SERVICE_ERROR;
 	}
 }

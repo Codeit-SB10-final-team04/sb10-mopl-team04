@@ -15,7 +15,8 @@ public enum AuthErrorCode implements ErrorCode {
 	INVALID_ACCESS_TOKEN(HttpStatus.UNAUTHORIZED, "AU04", "유효하지 않은 access token입니다."),
 	EXPIRED_ACCESS_TOKEN(HttpStatus.UNAUTHORIZED, "AU05", "만료된 access token입니다."),
 	AUTH_SESSION_INVALID(HttpStatus.UNAUTHORIZED, "AU06", "인증 세션이 유효하지 않습니다."),
-	ACCESS_DENIED(HttpStatus.FORBIDDEN, "AU07", "접근 권한이 없습니다.");
+	ACCESS_DENIED(HttpStatus.FORBIDDEN, "AU07", "접근 권한이 없습니다."),
+	AUTHENTICATION_SERVICE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "AU08", "인증 처리 중 오류가 발생했습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String code;
