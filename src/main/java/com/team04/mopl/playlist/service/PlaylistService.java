@@ -11,6 +11,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team04.mopl.common.dto.ContentSummary;
+import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.repository.ContentTagRepository;
@@ -18,10 +20,8 @@ import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
-import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
 import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
-import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.dto.row.PlaylistContentRow;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
@@ -68,9 +68,7 @@ public class PlaylistService {
 		playlistRepository.save(playlist);
 
 		// 플레이리스트 소유자 summary
-		// TODO: UserSummary 구현 후 변경
-		// UserSummary ownerSummary = getUserSummary(owner);
-		PlaylistUserSummary ownerSummary = getUserSummary(owner);
+		UserSummary ownerSummary = getUserSummary(owner);
 
 		// 플레이리스트 구독자 조회 (생성이라 존재 X)
 		long subscriberCount = 0L;
@@ -79,9 +77,7 @@ public class PlaylistService {
 		boolean subscribedByMe = false;
 
 		// 플레이리스트 내 콘텐츠 조회 (생성이라 존재 X)
-		// TODO: ContentSummary 구현 후 변경
-		// List<ContentSummary> contentSummaries = List.of();
-		List<PlaylistContentSummary> contentSummaries = List.of();
+		List<ContentSummary> contentSummaries = List.of();
 
 		PlaylistDto playlistDto = playlistMapper.toDto(
 			playlist,
@@ -146,7 +142,7 @@ public class PlaylistService {
 		Set<UUID> subscribedPlaylistIds = getSubscribedPlaylistIds(playlistIds, currentUserId);
 
 		// 플레이리스트가 가진 콘텐츠의 ContentSummaryMap 생성
-		Map<UUID, List<PlaylistContentSummary>> contentSummaryMap =
+		Map<UUID, List<ContentSummary>> contentSummaryMap =
 			getContentSummariesByPlaylistIds(playlistIds);
 
 		// PlaylistDto로 조립 (OwnerSummary, 구독 여부, ContentSummary)
@@ -156,7 +152,7 @@ public class PlaylistService {
 				UUID playlistId = playlist.getId();
 				return playlistMapper.toDto(
 					playlist,
-					new PlaylistUserSummary(row.ownerId(), row.ownerName(), row.ownerProfileImageUrl()),
+					new UserSummary(row.ownerId(), row.ownerName(), row.ownerProfileImageUrl()),
 					row.subscriberCount(),
 					subscribedPlaylistIds.contains(playlistId),
 					contentSummaryMap.getOrDefault(playlistId, List.of())
@@ -284,11 +280,9 @@ public class PlaylistService {
 	}
 
 	// 플레이리스트 응답에 포함할 소유자 요약 정보를 만듦
-	// TODO: UserSummary 구현 후 변경
-	// private UserSummary getUserSummary(User user) {
-	private PlaylistUserSummary getUserSummary(User user) {
+	private UserSummary getUserSummary(User user) {
 		// 	return new UserSummary(
-		return new PlaylistUserSummary(
+		return new UserSummary(
 			user.getId(),
 			user.getName(),
 			user.getProfileImageUrl()
@@ -344,9 +338,7 @@ public class PlaylistService {
 	}
 
 	// 여러 플레이리스트에 포함된 콘텐츠 조회 후, 콘텐츠별 태그를 붙여 요약 DTO 구현
-	// TODO: ContentSummary 구현 시 교체
-	// private Map<UUID, List<ContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
-	private Map<UUID, List<PlaylistContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
+	private Map<UUID, List<ContentSummary>> getContentSummariesByPlaylistIds(List<UUID> playlistIds) {
 		// 조회 대상이 없다면 실행 X
 		if (playlistIds.isEmpty()) {
 			return Map.of();
@@ -393,19 +385,15 @@ public class PlaylistService {
 	}
 
 	// 단건 조회에서 사용할 콘텐츠 요약 목록을 가져옴
-	// TODO: ContentSummary 구현 시 교체
-	// private ContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
-	private List<PlaylistContentSummary> getContentSummaries(UUID playlistId) {
+	private List<ContentSummary> getContentSummaries(UUID playlistId) {
 		// 포함된 콘텐츠가 없다면 빈 목록 반환
 		return getContentSummariesByPlaylistIds(List.of(playlistId))
 			.getOrDefault(playlistId, List.of());
 	}
 
 	// 콘텐츠와 태그 목록을 이용해 콘텐츠 요약 DTO 생성
-	// TODO: ContentSummary 구현 시 교체
-	// private ContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
-	private PlaylistContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
-		return new PlaylistContentSummary(
+	private ContentSummary toContentSummary(Content content, Map<UUID, List<String>> tagNameMap) {
+		return new ContentSummary(
 			content.getId(),
 			content.getType(),
 			content.getTitle(),
@@ -422,9 +410,7 @@ public class PlaylistService {
 		UUID playlistId = playlist.getId();
 
 		// 플레이리스트 소유자 summary
-		// TODO: UserSummary 구현 후 변경
-		// UserSummary ownerSummary = getUserSummary(owner);
-		PlaylistUserSummary ownerSummary = getUserSummary(playlist.getOwner());
+		UserSummary ownerSummary = getUserSummary(playlist.getOwner());
 
 		// 플레이리스트 구독자 조회
 		long subscriberCount = getSubscriberCount(playlistId);
@@ -433,9 +419,7 @@ public class PlaylistService {
 		boolean subscribedByMe = isSubscribedByMe(playlistId, currentUserId);
 
 		// 플레이리스트 내 콘텐츠 조회
-		// TODO: ContentSummary 구현 후 변경
-		// List<ContentSummary> contentSummaries = List.of();
-		List<PlaylistContentSummary> contentSummaries = getContentSummaries(playlistId);
+		List<ContentSummary> contentSummaries = getContentSummaries(playlistId);
 
 		return playlistMapper.toDto(
 			playlist,

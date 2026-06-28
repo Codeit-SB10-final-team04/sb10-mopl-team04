@@ -19,6 +19,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.team04.mopl.common.dto.ContentSummary;
+import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
@@ -26,11 +28,9 @@ import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
-import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
 import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistRow;
-import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.dto.row.PlaylistContentRow;
 import com.team04.mopl.playlist.dto.row.PlaylistSubscriberCountRow;
 import com.team04.mopl.playlist.entity.Playlist;
@@ -76,9 +76,7 @@ class PlaylistServiceTest {
 		PlaylistCreateRequest request = new PlaylistCreateRequest("테스트 제목", "테스트 설명");
 		User owner = createUser(currentUserId);
 
-		// TODO: UserSummary 구현 후 변경
-		// UserSummary ownerSummary = new UserSummary(owner.getId(), owner.getName(), owner.getProfileImageUrl());
-		PlaylistUserSummary ownerSummary = new PlaylistUserSummary(owner.getId(), owner.getName(),
+		UserSummary ownerSummary = new UserSummary(owner.getId(), owner.getName(),
 			owner.getProfileImageUrl());
 
 		PlaylistDto mapperResult = new PlaylistDto(
@@ -96,9 +94,7 @@ class PlaylistServiceTest {
 			.thenReturn(Optional.of(owner));
 		when(playlistMapper.toDto(
 				any(Playlist.class),
-				// TODO: UserSummary 구현 후 변경
-				// any(UserSummary.class),
-				any(PlaylistUserSummary.class),
+				any(UserSummary.class),
 				anyLong(),
 				anyBoolean(),
 				anyList()
@@ -114,16 +110,14 @@ class PlaylistServiceTest {
 		ArgumentCaptor<Playlist> playlistCaptor = ArgumentCaptor.forClass(Playlist.class);
 		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
-		ArgumentCaptor<List<PlaylistContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
+		ArgumentCaptor<List<ContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
 
 		verify(userRepository).findById(currentUserId);
 		verify(playlistRepository).save(playlistCaptor.capture());
 
 		verify(playlistMapper).toDto(
 			playlistCaptor.capture(),
-			// TODO: UserSummary 구현 후 변경
-			// any(UserSummary.class),
-			any(PlaylistUserSummary.class),
+			any(UserSummary.class),
 			subscriberCountCaptor.capture(),
 			subscribedByMeCaptor.capture(),
 			contentCaptor.capture()
@@ -154,9 +148,7 @@ class PlaylistServiceTest {
 		verify(playlistRepository, never()).save(any(Playlist.class));
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
-			// TODO: UserSummary 구현 후 변경
-			// any(UserSummary.class),
-			any(PlaylistUserSummary.class),
+			any(UserSummary.class),
 			anyLong(),
 			anyBoolean(),
 			anyList()
@@ -178,13 +170,10 @@ class PlaylistServiceTest {
 		Playlist playlist = createPlaylist(owner, playlistId);
 		Content content = createContent(contentId);
 
-		// TODO: UserSummary 구현 후 변경
-		// UserSummary ownerSummary = new UserSummary(owner.getId(), owner.getName(), owner.getProfileImageUrl());
-		PlaylistUserSummary ownerSummary = new PlaylistUserSummary(owner.getId(), owner.getName(),
+		UserSummary ownerSummary = new UserSummary(owner.getId(), owner.getName(),
 			owner.getProfileImageUrl());
 
-		// TODO: ContentSummary 구현 후 변경
-		PlaylistContentSummary contentSummary = new PlaylistContentSummary(
+		ContentSummary contentSummary = new ContentSummary(
 			content.getId(),
 			content.getType(),
 			content.getTitle(),
@@ -218,9 +207,7 @@ class PlaylistServiceTest {
 			.thenReturn(List.of(new PlaylistContentRow(playlistId, content)));
 		when(playlistMapper.toDto(
 				any(Playlist.class),
-				// TODO: UserSummary 구현 후 변경
-				// any(UserSummary.class),
-				any(PlaylistUserSummary.class),
+				any(UserSummary.class),
 				anyLong(),
 				anyBoolean(),
 				anyList()
@@ -241,12 +228,10 @@ class PlaylistServiceTest {
 
 		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
-		ArgumentCaptor<List<PlaylistContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
+		ArgumentCaptor<List<ContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
 
 		verify(playlistMapper).toDto(
 			eq(playlist),
-			// TODO: UserSummary 구현 후 변경
-			// any(UserSummary.class),
 			eq(ownerSummary),
 			subscriberCountCaptor.capture(),
 			subscribedByMeCaptor.capture(),
@@ -282,9 +267,7 @@ class PlaylistServiceTest {
 		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
-			// TODO: UserSummary 구현 후 변경
-			// any(UserSummary.class),
-			any(PlaylistUserSummary.class),
+			any(UserSummary.class),
 			anyLong(),
 			anyBoolean(),
 			anyList()
@@ -318,9 +301,7 @@ class PlaylistServiceTest {
 		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
-			// TODO: UserSummary 구현 후 변경
-			// any(UserSummary.class),
-			any(PlaylistUserSummary.class),
+			any(UserSummary.class),
 			anyLong(),
 			anyBoolean(),
 			anyList()
@@ -339,9 +320,7 @@ class PlaylistServiceTest {
 		User owner = createUser(currentUserId);
 		Playlist playlist = createPlaylist(owner, playlistId);
 
-		// TODO: UserSummary 구현 후 변경
-		// UserSummary ownerSummary = new UserSummary(owner.getId(), owner.getName(), owner.getProfileImageUrl());
-		PlaylistUserSummary ownerSummary = new PlaylistUserSummary(owner.getId(), owner.getName(),
+		UserSummary ownerSummary = new UserSummary(owner.getId(), owner.getName(),
 			owner.getProfileImageUrl());
 
 		PlaylistDto mapperResult = new PlaylistDto(
@@ -367,9 +346,7 @@ class PlaylistServiceTest {
 			.thenReturn(List.of());
 		when(playlistMapper.toDto(
 				any(Playlist.class),
-				// TODO: UserSummary 구현 후 변경
-				// any(UserSummary.class),
-				any(PlaylistUserSummary.class),
+				any(UserSummary.class),
 				anyLong(),
 				anyBoolean(),
 				anyList()
@@ -389,13 +366,11 @@ class PlaylistServiceTest {
 
 		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
-		ArgumentCaptor<List<PlaylistContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
+		ArgumentCaptor<List<ContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
 
 		verify(playlistMapper).toDto(
 			eq(playlist),
-			// TODO: UserSummary 구현 후 변경
-			// any(UserSummary.class),
-			any(PlaylistUserSummary.class),
+			any(UserSummary.class),
 			subscriberCountCaptor.capture(),
 			subscribedByMeCaptor.capture(),
 			contentCaptor.capture()
@@ -427,9 +402,7 @@ class PlaylistServiceTest {
 
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
-			// TODO: UserSummary 구현 후 변경
-			// any(UserSummary.class),
-			any(PlaylistUserSummary.class),
+			any(UserSummary.class),
 			anyLong(),
 			anyBoolean(),
 			anyList()
@@ -464,9 +437,7 @@ class PlaylistServiceTest {
 
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
-			// TODO: UserSummary 구현 후 변경
-			// any(UserSummary.class),
-			any(PlaylistUserSummary.class),
+			any(UserSummary.class),
 			anyLong(),
 			anyBoolean(),
 			anyList()
@@ -499,9 +470,7 @@ class PlaylistServiceTest {
 
 		verify(playlistMapper, never()).toDto(
 			any(Playlist.class),
-			// TODO: UserSummary 구현 후 변경
-			// any(UserSummary.class),
-			any(PlaylistUserSummary.class),
+			any(UserSummary.class),
 			anyLong(),
 			anyBoolean(),
 			anyList()
@@ -621,13 +590,13 @@ class PlaylistServiceTest {
 
 		PlaylistContentRow playlistContentRow = new PlaylistContentRow(playlistId2, content);
 
-		PlaylistUserSummary playlistUserSummary = new PlaylistUserSummary(
+		UserSummary userSummary = new UserSummary(
 			currentUserId,
 			currentUser.getName(),
 			currentUser.getProfileImageUrl()
 		);
 
-		PlaylistContentSummary playlistContentSummary = new PlaylistContentSummary(
+		ContentSummary contentSummary = new ContentSummary(
 			contentId,
 			content.getType(),
 			content.getTitle(),
@@ -640,7 +609,7 @@ class PlaylistServiceTest {
 
 		PlaylistDto playlistDto1 = new PlaylistDto(
 			playlistId1,
-			playlistUserSummary,
+			userSummary,
 			playlist1.getTitle(),
 			playlist1.getDescription(),
 			updatedAt1,
@@ -651,13 +620,13 @@ class PlaylistServiceTest {
 
 		PlaylistDto playlistDto2 = new PlaylistDto(
 			playlistId2,
-			playlistUserSummary,
+			userSummary,
 			playlist2.getTitle(),
 			playlist2.getDescription(),
 			updatedAt2,
 			3L,
 			false,
-			List.of(playlistContentSummary)
+			List.of(contentSummary)
 		);
 
 		CursorResponsePlaylistDto cursorResponsePlaylistDtoResult = new CursorResponsePlaylistDto(
@@ -683,9 +652,7 @@ class PlaylistServiceTest {
 		).thenReturn(List.of(playlistContentRow));
 		when(playlistMapper.toDto(
 				any(Playlist.class),
-				// TODO: UserSummary 구현 후 변경
-				// any(UserSummary.class),
-				any(PlaylistUserSummary.class),
+				any(UserSummary.class),
 				anyLong(),
 				anyBoolean(),
 				anyList()
@@ -716,10 +683,10 @@ class PlaylistServiceTest {
 		);
 
 		ArgumentCaptor<Playlist> playlistCaptor = ArgumentCaptor.forClass(Playlist.class);
-		ArgumentCaptor<PlaylistUserSummary> ownerUserSummary = ArgumentCaptor.forClass(PlaylistUserSummary.class);
+		ArgumentCaptor<UserSummary> ownerUserSummary = ArgumentCaptor.forClass(UserSummary.class);
 		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
-		ArgumentCaptor<List<PlaylistContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
+		ArgumentCaptor<List<ContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
 
 		verify(playlistMapper, times(2)).toDto(
 			playlistCaptor.capture(),
@@ -732,7 +699,7 @@ class PlaylistServiceTest {
 		assertEquals(List.of(playlist1, playlist2), playlistCaptor.getAllValues());
 		assertEquals(List.of(2L, 3L), subscriberCountCaptor.getAllValues());
 		assertEquals(List.of(false, false), subscribedByMeCaptor.getAllValues());
-		assertEquals(List.of(List.of(), List.of(playlistContentSummary)), contentCaptor.getAllValues());
+		assertEquals(List.of(List.of(), List.of(contentSummary)), contentCaptor.getAllValues());
 	}
 
 	@Test

@@ -18,13 +18,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
-import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
 import com.team04.mopl.playlist.service.PlaylistService;
 
@@ -54,7 +54,7 @@ class PlaylistControllerTest {
 			playlistId,
 			// TODO: UserSummary 구현 후 변경
 			// new UserSummary(currentUserId, "테스트 사용자", null),
-			new PlaylistUserSummary(currentUserId, "테스트 사용자", null),
+			new UserSummary(currentUserId, "테스트 사용자", null),
 			request.title(),
 			request.description(),
 			Instant.parse("2026-06-24T01:00:00Z"),
@@ -108,7 +108,7 @@ class PlaylistControllerTest {
 			playlistId,
 			// TODO: UserSummary 구현 후 변경
 			// new UserSummary(currentUserId, "테스트 사용자", null),
-			new PlaylistUserSummary(currentUserId, "테스트 사용자", null),
+			new UserSummary(currentUserId, "테스트 사용자", null),
 			"테스트 제목",
 			"테스트 설명",
 			Instant.parse("2026-06-24T01:00:00Z"),
@@ -171,7 +171,7 @@ class PlaylistControllerTest {
 			playlistId,
 			// TODO: UserSummary 구현 후 변경
 			// new UserSummary(currentUserId, "테스트 사용자", null),
-			new PlaylistUserSummary(currentUserId, "테스트 사용자", null),
+			new UserSummary(currentUserId, "테스트 사용자", null),
 			"수정 title",
 			"수정 description",
 			Instant.parse("2026-06-24T01:00:00Z"),
@@ -260,7 +260,7 @@ class PlaylistControllerTest {
 			playlistId1,
 			// TODO: UserSummary 구현 후 변경
 			// new UserSummary(currentUserId, "테스트 사용자", null),
-			new PlaylistUserSummary(currentUserId, "currentUserId 사용자", null),
+			new UserSummary(currentUserId, "currentUserId 사용자", null),
 			"테스트 제목1",
 			"테스트 설명1",
 			Instant.parse("2026-06-24T01:00:00Z"),
@@ -273,7 +273,7 @@ class PlaylistControllerTest {
 			playlistId2,
 			// TODO: UserSummary 구현 후 변경
 			// new UserSummary(currentUserId, "테스트 사용자", null),
-			new PlaylistUserSummary(ownerId1, "ownerId1 사용자", null),
+			new UserSummary(ownerId1, "ownerId1 사용자", null),
 			"테스트 제목2",
 			"테스트 설명2",
 			Instant.parse("2026-06-24T00:00:00Z"),
@@ -334,7 +334,7 @@ class PlaylistControllerTest {
 	void findAllPlaylists_returnBadRequest_whenSortByOrSortDirectionIsMissing() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
-		
+
 		// when, then
 		mockMvc.perform(get("/api/playlists")
 				.param("keywordLike", "제목")
