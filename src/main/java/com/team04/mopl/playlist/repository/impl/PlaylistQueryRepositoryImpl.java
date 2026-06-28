@@ -46,8 +46,9 @@ public class PlaylistQueryRepositoryImpl implements PlaylistQueryRepository {
 			|| (cursor == null && idAfter != null)
 		) {
 			throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT)
-				.addDetail("cursor", cursor)
-				.addDetail("idAfter", idAfter);
+				.addDetail("reason", "cursor와 idAfter는 함께 요청되어야 합니다.")
+				.addDetail("isProvidedCursor", cursor != null)
+				.addDetail("isProvidedIdAfter", idAfter != null);
 		}
 
 		// 구독자 수를 세는 SQL 집계식을 Java 객체로 표현 = `COUNT(playlist_subscription.id)`
