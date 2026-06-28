@@ -1,4 +1,4 @@
-CREATE TABLE users
+CREATE TABLE IF NOT EXISTS users
 (
     id                UUID PRIMARY KEY,
     name              VARCHAR(50)              NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE users
 );
 
 
-CREATE TABLE playlists
+CREATE TABLE IF NOT EXISTS playlists
 (
     id          UUID PRIMARY KEY,
     owner_id    UUID                     NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE playlists
     CONSTRAINT fk_playlists_owner FOREIGN KEY (owner_id) REFERENCES users (id)
 );
 
-CREATE TABLE playlist_subscriptions
+CREATE TABLE IF NOT EXISTS playlist_subscriptions
 (
     id            UUID PRIMARY KEY,
     subscriber_id UUID                     NOT NULL,
