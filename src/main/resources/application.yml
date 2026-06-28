@@ -15,3 +15,10 @@ playlist:
   hard-delete:
     cron: "0 1 0 * * *"
     retention-months: 1
+
+mopl:
+  jwt:
+    issuer: ${MOPL_JWT_ISSUER:mopl}
+    access-token-expiration-seconds: ${MOPL_ACCESS_TOKEN_EXPIRATION_SECONDS:1800}
+    refresh-token-expiration-seconds: ${MOPL_REFRESH_TOKEN_EXPIRATION_SECONDS:1209600}
+    refresh-token-cookie-name: ${MOPL_REFRESH_TOKEN_COOKIE_NAME:REFRESH_TOKEN}
