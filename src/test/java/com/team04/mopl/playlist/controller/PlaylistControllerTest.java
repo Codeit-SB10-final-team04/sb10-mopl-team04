@@ -18,10 +18,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
+import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
+import com.team04.mopl.playlist.enums.PlaylistSortBy;
 import com.team04.mopl.playlist.service.PlaylistService;
 
 @WebMvcTest(PlaylistController.class)
@@ -138,8 +142,8 @@ class PlaylistControllerTest {
 		mockMvc.perform(get("/api/playlists")
 				.header("X-MOPL-USER-ID", currentUserId)
 				.contentType(MediaType.APPLICATION_JSON))
-			// .andExpect(status().isMethodNotAllowed());
-			.andExpect(status().isInternalServerError());
+			.andExpect(status().isBadRequest());
+		// .andExpect(status().isInternalServerError());
 	}
 
 	@Test
@@ -231,6 +235,136 @@ class PlaylistControllerTest {
 
 		// when, then
 		mockMvc.perform(delete("/api/playlists/{playlistId}", "UUID")
+				.header("X-MOPL-USER-ID", currentUserId))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("플레이리스트 목록 조회 요청에 성공하면 200 OK와 플레이리스트 커서 페이지네이션 응답 DTO를 반환한다.")
+	void findAllPlaylists_returnOK_whenValidRequest() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID ownerId1 = UUID.randomUUID();
+		UUID playlistId1 = UUID.randomUUID();
+		UUID playlistId2 = UUID.randomUUID();
+
+		PlaylistSearchRequest request = new PlaylistSearchRequest(
+			"제목",
+			null,
+			null,
+			null,
+			null,
+			2,
+			SortDirection.DESCENDING,
+			PlaylistSortBy.updatedAt
+		);
+
+		PlaylistDto playlistDto1 = new PlaylistDto(
+			playlistId1,
+			// TODO: UserSummary 구현 후 변경
+			// new UserSummary(currentUserId, "테스트 사용자", null),
+			new PlaylistUserSummary(currentUserId, "currentUserId 사용자", null),
+			"테스트 제목1",
+			"테스트 설명1",
+			Instant.parse("2026-06-24T01:00:00Z"),
+			0L,
+			false,
+			List.of()
+		);
+
+		PlaylistDto playlistDto2 = new PlaylistDto(
+			playlistId2,
+			// TODO: UserSummary 구현 후 변경
+			// new UserSummary(currentUserId, "테스트 사용자", null),
+			new PlaylistUserSummary(ownerId1, "ownerId1 사용자", null),
+			"테스트 제목2",
+			"테스트 설명2",
+			Instant.parse("2026-06-24T00:00:00Z"),
+			0L,
+			false,
+			List.of()
+		);
+
+		CursorResponsePlaylistDto response = new CursorResponsePlaylistDto(
+			List.of(playlistDto1, playlistDto2),
+			playlistDto2.updatedAt().toString(),
+			playlistDto2.id(),
+			true,
+			3L,
+			PlaylistSortBy.updatedAt.toString(),
+			SortDirection.DESCENDING
+		);
+
+		when(playlistService.findAllPlaylists(request, currentUserId))
+			.thenReturn(response);
+
+		// when, then
+		mockMvc.perform(get("/api/playlists")
+				.param("keywordLike", "제목")
+				.param("limit", "2")
+				.param("sortDirection", SortDirection.DESCENDING.toString())
+				.param("sortBy", PlaylistSortBy.updatedAt.toString())
+				.header("X-MOPL-USER-ID", currentUserId))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.size()").value(2))
+			.andExpect(jsonPath("$.data[0].id").value(playlistId1.toString()))
+			.andExpect(jsonPath("$.data[1].id").value(playlistId2.toString()))
+			.andExpect(jsonPath("$.nextCursor").value(playlistDto2.updatedAt().toString()))
+			.andExpect(jsonPath("$.nextIdAfter").value(playlistDto2.id().toString()))
+			.andExpect(jsonPath("$.hasNext").value(true))
+			.andExpect(jsonPath("$.totalCount").value(3))
+			.andExpect(jsonPath("$.sortBy").value(PlaylistSortBy.updatedAt.toString()))
+			.andExpect(jsonPath("$.sortDirection").value(SortDirection.DESCENDING.toString()));
+	}
+
+	@Test
+	@DisplayName("플레이리스트 목록 조회 요청에서 필수 파라미터 limit이 없으면 400 Bad Request로 실패한다.")
+	void findAllPlaylists_returnBadRequest_whenLimitIsMissing() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		PlaylistSearchRequest request = new PlaylistSearchRequest(
+			"제목",
+			null,
+			null,
+			null,
+			null,
+			null,
+			SortDirection.DESCENDING,
+			PlaylistSortBy.updatedAt
+		);
+
+		// when, then
+		mockMvc.perform(get("/api/playlists")
+				.param("keywordLike", "제목")
+				.param("sortDirection", SortDirection.DESCENDING.toString())
+				.param("sortBy", PlaylistSortBy.updatedAt.toString())
+				.header("X-MOPL-USER-ID", currentUserId))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("플레이리스트 목록 조회 요청에서 필수 파라미터 sortBy나 sortDirection이 없으면 400 Bad Request로 실패한다.")
+	void findAllPlaylists_returnBadRequest_whenSortByOrSortDirectionIsMissing() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		PlaylistSearchRequest request = new PlaylistSearchRequest(
+			"제목",
+			null,
+			null,
+			null,
+			null,
+			2,
+			null,
+			PlaylistSortBy.updatedAt
+		);
+
+		// when, then
+		mockMvc.perform(get("/api/playlists")
+				.param("keywordLike", "제목")
+				.param("limit", "2")
+				.param("sortBy", PlaylistSortBy.updatedAt.toString())
 				.header("X-MOPL-USER-ID", currentUserId))
 			.andExpect(status().isBadRequest());
 	}
