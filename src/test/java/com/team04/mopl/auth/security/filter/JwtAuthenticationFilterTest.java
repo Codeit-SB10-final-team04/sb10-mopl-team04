@@ -80,6 +80,39 @@ class JwtAuthenticationFilterTest {
 	}
 
 	@Test
+	@DisplayName("로그인 경로라도 POST가 아니면 JWT 필터를 적용한다")
+	void doFilterInternal_savesAuthentication_whenSignInPathMethodIsNotPost() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID sessionId = UUID.randomUUID();
+		String accessToken = "valid-access-token";
+
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/sign-in");
+		request.setServletPath("/api/auth/sign-in");
+		request.addHeader("Authorization", "Bearer " + accessToken);
+
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		MockFilterChain filterChain = new MockFilterChain();
+
+		JwtAuthenticationClaims claims = new JwtAuthenticationClaims(
+			userId,
+			sessionId,
+			"test@test.com",
+			UserRole.USER
+		);
+
+		when(jwtTokenProvider.parseAccessToken(accessToken)).thenReturn(claims);
+		when(authSessionStore.isActive(userId, sessionId)).thenReturn(true);
+
+		// when
+		jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+		// then
+		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+		verify(jwtTokenProvider).parseAccessToken(accessToken);
+	}
+
+	@Test
 	@DisplayName("Bearer 형식이 아니면 인증 에러 응답을 반환한다")
 	void doFilterInternal_writesError_whenAuthorizationHeaderIsNotBearerType() throws Exception {
 		// given

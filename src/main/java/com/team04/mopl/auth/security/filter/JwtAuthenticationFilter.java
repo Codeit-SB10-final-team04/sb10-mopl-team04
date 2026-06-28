@@ -3,6 +3,7 @@ package com.team04.mopl.auth.security.filter;
 import java.io.IOException;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -71,7 +72,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	// 로그인 요청은 JWT 인증 필터를 적용하지 않도록 제외
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		return SIGN_IN_PATH.equals(request.getServletPath());
+		return SIGN_IN_PATH.equals(request.getServletPath())
+			&& HttpMethod.POST.matches(request.getMethod());
 	}
 
 	// Authorization 헤더에서 Bearer Access Token 추출
