@@ -19,17 +19,22 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
-import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
+import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
+import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
+import com.team04.mopl.playlist.dto.response.PlaylistRow;
 import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.dto.row.PlaylistContentRow;
 import com.team04.mopl.playlist.dto.row.PlaylistSubscriberCountRow;
 import com.team04.mopl.playlist.entity.Playlist;
+import com.team04.mopl.playlist.enums.PlaylistSortBy;
 import com.team04.mopl.playlist.exception.PlaylistErrorCode;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.mapper.PlaylistMapper;
@@ -44,9 +49,6 @@ class PlaylistServiceTest {
 
 	@Mock
 	private UserRepository userRepository;
-
-	@Mock
-	private ContentTagRepository contentTagRepository;
 
 	@Mock
 	private PlaylistRepository playlistRepository;
@@ -567,6 +569,239 @@ class PlaylistServiceTest {
 		assertNull(playlist.getDeletedAt());
 
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
+	}
+
+	@Test
+	@DisplayName("플레이리스트 목록 조회에 성공하면 플레이리스트 커서 페이지네이션 응답 DTO를 반환한다.")
+	void findAllPlaylists_returnCursorResponse_whenValidRequest() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID playlistId1 = UUID.randomUUID();
+		UUID playlistId2 = UUID.randomUUID();
+		UUID contentId = UUID.randomUUID();
+		Instant updatedAt1 = Instant.parse("2026-06-24T01:00:00Z");
+		Instant updatedAt2 = Instant.parse("2026-06-24T00:00:00Z");
+
+		User currentUser = createUser(currentUserId);
+		Playlist playlist1 = createPlaylist(currentUser, playlistId1);
+		Playlist playlist2 = createPlaylist(currentUser, playlistId2);
+		ReflectionTestUtils.setField(playlist1, "updatedAt", updatedAt1);
+		ReflectionTestUtils.setField(playlist2, "updatedAt", updatedAt2);
+
+		Content content = createContent(contentId);
+
+		PlaylistSearchRequest request = new PlaylistSearchRequest(
+			"제목",
+			null, null, null, null,
+			2,
+			SortDirection.DESCENDING,
+			PlaylistSortBy.updatedAt
+		);
+
+		PlaylistRow playlistRow1 = new PlaylistRow(
+			playlist1,
+			2L,
+			currentUserId,
+			currentUser.getName(),
+			currentUser.getProfileImageUrl()
+		);
+		PlaylistRow playlistRow2 = new PlaylistRow(
+			playlist2,
+			3L,
+			currentUserId,
+			currentUser.getName(),
+			currentUser.getProfileImageUrl()
+		);
+
+		PlaylistCursorPage playlistCursorPage = new PlaylistCursorPage(
+			List.of(playlistRow1, playlistRow2),
+			true,
+			3L
+		);
+
+		PlaylistContentRow playlistContentRow = new PlaylistContentRow(playlistId2, content);
+
+		PlaylistUserSummary playlistUserSummary = new PlaylistUserSummary(
+			currentUserId,
+			currentUser.getName(),
+			currentUser.getProfileImageUrl()
+		);
+
+		PlaylistContentSummary playlistContentSummary = new PlaylistContentSummary(
+			contentId,
+			content.getType(),
+			content.getTitle(),
+			content.getDescription(),
+			content.getThumbnailUrl(),
+			List.of(),
+			content.getAverageRating(),
+			content.getReviewCount()
+		);
+
+		PlaylistDto playlistDto1 = new PlaylistDto(
+			playlistId1,
+			playlistUserSummary,
+			playlist1.getTitle(),
+			playlist1.getDescription(),
+			updatedAt1,
+			2L,
+			false,
+			List.of()
+		);
+
+		PlaylistDto playlistDto2 = new PlaylistDto(
+			playlistId2,
+			playlistUserSummary,
+			playlist2.getTitle(),
+			playlist2.getDescription(),
+			updatedAt2,
+			3L,
+			false,
+			List.of(playlistContentSummary)
+		);
+
+		CursorResponsePlaylistDto cursorResponsePlaylistDtoResult = new CursorResponsePlaylistDto(
+			List.of(playlistDto1, playlistDto2),
+			playlist2.getUpdatedAt().toString(),
+			playlist2.getId(),
+			true,
+			3L,
+			PlaylistSortBy.updatedAt.toString(),
+			SortDirection.DESCENDING
+		);
+
+		when(userRepository.findById(currentUserId))
+			.thenReturn(Optional.of(currentUser));
+		when(playlistRepository.findPlaylists(request))
+			.thenReturn(playlistCursorPage);
+		when(playlistSubscriptionRepository.findSubscribedPlaylistIds(
+			List.of(playlistId1, playlistId2),
+			currentUserId)
+		).thenReturn(Set.of());
+		when(playlistContentRepository.findAllContentsByPlaylistIdsWithDeletedAtNull(
+			List.of(playlistId1, playlistId2))
+		).thenReturn(List.of(playlistContentRow));
+		when(playlistMapper.toDto(
+				any(Playlist.class),
+				// TODO: UserSummary 구현 후 변경
+				// any(UserSummary.class),
+				any(PlaylistUserSummary.class),
+				anyLong(),
+				anyBoolean(),
+				anyList()
+			)
+		).thenReturn(playlistDto1, playlistDto2);
+
+		// when
+		CursorResponsePlaylistDto result = playlistService.findAllPlaylists(request, currentUserId);
+
+		// then
+		assertEquals(cursorResponsePlaylistDtoResult, result);
+		assertEquals(List.of(playlistDto1, playlistDto2), result.data());
+		assertEquals(updatedAt2.toString(), result.nextCursor());
+		assertEquals(playlist2.getId(), result.nextIdAfter());
+		assertEquals(true, result.hasNext());
+		assertEquals(3L, result.totalCount());
+		assertEquals(PlaylistSortBy.updatedAt.toString(), result.sortBy());
+		assertEquals(SortDirection.DESCENDING, result.sortDirection());
+
+		verify(userRepository).findById(currentUserId);
+		verify(playlistRepository).findPlaylists(request);
+		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(
+			List.of(playlistId1, playlistId2),
+			currentUserId
+		);
+		verify(playlistContentRepository).findAllContentsByPlaylistIdsWithDeletedAtNull(
+			List.of(playlistId1, playlistId2)
+		);
+
+		ArgumentCaptor<Playlist> playlistCaptor = ArgumentCaptor.forClass(Playlist.class);
+		ArgumentCaptor<PlaylistUserSummary> ownerUserSummary = ArgumentCaptor.forClass(PlaylistUserSummary.class);
+		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
+		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
+		ArgumentCaptor<List<PlaylistContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
+
+		verify(playlistMapper, times(2)).toDto(
+			playlistCaptor.capture(),
+			ownerUserSummary.capture(),
+			subscriberCountCaptor.capture(),
+			subscribedByMeCaptor.capture(),
+			contentCaptor.capture()
+		);
+
+		assertEquals(List.of(playlist1, playlist2), playlistCaptor.getAllValues());
+		assertEquals(List.of(2L, 3L), subscriberCountCaptor.getAllValues());
+		assertEquals(List.of(false, false), subscribedByMeCaptor.getAllValues());
+		assertEquals(List.of(List.of(), List.of(playlistContentSummary)), contentCaptor.getAllValues());
+	}
+
+	@Test
+	@DisplayName("플레이리스트 목록 조회 시 데이터가 없다면 빈 리스트를 반환한다.")
+	void findAllPlaylists_returnEmptyCursorResponse_whenValidRequest() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		User currentUser = createUser(currentUserId);
+
+		PlaylistSearchRequest request = new PlaylistSearchRequest(
+			"제목",
+			null, null, null, null,
+			2,
+			SortDirection.DESCENDING,
+			PlaylistSortBy.updatedAt
+		);
+
+		PlaylistCursorPage playlistCursorPage = new PlaylistCursorPage(
+			List.of(),
+			false,
+			0L
+		);
+
+		when(userRepository.findById(currentUserId))
+			.thenReturn(Optional.of(currentUser));
+		when(playlistRepository.findPlaylists(request))
+			.thenReturn(playlistCursorPage);
+
+		// when
+		CursorResponsePlaylistDto result = playlistService.findAllPlaylists(request, currentUserId);
+
+		// then
+		assertTrue(result.data().isEmpty());
+		assertNull(result.nextCursor());
+		assertNull(result.nextIdAfter());
+		assertFalse(result.hasNext());
+		assertEquals(0L, result.totalCount());
+		assertEquals(PlaylistSortBy.updatedAt.toString(), result.sortBy());
+		assertEquals(SortDirection.DESCENDING, result.sortDirection());
+
+		verify(userRepository).findById(currentUserId);
+		verify(playlistRepository).findPlaylists(request);
+	}
+
+	@Test
+	@DisplayName("플레이리스트 목록 조회 시 사용자가 존재하지 않으면 예외가 발생한다.")
+	void findAllPlaylists_throwException_whenUserNotFound() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		PlaylistSearchRequest request = new PlaylistSearchRequest(
+			"제목",
+			null, null, null, null,
+			2,
+			SortDirection.DESCENDING,
+			PlaylistSortBy.updatedAt
+		);
+
+		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
+		when(userRepository.findById(currentUserId))
+			.thenReturn(Optional.empty());
+
+		// when, then
+		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
+		assertThrows(IllegalArgumentException.class,
+			() -> playlistService.findAllPlaylists(request, currentUserId));
+
+		verify(userRepository).findById(currentUserId);
 	}
 
 	private User createUser(UUID userId) {
