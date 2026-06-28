@@ -1,26 +1,35 @@
 package com.team04.mopl.content.batch;
 
+import java.util.List;
+
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.team04.mopl.content.batch.step.EventDetailItemProcessor;
+import com.team04.mopl.content.batch.step.EventDetailItemReader;
+import com.team04.mopl.content.batch.step.EventDetailItemWriter;
 import com.team04.mopl.content.batch.step.LeagueCollectTasklet;
-import com.team04.mopl.content.batch.step.MatchCollectTasklet;
+import com.team04.mopl.content.batch.step.MatchListCollectTasklet;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- 스포츠 데이터 수집 Spring Batch
- Job: sportsDataCollectJob
- Step 1 (leagueCollectStep): 리그 ID 수집 → JobContext에 저장
- Step 2 (eventCollectStep) : 리그별 경기 수집 → contents 테이블에 저장
+ * 스포츠 데이터 수집 Spring Batch
+ *
+ * Step 1 (leagueCollectStep)     : 리그 ID 수집 → JobContext["leagueIds"]
+ * Step 2 (matchListCollectStep)  : 경기 ID 목록 수집 → JobContext["eventIds"]
+ * Step 3 (eventDetailCollectStep): 경기 상세 조회 → DB 저장 (chunk 기반)
  */
 @Configuration
 @EnableRetry
@@ -28,29 +37,28 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SportsDataBatchConfig {
 
-	private final LeagueCollectTasklet leagueCollectTasklet;
-	private final MatchCollectTasklet matchCollectTasklet;
+	private static final int CHUNK_SIZE = 10;
 
-	/**
-	 스포츠 데이터 수집 Job
-	 leagueCollectStep → eventCollectStep 순서로 실행
-	 */
+	private final LeagueCollectTasklet leagueCollectTasklet;
+	private final MatchListCollectTasklet matchListCollectTasklet;
+	private final EventDetailItemProcessor eventDetailItemProcessor;
+	private final EventDetailItemWriter eventDetailItemWriter;
+
 	@Bean
 	public Job sportsDataCollectJob(
 		JobRepository jobRepository,
 		Step leagueCollectStep,
-		Step matchCollectStep
+		Step matchListCollectStep,
+		Step eventDetailCollectStep
 	) {
 		return new JobBuilder("sportsDataCollectJob", jobRepository)
 			.start(leagueCollectStep)
-			.next(matchCollectStep)
+			.next(matchListCollectStep)
+			.next(eventDetailCollectStep)
 			.build();
 	}
 
-	/**
-	 Step 1: 리그 ID 수집
-	 /all_leagues.php → 리그 ID 목록을 JobContext에 저장
-	 */
+	/** Step 1: 리그 ID 수집 */
 	@Bean
 	public Step leagueCollectStep(
 		JobRepository jobRepository,
@@ -61,17 +69,47 @@ public class SportsDataBatchConfig {
 			.build();
 	}
 
-	/**
-	 Step 2: 경기 수집
-	 JobContext에서 리그 ID 읽기 → /eventsseason.php + /lookupevent.php → Content 저장
-	 */
+	/** Step 2: 경기 ID 목록 수집 */
 	@Bean
-	public Step matchCollectStep(
+	public Step matchListCollectStep(
 		JobRepository jobRepository,
 		PlatformTransactionManager transactionManager
 	) {
-		return new StepBuilder("matchCollectStep", jobRepository)
-			.tasklet(matchCollectTasklet, transactionManager)
+		return new StepBuilder("matchListCollectStep", jobRepository)
+			.tasklet(matchListCollectTasklet, transactionManager)
+			.build();
+	}
+
+	/**
+	 * Step 3 Reader: JobContext의 eventIds를 StepScope로 주입받아 하나씩 반환
+	 * @StepScope Bean이므로 Step 실행 시점에 jobExecutionContext가 확정된 뒤 생성됨 -> eventIds를 Parameter로 받아야함
+	 */
+	@Bean
+	@StepScope
+	public EventDetailItemReader eventDetailItemReader(
+		@Value("#{jobExecutionContext['eventIds']}") List<String> eventIds
+	) {
+		return new EventDetailItemReader(eventIds);
+	}
+
+	/**
+	 * Step 3: 경기 상세 조회 → chunk 단위 DB 저장
+	 * faultTolerant + skip 으로 개별 경기 API 실패 시 해당 건만 넘어간다.
+	 */
+	@Bean
+	public Step eventDetailCollectStep(
+		JobRepository jobRepository,
+		PlatformTransactionManager transactionManager,
+		EventDetailItemReader eventDetailItemReader
+	) {
+		return new StepBuilder("eventDetailCollectStep", jobRepository)
+			.<String, JsonNode>chunk(CHUNK_SIZE, transactionManager)
+			.reader(eventDetailItemReader)
+			.processor(eventDetailItemProcessor)
+			.writer(eventDetailItemWriter)
+			.faultTolerant()
+			.skip(Exception.class)
+			.skipLimit(50)
 			.build();
 	}
 }
