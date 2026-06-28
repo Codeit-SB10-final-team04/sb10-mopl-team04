@@ -250,10 +250,7 @@ class PlaylistControllerTest {
 
 		PlaylistSearchRequest request = new PlaylistSearchRequest(
 			"제목",
-			null,
-			null,
-			null,
-			null,
+			null, null, null, null,
 			2,
 			SortDirection.DESCENDING,
 			PlaylistSortBy.updatedAt
