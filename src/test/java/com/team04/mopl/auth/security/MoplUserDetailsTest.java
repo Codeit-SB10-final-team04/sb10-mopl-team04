@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.team04.mopl.user.dto.response.UserDto;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.entity.UserRole;
 
@@ -116,5 +117,41 @@ class MoplUserDetailsTest {
 		assertThat(userDetails.isAccountNonExpired()).isTrue();
 		assertThat(userDetails.isCredentialsNonExpired()).isTrue();
 		assertThat(userDetails.isEnabled()).isTrue();
+	}
+
+	@Test
+	@DisplayName("User 엔티티 기반 Principal을 UserDto로 변환한다")
+	void toUserDto_returnsUserDto_whenUserDetailsCreatedFromUser() {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
+		String email = "test@test.com";
+		String name = "테스트유저";
+		String profileImageUrl = "https://example.com/profile.png";
+
+		User user = mock(User.class);
+
+		when(user.getId()).thenReturn(userId);
+		when(user.getCreatedAt()).thenReturn(createdAt);
+		when(user.getEmail()).thenReturn(email);
+		when(user.getName()).thenReturn(name);
+		when(user.getProfileImageUrl()).thenReturn(profileImageUrl);
+		when(user.getRole()).thenReturn(UserRole.USER);
+		when(user.isLocked()).thenReturn(true);
+		when(user.getPasswordHashForAuthentication()).thenReturn("encoded-password");
+
+		MoplUserDetails userDetails = MoplUserDetails.from(user);
+
+		// when
+		UserDto userDto = userDetails.toUserDto();
+
+		// then
+		assertThat(userDto.id()).isEqualTo(userId);
+		assertThat(userDto.createdAt()).isEqualTo(createdAt);
+		assertThat(userDto.email()).isEqualTo(email);
+		assertThat(userDto.name()).isEqualTo(name);
+		assertThat(userDto.profileImageUrl()).isEqualTo(profileImageUrl);
+		assertThat(userDto.role()).isEqualTo(UserRole.USER);
+		assertThat(userDto.locked()).isTrue();
 	}
 }
