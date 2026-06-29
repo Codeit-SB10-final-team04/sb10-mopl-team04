@@ -20,6 +20,12 @@ import com.team04.mopl.conversation.mapper.ConversationMapper;
 import com.team04.mopl.conversation.mapper.ConversationParticipantMapper;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
+import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
+import com.team04.mopl.directmessage.entity.DirectMessage;
+import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
+import com.team04.mopl.directmessage.exception.DirectMessageException;
+import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
+import com.team04.mopl.directmessage.repository.DirectMessageRepository;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
@@ -36,10 +42,12 @@ public class ConversationService {
 
 	private final ConversationRepository conversationRepository;
 	private final ConversationParticipantRepository conversationParticipantRepository;
+	private final DirectMessageRepository directMessageRepository;
 	private final UserRepository userRepository;
 
 	private final ConversationMapper conversationMapper;
 	private final ConversationParticipantMapper conversationParticipantMapper;
+	private final DirectMessageMapper directMessageMapper;
 
 	@Transactional
 	@PreAuthorize("#conversationCreateRequest.withUserId() != #moplUserDetails.userId")
@@ -74,10 +82,10 @@ public class ConversationService {
 			log.info("[CONVERSATION CREATE] 대화 생성 완료: conversationId={}",
 				newConversation.getId());
 
-			// 응답 DTO 변환 (대화방, 대화 상대 정보, 마지막 메시지 내용)
-			// 대화방 생성 로직이므로 마지막 메시지 내용은 null 처리
+			// 응답 DTO 변환 (대화방, 대화 상대 정보, 마지막 메시지 내용, 안 읽음 여부)
+			// 대화방 생성 로직이므로 마지막 메시지 내용은 null, 안 읽음 여부는 false 처리
 			UserSummary with = getUserSummary(withUser);
-			return conversationMapper.toDto(newConversation, with, null);
+			return conversationMapper.toDto(newConversation, with, null, false);
 
 		} catch (DataIntegrityViolationException e) {
 			// DB 제약조건 위반 시, 이미 중복인 상황으로 간주
@@ -111,11 +119,20 @@ public class ConversationService {
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
 		// 3. 대화 상대방 정보 조회
-		User withUser = getUserEntityOrThrow(requestUserId);
+		User withUser = getWithUserEntityOrThrow(conversation.getId(), requestUserId);
 		UserSummary with = getUserSummary(withUser);
 
 		// 4. 마지막 메시지 내용 조회
+		DirectMessage latestDIrectMessage = getLatestMessageEntityOrThrow(conversationId);
+		DirectMessageDto latestMessage = directMessageMapper.toDto(latestDIrectMessage);
 
+		// 5. 안 읽음 여부 판단
+		boolean hasUnread = latestDIrectMessage.getReceiver().getId().equals(requestUserId)
+			&& !latestDIrectMessage.isRead();
+
+		log.debug("[FIND_CONVERSATION] 대화 단건 조회 완료: conversationId={}", conversationId);
+
+		return conversationMapper.toDto(conversation, with, latestMessage, false);
 	}
 
 	// 유효성 검증: 대화 중복 검사
@@ -148,6 +165,13 @@ public class ConversationService {
 			.filter(user -> !user.getId().equals(requestUserId))
 			.findFirst()
 			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+	}
+
+	// 마지막 메시지 조회
+	private DirectMessage getLatestMessageEntityOrThrow(UUID conversationId) {
+		return directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId)
+			.orElseThrow(() -> new DirectMessageException(DirectMessageErrorCode.DM_NOT_FOUND)
+				.addDetail("conversationId", conversationId));
 	}
 
 	// 사용자 요약 정보 반환
