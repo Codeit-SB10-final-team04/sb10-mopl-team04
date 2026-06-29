@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 public enum ConversationErrorCode implements ErrorCode {
-	CONVERSATION_ALREADY_EXISTS(HttpStatus.CONFLICT, "CV01", "이미 해당 사용자와의 대화방이 존재합니다.");
+	CONVERSATION_ALREADY_EXISTS(HttpStatus.CONFLICT, "CV01", "이미 해당 사용자와의 대화방이 존재합니다."),
+	CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CV02", "해당 대화의 정보를 찾을 수 없습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String code;
