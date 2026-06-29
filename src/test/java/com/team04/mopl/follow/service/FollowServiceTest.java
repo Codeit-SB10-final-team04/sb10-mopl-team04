@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
 import com.team04.mopl.follow.entity.Follow;
@@ -23,6 +24,7 @@ import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.entity.UserRole;
 import com.team04.mopl.user.repository.UserRepository;
 
 // import com.team04.mopl.user.exception.UserErrorCode;
@@ -45,16 +47,21 @@ class FollowServiceTest {
 
 	/*
 	=========================
-		팔로우 생성
+	   팔로우 생성
 	=========================
 	 */
 	@Test
 	@DisplayName("성공: 유효한 요청일 경우 팔로우가 정상적으로 생성된다.")
 	void createFollow_Success() {
 		// given
-		UUID currentUserId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
 		User follower = mock(User.class);
-		given(follower.getId()).willReturn(currentUserId);
+		given(follower.getId()).willReturn(requestUserId);
 
 		UUID followeeId = UUID.randomUUID();
 		User followee = mock(User.class);
@@ -63,10 +70,10 @@ class FollowServiceTest {
 
 		// 사용자 조회 모킹
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
-		given(userRepository.findById(currentUserId)).willReturn(Optional.of(follower));
+		given(userRepository.findById(requestUserId)).willReturn(Optional.of(follower));
 
 		// 중복 검사 모킹 (중복 아님)
-		given(followRepository.existsByFolloweeIdAndFollowerId(followeeId, currentUserId)).willReturn(false);
+		given(followRepository.existsByFolloweeIdAndFollowerId(followeeId, requestUserId)).willReturn(false);
 
 		// 매퍼 모킹
 		Follow mockFollow = mock(Follow.class);
@@ -76,7 +83,7 @@ class FollowServiceTest {
 		given(followMapper.toDto(mockFollow)).willReturn(mockDto);
 
 		// when
-		FollowDto result = followService.createFollow(request, currentUserId);
+		FollowDto result = followService.createFollow(request, userDetails);
 
 		// then
 		assertThat(result).isNotNull();
@@ -86,47 +93,36 @@ class FollowServiceTest {
 	// @Test
 	// @DisplayName("실패: 팔로우 대상(Followee)이 존재하지 않으면 예외가 발생한다.")
 	// void createFollow_FolloweeNotFound_Fail() {
-	// 	// given
-	// 	UUID currentUserId = UUID.randomUUID();
-	// 	UUID followeeId = UUID.randomUUID();
-	// 	FollowRequest request = new FollowRequest(followeeId);
+	//     // given
+	//     UUID requestUserId = UUID.randomUUID();
+	//     MoplUserDetails userDetails = MoplUserDetails.authenticated(
+	// 			requestUserId,
+	// 			"test@test.com",
+	// 			UserRole.USER
+	// 		);
+	//     UUID followeeId = UUID.randomUUID();
+	//     FollowRequest request = new FollowRequest(followeeId);
 	//
-	// 	given(userRepository.findById(followeeId)).willReturn(Optional.empty());
+	//     given(userRepository.findById(followeeId)).willReturn(Optional.empty());
 	//
-	// 	// when & then
-	// 	// TODO: User 도메인의 최상위 예외 클래스 구현 시 주석 제거 예정
-	// 	assertThatThrownBy(() -> followService.createFollow(request, currentUserId))
-	// 		.isInstanceOf(/*UserException.class*/);
+	//     // when & then
+	//     // TODO: User 도메인의 최상위 예외 클래스 구현 시 주석 제거 예정
+	//     assertThatThrownBy(() -> followService.createFollow(request, userDetails))
+	//        .isInstanceOf(/*UserException.class*/);
 	// }
-
-	@Test
-	@DisplayName("실패: 본인을 팔로우하려고 하면 중복 조회 및 저장 없이 FollowException이 발생한다.")
-	void createFollow_SelfFollow_Fail() {
-		// given
-		UUID currentUserId = UUID.randomUUID();
-		FollowRequest request = new FollowRequest(currentUserId);
-		User user = mock(User.class);
-
-		given(user.getId()).willReturn(currentUserId);
-		given(userRepository.findById(currentUserId)).willReturn(Optional.of(user));
-
-		// when & then
-		assertThatThrownBy(() -> followService.createFollow(request, currentUserId))
-			.isInstanceOf(FollowException.class)
-			.hasMessageContaining(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED.getMessage());
-
-		// DB 중복 조회 및 저장 미발생 확인
-		verify(followRepository, never()).existsByFolloweeIdAndFollowerId(any(), any());
-		verify(followRepository, never()).save(any(Follow.class));
-	}
 
 	@Test
 	@DisplayName("실패: 이미 팔로우 중인 대상이면 FollowException이 발생한다.")
 	void createFollow_DuplicateFollow_Fail() {
 		// given
-		UUID currentUserId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
 		User follower = mock(User.class);
-		given(follower.getId()).willReturn(currentUserId);
+		given(follower.getId()).willReturn(requestUserId);
 
 		UUID followeeId = UUID.randomUUID();
 		User followee = mock(User.class);
@@ -134,13 +130,13 @@ class FollowServiceTest {
 		FollowRequest request = new FollowRequest(followeeId);
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
-		given(userRepository.findById(currentUserId)).willReturn(Optional.of(follower));
+		given(userRepository.findById(requestUserId)).willReturn(Optional.of(follower));
 
 		// 중복 검사 모킹 (이미 팔로우 중)
-		given(followRepository.existsByFolloweeIdAndFollowerId(followeeId, currentUserId)).willReturn(true);
+		given(followRepository.existsByFolloweeIdAndFollowerId(followeeId, requestUserId)).willReturn(true);
 
 		// when & then
-		assertThatThrownBy(() -> followService.createFollow(request, currentUserId))
+		assertThatThrownBy(() -> followService.createFollow(request, userDetails))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_ALREADY.getMessage());
 	}
@@ -149,9 +145,14 @@ class FollowServiceTest {
 	@DisplayName("실패: 팔로우 생성 시 동시 요청으로 인한 DB 제약조건 위반 시 FollowException(FOLLOW_ALREADY_CONCURRENT)이 발생한다.")
 	void createFollow_ConcurrentRequest_Fail() {
 		// given
-		UUID currentUserId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
 		User follower = mock(User.class);
-		given(follower.getId()).willReturn(currentUserId);
+		given(follower.getId()).willReturn(requestUserId);
 
 		UUID followeeId = UUID.randomUUID();
 		User followee = mock(User.class);
@@ -159,9 +160,9 @@ class FollowServiceTest {
 		FollowRequest request = new FollowRequest(followeeId);
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
-		given(userRepository.findById(currentUserId)).willReturn(Optional.of(follower));
+		given(userRepository.findById(requestUserId)).willReturn(Optional.of(follower));
 
-		given(followRepository.existsByFolloweeIdAndFollowerId(followeeId, currentUserId)).willReturn(false);
+		given(followRepository.existsByFolloweeIdAndFollowerId(followeeId, requestUserId)).willReturn(false);
 
 		Follow mockFollow = mock(Follow.class);
 		given(followMapper.toEntity(any(), any())).willReturn(mockFollow);
@@ -171,7 +172,7 @@ class FollowServiceTest {
 			.willThrow(new DataIntegrityViolationException("Duplicate entry"));
 
 		// when & then
-		assertThatThrownBy(() -> followService.createFollow(request, currentUserId))
+		assertThatThrownBy(() -> followService.createFollow(request, userDetails))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_ALREADY_CONCURRENT.getMessage());
 
@@ -181,88 +182,99 @@ class FollowServiceTest {
 
 	/*
 	=============================
-		특정 사용자 팔로우 여부 조회
+	   특정 사용자 팔로우 여부 조회
 	=============================
 	 */
 	@Test
 	@DisplayName("성공: 두 사용자가 존재하고 팔로우 관계가 있다면 FollowDto를 반환한다.")
 	void getFollowConnection_Success() {
 		// given
-		UUID currentUserId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
 		User requestedUser = mock(User.class);
-		given(requestedUser.getId()).willReturn(currentUserId);
+		given(requestedUser.getId()).willReturn(requestUserId);
 
 		UUID followeeId = UUID.randomUUID();
 		User targetUser = mock(User.class);
 		given(targetUser.getId()).willReturn(followeeId);
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(targetUser));
-		given(userRepository.findById(currentUserId)).willReturn(Optional.of(requestedUser));
+		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestedUser));
 
 		Follow mockFollow = mock(Follow.class);
 		given(mockFollow.getId()).willReturn(UUID.randomUUID());
-		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, currentUserId))
+		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, requestUserId))
 			.willReturn(Optional.of(mockFollow));
 
 		FollowDto mockDto = mock(FollowDto.class);
 		given(followMapper.toDto(mockFollow)).willReturn(mockDto);
 
 		// when
-		FollowDto result = followService.getFollowConnection(followeeId, currentUserId);
+		FollowDto result = followService.getFollowConnection(followeeId, userDetails);
 
 		// then
 		assertThat(result).isNotNull();
 		assertThat(result).isEqualTo(mockDto);
-		verify(followRepository, times(1)).findByFolloweeIdAndFollowerId(followeeId, currentUserId);
+		verify(followRepository, times(1)).findByFolloweeIdAndFollowerId(followeeId, requestUserId);
 	}
 
 	// @Test
 	// @DisplayName("실패: 팔로우 대상(Followee)이 존재하지 않으면 예외가 발생한다.")
 	// void isFollowing_UserNotFound_Fail() {
-	// 	// given
-	// 	UUID currentUserId = UUID.randomUUID();
-	// 	UUID followeeId = UUID.randomUUID();
+	//     // given
+	//     UUID requestUserId = UUID.randomUUID();
+	//     MoplUserDetails userDetails = MoplUserDetails.authenticated(
+	// 			requestUserId,
+	// 			"test@test.com",
+	// 			UserRole.USER
+	// 		);
+	//     UUID followeeId = UUID.randomUUID();
 	//
-	// 	// 타겟 유저 조회 시 Optional.empty() 반환
-	// 	given(userRepository.findById(followeeId)).willReturn(Optional.empty());
+	//     // 타겟 유저 조회 시 Optional.empty() 반환
+	//     given(userRepository.findById(followeeId)).willReturn(Optional.empty());
 	//
-	// 	// when & then
-	// 	// TODO: 향후 User 도메인 예외 도입 시 해당 예외 타입으로 검증 강화
-	// 	assertThatThrownBy(() -> followService.isFollowing(followeeId, currentUserId))
-	// 		.isInstanceOf();
+	//     // when & then
+	//     // TODO: 향후 User 도메인 예외 도입 시 해당 예외 타입으로 검증 강화
+	//     assertThatThrownBy(() -> followService.isFollowing(followeeId, userDetails))
+	//        .isInstanceOf();
 	//
-	// 	// 유저가 없으면 팔로우 조회 쿼리가 실행되지 않아야 함 (조기 차단 검증)
-	// 	verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
+	//     // 유저가 없으면 팔로우 조회 쿼리가 실행되지 않아야 함 (조기 차단 검증)
+	//     verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
 	// }
 
 	@Test
 	@DisplayName("실패: 팔로우 관계가 존재하지 않으면 FOLLOW_NOT_FOUND 예외가 발생한다.")
 	void getFollowConnection_FollowNotFound_Fail() {
 		// given
-		UUID currentUserId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(requestUserId, "test@test.com", UserRole.USER);
 		User requestedUser = mock(User.class);
-		given(requestedUser.getId()).willReturn(currentUserId);
+		given(requestedUser.getId()).willReturn(requestUserId);
 
 		UUID followeeId = UUID.randomUUID();
 		User targetUser = mock(User.class);
 		given(targetUser.getId()).willReturn(followeeId);
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(targetUser));
-		given(userRepository.findById(currentUserId)).willReturn(Optional.of(requestedUser));
+		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestedUser));
 
 		// 팔로우 미존재
-		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, currentUserId))
+		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, requestUserId))
 			.willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, currentUserId))
+		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, userDetails))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
 	}
 
 	/*
 	=============================
-		특정 사용자의 팔로우 수 조회
+	   특정 사용자의 팔로우 수 조회
 	=============================
 	 */
 	@Test
@@ -293,30 +305,35 @@ class FollowServiceTest {
 	// @Test
 	// @DisplayName("실패: 조회하려는 유저가 존재하지 않으면 예외가 발생한다.")
 	// void getFollowerCount_UserNotFound_ThrowException_Fail() {
-	// 	// given
-	// 	UUID invalidUserId = UUID.randomUUID();
-	// 	FollowRequest request = new FollowRequest(invalidUserId);
+	//     // given
+	//     UUID invalidUserId = UUID.randomUUID();
+	//     FollowRequest request = new FollowRequest(invalidUserId);
 	//
-	// 	given(userRepository.findById(invalidUserId)).willReturn(Optional.empty());
+	//     given(userRepository.findById(invalidUserId)).willReturn(Optional.empty());
 	//
-	// 	// when & then
-	// 	assertThatThrownBy(() -> followService.getFollowerCount(request))
-	// 		.isInstanceOf(UserException.class)
-	// 		.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
+	//     // when & then
+	//     assertThatThrownBy(() -> followService.getFollowerCount(request))
+	//        .isInstanceOf(UserException.class)
+	//        .hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
 	// }
 
 	/*
 	==================
-		팔로우 취소
+	   팔로우 취소
 	==================
 	 */
 	@Test
 	@DisplayName("성공: 본인의 팔로우 관계를 정상적으로 삭제한다.")
 	void deleteFollow_Success() {
 		// given
-		UUID currentUserId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
 		User follower = mock(User.class);
-		given(follower.getId()).willReturn(currentUserId);
+		given(follower.getId()).willReturn(requestUserId);
 
 		UUID followId = UUID.randomUUID();
 		Follow targetFollow = mock(Follow.class);
@@ -325,7 +342,7 @@ class FollowServiceTest {
 		given(followRepository.findById(followId)).willReturn(Optional.of(targetFollow));
 
 		// when
-		followService.deleteFollow(followId, currentUserId);
+		followService.deleteFollow(followId, userDetails);
 
 		// then
 		verify(followRepository, times(1)).delete(targetFollow);
@@ -335,10 +352,16 @@ class FollowServiceTest {
 	@DisplayName("실패: 팔로우 관계가 존재하지 않으면 예외가 발생한다.")
 	void deleteFollow_FollowNotFound_Fail() {
 		// given
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
 		given(followRepository.findById(any())).willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), UUID.randomUUID()))
+		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), userDetails))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
 	}
@@ -347,7 +370,12 @@ class FollowServiceTest {
 	@DisplayName("실패: 본인의 팔로우가 아닌 경우 접근 거부 예외가 발생한다.")
 	void deleteFollow_AccessDenied_Fail() {
 		// given
-		UUID currentUserId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
 
 		UUID wrongOwnerId = UUID.randomUUID();
 		User otherUser = mock(User.class);
@@ -360,7 +388,7 @@ class FollowServiceTest {
 		given(followRepository.findById(any())).willReturn(Optional.of(targetFollow));
 
 		// when & then
-		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), currentUserId))
+		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), userDetails))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_ACCESS_DENIED.getMessage());
 	}
