@@ -28,4 +28,9 @@ public record CursorResponsePlaylistDto(
 	// 정렬 방향
 	SortDirection sortDirection
 ) {
+	public CursorResponsePlaylistDto {
+		data = (data == null)
+			? List.of()
+			: List.copyOf(data);
+	}
 }
