@@ -27,5 +27,8 @@ public interface ConversationControllerDocs {
 		summary = "대화 단건 조회",
 		description = "대화 ID를 통해 특정 대화방을 조회합니다."
 	)
-	ResponseEntity<ConversationDto> findConversationById(UUID conversationId);
+	ResponseEntity<ConversationDto> findConversationById(
+		UUID conversationId,
+		MoplUserDetails moplUserDetails
+	);
 }

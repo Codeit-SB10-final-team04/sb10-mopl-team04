@@ -42,9 +42,12 @@ public class ConversationController implements ConversationControllerDocs {
 
 	@Override
 	@GetMapping("/{conversationId}")
-	public ResponseEntity<ConversationDto> findConversationById(@RequestParam UUID conversationId) {
+	public ResponseEntity<ConversationDto> findConversationById(
+		@RequestParam UUID conversationId,
+		@AuthenticationPrincipal MoplUserDetails moplUserDetails
+	) {
 
-		ConversationDto conversationDto = conversationService.findConversationById(conversationId);
+		ConversationDto conversationDto = conversationService.findConversationById(conversationId, moplUserDetails);
 
 		return ResponseEntity.status(HttpStatus.OK).body(conversationDto);
 	}
