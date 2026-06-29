@@ -3,11 +3,10 @@ package com.team04.mopl.auth.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -130,10 +129,13 @@ class AuthControllerTest {
 		// when & then
 		mockMvc.perform(post("/api/auth/refresh")
 				.cookie(new Cookie("REFRESH_TOKEN", refreshToken)))
-			.andExpect(status().isOk());
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.accessToken").value(accessToken))
+			.andExpect(jsonPath("$.userDto.email").value("test@test.com"));
 
+		verify(authTokenService).refresh(refreshToken);
 		verify(refreshTokenCookieWriter).write(
-			any(MockHttpServletResponse.class),
+			any(HttpServletResponse.class),
 			eq(newRefreshToken)
 		);
 	}
@@ -178,5 +180,17 @@ class AuthControllerTest {
 			any(HttpServletResponse.class),
 			any()
 		);
+	}
+
+	@Test
+	@DisplayName("CSRF 토큰 조회 요청에 성공하면 204 No Content를 반환한다")
+	void getCsrfToken_returnNoContent_whenRequested() throws Exception {
+		// when & then
+		mockMvc.perform(get("/api/auth/csrf-token"))
+			.andExpect(status().isNoContent())
+			.andExpect(content().string(""));
+
+		verifyNoInteractions(authTokenService);
+		verifyNoInteractions(refreshTokenCookieWriter);
 	}
 }
