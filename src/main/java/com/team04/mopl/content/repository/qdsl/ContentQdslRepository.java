@@ -5,7 +5,7 @@ import java.util.List;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
 import com.team04.mopl.content.entity.Content;
 
-public interface ContentQDSLRepository {
+public interface ContentQdslRepository {
 	List<Content> findContents(ContentPageRequest contentPageRequest);
 	long countContents(ContentPageRequest contentPageRequest);
 }

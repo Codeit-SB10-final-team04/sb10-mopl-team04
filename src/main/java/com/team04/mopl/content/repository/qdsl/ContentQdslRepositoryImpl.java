@@ -24,7 +24,7 @@ import lombok.RequiredArgsConstructor;
 
 @Repository
 @RequiredArgsConstructor
-public class ContentQDSLRepositoryImpl implements ContentQDSLRepository {
+public class ContentQdslRepositoryImpl implements ContentQdslRepository {
 
 	private final JPAQueryFactory jpaQueryFactory;
 
