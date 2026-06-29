@@ -36,7 +36,6 @@ import lombok.RequiredArgsConstructor;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 	private static final String BEARER_PREFIX = "Bearer ";
-	private static final String SIGN_IN_PATH = "/api/auth/sign-in";
 
 	private final JwtTokenProvider jwtTokenProvider;
 	private final AuthSessionStore authSessionStore;
@@ -69,11 +68,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		}
 	}
 
-	// 로그인 요청은 JWT 인증 필터를 적용하지 않도록 제외
+	// 로그인/로그아웃 요청은 JWT 인증 필터를 적용하지 않도록 제외
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		return SIGN_IN_PATH.equals(request.getServletPath())
-			&& HttpMethod.POST.matches(request.getMethod());
+		return isPost(request, "/api/auth/sign-in")
+			|| isPost(request, "/api/auth/sign-out");
 	}
 
 	// Authorization 헤더에서 Bearer Access Token 추출
@@ -128,5 +127,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		);
 
 		SecurityContextHolder.getContext().setAuthentication(authentication);
+	}
+
+	// 요청 경로와 HTTP Method가 일치하는지 확인
+	private boolean isPost(HttpServletRequest request, String path) {
+		return path.equals(request.getServletPath())
+			&& HttpMethod.POST.matches(request.getMethod());
 	}
 }
