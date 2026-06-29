@@ -19,6 +19,8 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
+import com.team04.mopl.content.exception.ContentErrorCode;
+import com.team04.mopl.content.exception.ContentException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,12 +33,19 @@ public class ContentQdslRepositoryImpl implements ContentQdslRepository {
 	@Override
 	public List<Content> findContents(ContentPageRequest req) {
 		int limit = req.limit() != null ? req.limit() : 20;
-		boolean isDesc = !"ASC".equalsIgnoreCase(req.sortDirection());
+		boolean isDesc = !"ASCENDING".equalsIgnoreCase(req.sortDirection());
 		String sortBy = req.sortBy() != null ? req.sortBy() : "watcherCount";
+
+		// cursor와 idAfter는 반드시 함께 전달되어야 함
+		boolean hasCursor = req.cursor() != null;
+		boolean hasIdAfter = req.idAfter() != null;
+		if (hasCursor != hasIdAfter) {
+			throw new ContentException(ContentErrorCode.INVALID_CURSOR_PAIR);
+		}
 
 		BooleanBuilder where = buildBaseWhere(req);
 
-		if (req.cursor() != null && req.idAfter() != null) {
+		if (hasCursor) {
 			where.and(buildCursorCondition(sortBy, req.cursor(), req.idAfter(), isDesc));
 		}
 
@@ -92,7 +101,12 @@ public class ContentQdslRepositoryImpl implements ContentQdslRepository {
 						.or(content.averageRating.eq(cursorVal).and(content.id.gt(idAfter)));
 			}
 			case "createdAt" -> {
-				Instant cursorVal = Instant.parse(cursor);
+				Instant cursorVal;
+				try {
+					cursorVal = Instant.parse(cursor);
+				} catch (Exception e) {
+					throw new ContentException(ContentErrorCode.INVALID_CURSOR);
+				}
 				yield isDesc
 					? content.createdAt.lt(cursorVal)
 						.or(content.createdAt.eq(cursorVal).and(content.id.gt(idAfter)))

@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 public enum ContentErrorCode implements ErrorCode {
-	CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CT01", "콘텐츠를 찾을 수 없습니다.");
+	CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CT01", "콘텐츠를 찾을 수 없습니다."),
+	INVALID_CURSOR(HttpStatus.BAD_REQUEST, "CT02", "커서 값이 올바르지 않습니다."),
+	INVALID_CURSOR_PAIR(HttpStatus.BAD_REQUEST, "CT03", "cursor와 idAfter는 함께 전달되어야 합니다.");
 
 	private final HttpStatus httpStatus;
 	private final String code;
