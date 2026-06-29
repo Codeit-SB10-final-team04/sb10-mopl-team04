@@ -29,7 +29,7 @@ public class PlaylistSubscriptionService {
 
 	@Transactional
 	public void subscribePlaylist(UUID playlistId, UUID currentUserId) {
-		log.info("[PLAYLIST_SUBSCRIPTION] 플레이리스트 구독 시작: currentUserId = {}, playlistId = {}",
+		log.info("[PLAYLIST_SUBSCRIPTION] 플레이리스트 구독 시작: currentUserId={}, playlistId={}",
 			currentUserId, playlistId);
 
 		// 현재 로그인한 인증된 사용자 조회
@@ -38,13 +38,15 @@ public class PlaylistSubscriptionService {
 		// 플레이리스트 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
 
-		// 본인이 생성한 플레이리스트에 구독 요청 여부
-		if (playlist.getOwner().getId().equals(currentUserId)) {
+		// 본인이 생성한 플레이리스트 여부
+		if (isSelfSubscription(playlist.getOwner().getId(), currentUserId)) {
+			// 본인이 생성한 플레이리스트에 구독 요청했으므로 예외 발생
 			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_SELF_SUBSCRIPTION_NOT_ALLOWED);
 		}
 
 		// 기존 구독 여부
 		if (isSubscribed(playlistId, currentUserId)) {
+			// 이미 구독했는데 또 구독 요청 시 예외 발생
 			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_ALREADY_SUBSCRIBED);
 		}
 
@@ -63,7 +65,31 @@ public class PlaylistSubscriptionService {
 				.addDetail("currentUserId", currentUserId);
 		}
 
-		log.info("[PLAYLIST_SUBSCRIPTION] 플레이리스트 구독 완료: currentUserId = {}, playlistId = {}",
+		log.info("[PLAYLIST_SUBSCRIPTION] 플레이리스트 구독 완료: currentUserId={}, playlistId={}",
+			currentUserId, playlistId);
+	}
+
+	@Transactional
+	public void unSubscribePlaylist(UUID playlistId, UUID currentUserId) {
+		log.info("[PLAYLIST_UNSUBSCRIPTION] 플레이리스트 구독 취소 시작: currentUserId={}, playlistId={}",
+			currentUserId, playlistId);
+
+		// 플레이리스트 조회
+		Playlist playlist = getPlaylistOrThrow(playlistId);
+
+		// 본인이 생성한 플레이리스트 여부
+		if (isSelfSubscription(playlist.getOwner().getId(), currentUserId)) {
+			// 본인이 생성한 플레이리스트에 구독 취소 요청했으므로 예외 발생
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_SELF_UNSUBSCRIPTION_NOT_ALLOWED);
+		}
+
+		// 플레이리스트 구독 관계 조회
+		PlaylistSubscription playlistSubscription = getPlaylistSubscriptionOrThrow(playlistId, currentUserId);
+
+		// 구독 취소
+		playlistSubscriptionRepository.delete(playlistSubscription);
+
+		log.info("[PLAYLIST_UNSUBSCRIPTION] 플레이리스트 구독 취소 완료: currentUserId={}, playlistId={}",
 			currentUserId, playlistId);
 	}
 
@@ -81,8 +107,18 @@ public class PlaylistSubscriptionService {
 			.orElseThrow(() -> new PlaylistException(PlaylistErrorCode.PLAYLIST_NOT_FOUND));
 	}
 
+	// 본인이 생성한 플레이리스트 여부
+	private boolean isSelfSubscription(UUID ownerId, UUID currentUserId) {
+		return ownerId.equals(currentUserId);
+	}
+
 	// 기존 구독 여부
 	private boolean isSubscribed(UUID playlistId, UUID subscriberId) {
 		return playlistSubscriptionRepository.existsByPlaylistIdAndSubscriberId(playlistId, subscriberId);
+	}
+
+	private PlaylistSubscription getPlaylistSubscriptionOrThrow(UUID playlistId, UUID subscriberId) {
+		return playlistSubscriptionRepository.findByPlaylistIdAndSubscriberId(playlistId, subscriberId)
+			.orElseThrow(() -> new PlaylistException(PlaylistErrorCode.PLAYLIST_UNSUBSCRIBED));
 	}
 }
