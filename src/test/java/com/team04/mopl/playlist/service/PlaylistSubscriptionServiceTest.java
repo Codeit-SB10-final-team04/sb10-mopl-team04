@@ -205,6 +205,7 @@ class PlaylistSubscriptionServiceTest {
 		// then
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository).findByPlaylistIdAndSubscriberId(playlistId, currentUserId);
+		verify(playlistSubscriptionRepository).delete(playlistSubscription);
 	}
 
 	@Test
@@ -225,6 +226,7 @@ class PlaylistSubscriptionServiceTest {
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository, never()).findByPlaylistIdAndSubscriberId(any(UUID.class),
 			any(UUID.class));
+		verify(playlistSubscriptionRepository, never()).delete(any(PlaylistSubscription.class));
 	}
 
 	@Test
@@ -250,6 +252,7 @@ class PlaylistSubscriptionServiceTest {
 		// then
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository).findByPlaylistIdAndSubscriberId(playlistId, currentUserId);
+		verify(playlistSubscriptionRepository, never()).delete(any(PlaylistSubscription.class));
 	}
 
 	private User createUser(UUID userId) {
