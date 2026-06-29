@@ -27,9 +27,9 @@ import org.springframework.security.web.savedrequest.NullRequestCache;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
+import com.team04.mopl.auth.security.handler.AuthSessionLogoutHandler;
 import com.team04.mopl.auth.security.handler.LoginFailureHandler;
 import com.team04.mopl.auth.security.handler.LoginSuccessHandler;
-import com.team04.mopl.auth.security.handler.AuthSessionLogoutHandler;
 import com.team04.mopl.auth.security.handler.RestAccessDeniedHandler;
 import com.team04.mopl.auth.security.handler.RestAuthenticationEntryPoint;
 import com.team04.mopl.auth.security.handler.RestLogoutSuccessHandler;
@@ -91,6 +91,7 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/users").permitAll() // 회원가입
 				.requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll() // 로그인
 				.requestMatchers(HttpMethod.POST, "/api/auth/sign-out").permitAll() // 로그아웃
+				.requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll() // 토큰 재발급
 				.requestMatchers(
 					"/swagger-ui/**",
 					"/v3/api-docs/**",
