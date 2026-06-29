@@ -127,7 +127,7 @@ class JwtTokenProviderTest {
 		assertThatThrownBy(() -> jwtTokenProvider.parseAccessToken(invalidToken))
 			.isInstanceOf(AuthException.class)
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 	}
 
 	@Test
@@ -156,7 +156,7 @@ class JwtTokenProviderTest {
 		assertThatThrownBy(() -> jwtTokenProvider.parseAccessToken(expiredAccessToken))
 			.isInstanceOf(AuthException.class)
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.EXPIRED_ACCESS_TOKEN);
+			.isEqualTo(AuthErrorCode.AUTH_EXPIRED_ACCESS_TOKEN);
 	}
 
 	@Test
@@ -178,7 +178,7 @@ class JwtTokenProviderTest {
 		assertThatThrownBy(() -> jwtTokenProvider.parseAccessToken(accessToken))
 			.isInstanceOf(AuthException.class)
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 	}
 
 	@Test
@@ -201,7 +201,7 @@ class JwtTokenProviderTest {
 		assertThatThrownBy(() -> jwtTokenProvider.parseAccessToken(accessToken))
 			.isInstanceOf(AuthException.class)
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 	}
 
 	private JwtDecoder createJwtDecoder() {

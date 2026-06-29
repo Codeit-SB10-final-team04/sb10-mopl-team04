@@ -178,7 +178,7 @@ class JwtAuthenticationFilterTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 	}
 
@@ -203,7 +203,7 @@ class JwtAuthenticationFilterTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 	}
 
@@ -299,7 +299,7 @@ class JwtAuthenticationFilterTest {
 		MockFilterChain filterChain = new MockFilterChain();
 
 		when(jwtTokenProvider.parseAccessToken(accessToken))
-			.thenThrow(new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN));
+			.thenThrow(new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN));
 
 		ArgumentCaptor<AuthException> exceptionCaptor = ArgumentCaptor.forClass(AuthException.class);
 
@@ -311,7 +311,7 @@ class JwtAuthenticationFilterTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 	}
 }

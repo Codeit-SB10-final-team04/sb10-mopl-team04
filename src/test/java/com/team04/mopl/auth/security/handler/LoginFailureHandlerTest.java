@@ -41,7 +41,7 @@ class LoginFailureHandlerTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.LOCKED_ACCOUNT);
+			.isEqualTo(AuthErrorCode.AUTH_LOCKED_ACCOUNT);
 	}
 
 	@Test
@@ -62,7 +62,7 @@ class LoginFailureHandlerTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.INVALID_CREDENTIALS);
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_CREDENTIALS);
 	}
 
 	@Test
@@ -84,6 +84,6 @@ class LoginFailureHandlerTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.AUTHENTICATION_SERVICE_ERROR);
+			.isEqualTo(AuthErrorCode.AUTH_SERVICE_ERROR);
 	}
 }

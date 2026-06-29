@@ -39,6 +39,6 @@ class RestAccessDeniedHandlerTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.ACCESS_DENIED);
+			.isEqualTo(AuthErrorCode.AUTH_ACCESS_DENIED);
 	}
 }

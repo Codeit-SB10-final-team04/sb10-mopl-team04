@@ -85,13 +85,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		}
 
 		if (!authorizationHeader.startsWith(BEARER_PREFIX)) {
-			throw new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			throw new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		}
 
 		String accessToken = authorizationHeader.substring(BEARER_PREFIX.length());
 
 		if (accessToken.isBlank()) {
-			throw new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			throw new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		}
 
 		return accessToken;

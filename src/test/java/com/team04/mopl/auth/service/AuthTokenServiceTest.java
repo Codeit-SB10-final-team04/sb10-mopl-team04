@@ -137,7 +137,7 @@ class AuthTokenServiceTest {
 		// when & then
 		assertThatThrownBy(() -> authTokenService.refresh(null))
 			.isInstanceOfSatisfying(AuthException.class, exception ->
-				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.MISSING_REFRESH_TOKEN)
+				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.AUTH_MISSING_REFRESH_TOKEN)
 			);
 
 		verifyNoInteractions(tokenHasher);
@@ -152,7 +152,7 @@ class AuthTokenServiceTest {
 		// when & then
 		assertThatThrownBy(() -> authTokenService.refresh("   "))
 			.isInstanceOfSatisfying(AuthException.class, exception ->
-				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.MISSING_REFRESH_TOKEN)
+				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.AUTH_MISSING_REFRESH_TOKEN)
 			);
 
 		verifyNoInteractions(tokenHasher);
@@ -173,7 +173,7 @@ class AuthTokenServiceTest {
 		// when & then
 		assertThatThrownBy(() -> authTokenService.refresh(refreshToken))
 			.isInstanceOfSatisfying(AuthException.class, exception ->
-				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.INVALID_REFRESH_TOKEN)
+				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.AUTH_INVALID_REFRESH_TOKEN)
 			);
 
 		verify(authSessionStore, never()).refresh(
@@ -208,7 +208,7 @@ class AuthTokenServiceTest {
 		// when & then
 		assertThatThrownBy(() -> authTokenService.refresh(refreshToken))
 			.isInstanceOfSatisfying(AuthException.class, exception ->
-				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.EXPIRED_REFRESH_TOKEN)
+				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.AUTH_EXPIRED_REFRESH_TOKEN)
 			);
 
 		verify(authSessionStore).delete(userId, sessionId);
@@ -241,7 +241,7 @@ class AuthTokenServiceTest {
 		// when & then
 		assertThatThrownBy(() -> authTokenService.refresh(refreshToken))
 			.isInstanceOfSatisfying(AuthException.class, exception ->
-				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.LOCKED_ACCOUNT)
+				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.AUTH_LOCKED_ACCOUNT)
 			);
 
 		verify(authSessionStore).deleteByUserId(userId);
@@ -305,7 +305,7 @@ class AuthTokenServiceTest {
 		// when & then
 		assertThatThrownBy(() -> authTokenService.refresh(refreshToken))
 			.isInstanceOfSatisfying(AuthException.class, exception ->
-				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.INVALID_REFRESH_TOKEN)
+				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.AUTH_INVALID_REFRESH_TOKEN)
 			);
 	}
 

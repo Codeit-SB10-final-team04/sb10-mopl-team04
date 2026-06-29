@@ -144,7 +144,7 @@ class AuthControllerTest {
 		// given
 		given(jwtProperties.refreshTokenCookieName()).willReturn("REFRESH_TOKEN");
 		given(authTokenService.refresh(null))
-			.willThrow(new AuthException(AuthErrorCode.MISSING_REFRESH_TOKEN));
+			.willThrow(new AuthException(AuthErrorCode.AUTH_MISSING_REFRESH_TOKEN));
 
 		// when & then
 		mockMvc.perform(post("/api/auth/refresh"))
@@ -164,7 +164,7 @@ class AuthControllerTest {
 		// given
 		given(jwtProperties.refreshTokenCookieName()).willReturn("REFRESH_TOKEN");
 		given(authTokenService.refresh(null))
-			.willThrow(new AuthException(AuthErrorCode.MISSING_REFRESH_TOKEN));
+			.willThrow(new AuthException(AuthErrorCode.AUTH_MISSING_REFRESH_TOKEN));
 
 		// when & then
 		mockMvc.perform(post("/api/auth/refresh")

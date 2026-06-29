@@ -3,6 +3,9 @@ package com.team04.mopl.auth.entity;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+
+import com.team04.mopl.auth.exception.AuthErrorCode;
+import com.team04.mopl.auth.exception.AuthException;
 import com.team04.mopl.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -70,14 +73,20 @@ public class AuthSession { // updatedAt만 활용하기 때문에 상속 안 함
 		Instant refreshExpiresAt,
 		Instant updatedAt
 	) {
-		this.sessionId = Objects.requireNonNull(sessionId, "sessionId는 필수입니다.");
-		this.user = Objects.requireNonNull(user, "user는 필수입니다.");
-		this.refreshTokenHash = requireText(refreshTokenHash);
-		this.accessExpiresAt = Objects.requireNonNull(accessExpiresAt, "accessExpiresAt은 필수입니다.");
-		this.refreshExpiresAt = Objects.requireNonNull(refreshExpiresAt, "refreshExpiresAt은 필수입니다.");
-		this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt은 필수입니다.");
-
+		validateSessionId(sessionId);
+		validateUser(user);
+		validateRefreshTokenHash(refreshTokenHash);
+		validateAccessExpiresAt(accessExpiresAt);
+		validateRefreshExpiresAt(refreshExpiresAt);
+		validateUpdatedAt(updatedAt);
 		validateExpiration(updatedAt, accessExpiresAt, refreshExpiresAt);
+
+		this.sessionId = sessionId;
+		this.user = user;
+		this.refreshTokenHash = refreshTokenHash;
+		this.accessExpiresAt = accessExpiresAt;
+		this.refreshExpiresAt = refreshExpiresAt;
+		this.updatedAt = updatedAt;
 	}
 
 	// Refresh Token 인증 세션 정보 갱신
@@ -87,35 +96,89 @@ public class AuthSession { // updatedAt만 활용하기 때문에 상속 안 함
 		Instant refreshExpiresAt,
 		Instant refreshedAt
 	) {
-		Objects.requireNonNull(refreshedAt, "refreshedAt은 필수입니다.");
-
+		validateRefreshTokenHash(refreshTokenHash);
+		validateAccessExpiresAt(accessExpiresAt);
+		validateRefreshExpiresAt(refreshExpiresAt);
+		validateRefreshedAt(refreshedAt);
 		validateExpiration(refreshedAt, accessExpiresAt, refreshExpiresAt);
 
-		this.refreshTokenHash = requireText(refreshTokenHash);
+		this.refreshTokenHash = refreshTokenHash;
 		this.accessExpiresAt = accessExpiresAt;
 		this.refreshExpiresAt = refreshExpiresAt;
 		this.lastRefreshedAt = refreshedAt;
 		this.updatedAt = refreshedAt;
 	}
 
+	// sessionId 일치 여부 확인
 	public boolean matchesSessionId(UUID sessionId) {
 		return this.sessionId.equals(sessionId);
 	}
 
+	// refresh token hash 일치 여부 확인
 	public boolean matchesRefreshTokenHash(String refreshTokenHash) {
 		return this.refreshTokenHash.equals(refreshTokenHash);
 	}
 
+	// access token 만료 여부 확인
 	public boolean isAccessTokenExpired(Instant now) {
-		Objects.requireNonNull(now, "현재시각은 필수입니다.");
+		validateCurrentTime(now);
 
 		return !now.isBefore(accessExpiresAt);
 	}
 
+	// refresh token 만료 여부 확인
 	public boolean isRefreshTokenExpired(Instant now) {
-		Objects.requireNonNull(now, "현재시각은 필수입니다.");
+		validateCurrentTime(now);
 
 		return !now.isBefore(refreshExpiresAt);
+	}
+
+	private static void validateSessionId(UUID sessionId) {
+		if (sessionId == null) {
+			throw new AuthException(AuthErrorCode.AUTH_SESSION_REQUIRED_VALUE);
+		}
+	}
+
+	private static void validateUser(User user) {
+		if (user == null) {
+			throw new AuthException(AuthErrorCode.AUTH_SESSION_REQUIRED_VALUE);
+		}
+	}
+
+	private static void validateRefreshTokenHash(String refreshTokenHash) {
+		if (refreshTokenHash == null || refreshTokenHash.isBlank()) {
+			throw new AuthException(AuthErrorCode.AUTH_SESSION_REQUIRED_VALUE);
+		}
+	}
+
+	private static void validateAccessExpiresAt(Instant accessExpiresAt) {
+		if (accessExpiresAt == null) {
+			throw new AuthException(AuthErrorCode.AUTH_SESSION_REQUIRED_VALUE);
+		}
+	}
+
+	private static void validateRefreshExpiresAt(Instant refreshExpiresAt) {
+		if (refreshExpiresAt == null) {
+			throw new AuthException(AuthErrorCode.AUTH_SESSION_REQUIRED_VALUE);
+		}
+	}
+
+	private static void validateUpdatedAt(Instant updatedAt) {
+		if (updatedAt == null) {
+			throw new AuthException(AuthErrorCode.AUTH_SESSION_REQUIRED_VALUE);
+		}
+	}
+
+	private static void validateRefreshedAt(Instant refreshedAt) {
+		if (refreshedAt == null) {
+			throw new AuthException(AuthErrorCode.AUTH_SESSION_REQUIRED_VALUE);
+		}
+	}
+
+	private static void validateCurrentTime(Instant now) {
+		if (now == null) {
+			throw new AuthException(AuthErrorCode.AUTH_SESSION_REQUIRED_VALUE);
+		}
 	}
 
 	private static void validateExpiration(
@@ -123,24 +186,16 @@ public class AuthSession { // updatedAt만 활용하기 때문에 상속 안 함
 		Instant accessExpiresAt,
 		Instant refreshExpiresAt
 	) {
-		Objects.requireNonNull(issuedAt, "issuedAt은 필수입니다.");
-		Objects.requireNonNull(accessExpiresAt, "accessExpiresAt은 필수입니다.");
-		Objects.requireNonNull(refreshExpiresAt, "refreshExpiresAt은 필수입니다.");
+		validateUpdatedAt(issuedAt);
+		validateAccessExpiresAt(accessExpiresAt);
+		validateRefreshExpiresAt(refreshExpiresAt);
 
 		if (!accessExpiresAt.isAfter(issuedAt)) {
-			throw new IllegalArgumentException("Access Token 만료 시각은 발급 시각 이후여야 합니다.");
+			throw new AuthException(AuthErrorCode.AUTH_TOKEN_EXPIRATION_INVALID);
 		}
 
 		if (!refreshExpiresAt.isAfter(accessExpiresAt)) {
-			throw new IllegalArgumentException("Refresh Token 만료 시각은 Access Token 만료 시각 이후여야 합니다.");
+			throw new AuthException(AuthErrorCode.AUTH_TOKEN_EXPIRATION_INVALID);
 		}
-	}
-
-	private static String requireText(String value) {
-		if (value == null || value.isBlank()) {
-			throw new IllegalArgumentException("Refresh Token 해시는 필수입니다.");
-		}
-
-		return value;
 	}
 }
