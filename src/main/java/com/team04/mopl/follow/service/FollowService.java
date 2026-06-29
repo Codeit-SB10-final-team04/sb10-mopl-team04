@@ -16,6 +16,8 @@ import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -146,10 +148,8 @@ public class FollowService {
 	// 사용자 엔티티 반환
 	private User getUserEntityOrThrow(UUID userId) {
 		return userRepository.findById(userId)
-			// TODO: User 도메인의 최상위 예외 클래스 구현 시 주석 제거 예정
-			.orElseThrow(/*() -> new Userxception(
-				UserErrorCode
-			)*/);
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
+				.addDetail("userId", userId));
 	}
 
 	// 팔로우 엔티티 반환 (팔로우 Id)
