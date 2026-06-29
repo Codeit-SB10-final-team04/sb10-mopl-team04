@@ -275,22 +275,94 @@ class DbAuthSessionStoreTest {
 	}
 
 	@Test
-	@DisplayName("인증 세션이 있으면 refresh token hash와 만료시간을 갱신한다")
-	void refresh_updateSessionAndReturnSession_whenSessionExists() {
+	@DisplayName("refresh token hash 기준으로 인증 세션을 조회한다")
+	void findByRefreshTokenHash_returnSession_whenSessionExists() {
+		// given
+		String refreshTokenHash = "refresh-token-hash";
+
+		given(authSessionRepository.findByRefreshTokenHash(refreshTokenHash))
+			.willReturn(Optional.of(existingSession));
+
+		// when
+		Optional<AuthSession> result = authSessionStore.findByRefreshTokenHash(refreshTokenHash);
+
+		// then
+		assertThat(result).contains(existingSession);
+
+		verify(authSessionRepository).findByRefreshTokenHash(refreshTokenHash);
+		verifyNoInteractions(entityManager);
+	}
+
+	@Test
+	@DisplayName("refresh token hash 기준 조회 시 세션이 없으면 empty를 반환한다")
+	void findByRefreshTokenHash_returnEmpty_whenSessionDoesNotExist() {
+		// given
+		String refreshTokenHash = "refresh-token-hash";
+
+		given(authSessionRepository.findByRefreshTokenHash(refreshTokenHash))
+			.willReturn(Optional.empty());
+
+		// when
+		Optional<AuthSession> result = authSessionStore.findByRefreshTokenHash(refreshTokenHash);
+
+		// then
+		assertThat(result).isEmpty();
+
+		verify(authSessionRepository).findByRefreshTokenHash(refreshTokenHash);
+		verifyNoInteractions(entityManager);
+	}
+
+	@Test
+	@DisplayName("refresh token hash가 null이면 인증 세션 조회 시 empty를 반환한다")
+	void findByRefreshTokenHash_returnEmpty_whenRefreshTokenHashIsNull() {
+		// given
+
+		// when
+		Optional<AuthSession> result = authSessionStore.findByRefreshTokenHash(null);
+
+		// then
+		assertThat(result).isEmpty();
+
+		verifyNoInteractions(entityManager);
+		verifyNoInteractions(authSessionRepository);
+	}
+
+	@Test
+	@DisplayName("refresh token hash가 공백이면 인증 세션 조회 시 empty를 반환한다")
+	void findByRefreshTokenHash_returnEmpty_whenRefreshTokenHashIsBlank() {
+		// given
+
+		// when
+		Optional<AuthSession> result = authSessionStore.findByRefreshTokenHash("   ");
+
+		// then
+		assertThat(result).isEmpty();
+
+		verifyNoInteractions(entityManager);
+		verifyNoInteractions(authSessionRepository);
+	}
+
+	@Test
+	@DisplayName("현재 refresh token hash와 userId가 일치하면 인증 세션을 갱신한다")
+	void refresh_updateSessionAndReturnSession_whenCurrentRefreshTokenHashAndUserIdMatch() {
 		// given
 		UUID userId = UUID.randomUUID();
-		String refreshTokenHash = "new-refresh-token-hash";
+		String currentRefreshTokenHash = "current-refresh-token-hash";
+		String newRefreshTokenHash = "new-refresh-token-hash";
 		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
 		Instant accessExpiresAt = refreshedAt.plusSeconds(1800);
 		Instant refreshExpiresAt = refreshedAt.plusSeconds(1209600);
 
-		given(authSessionRepository.findByUser_Id(userId))
+		given(authSessionRepository.findByRefreshTokenHash(currentRefreshTokenHash))
 			.willReturn(Optional.of(existingSession));
+		given(existingSession.getUser()).willReturn(user);
+		given(user.getId()).willReturn(userId);
 
 		// when
 		Optional<AuthSession> result = authSessionStore.refresh(
 			userId,
-			refreshTokenHash,
+			currentRefreshTokenHash,
+			newRefreshTokenHash,
 			accessExpiresAt,
 			refreshExpiresAt,
 			refreshedAt
@@ -299,9 +371,9 @@ class DbAuthSessionStoreTest {
 		// then
 		assertThat(result).contains(existingSession);
 
-		verify(authSessionRepository).findByUser_Id(userId);
+		verify(authSessionRepository).findByRefreshTokenHash(currentRefreshTokenHash);
 		verify(existingSession).refresh(
-			refreshTokenHash,
+			newRefreshTokenHash,
 			accessExpiresAt,
 			refreshExpiresAt,
 			refreshedAt
@@ -310,28 +382,74 @@ class DbAuthSessionStoreTest {
 	}
 
 	@Test
-	@DisplayName("인증 세션이 없으면 refresh 시 empty를 반환한다")
-	void refresh_returnEmpty_whenSessionDoesNotExist() {
+	@DisplayName("현재 refresh token hash에 해당하는 인증 세션이 없으면 empty를 반환한다")
+	void refresh_returnEmpty_whenCurrentRefreshTokenHashDoesNotExist() {
 		// given
 		UUID userId = UUID.randomUUID();
+		String currentRefreshTokenHash = "current-refresh-token-hash";
+		String newRefreshTokenHash = "new-refresh-token-hash";
 		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
+		Instant accessExpiresAt = refreshedAt.plusSeconds(1800);
+		Instant refreshExpiresAt = refreshedAt.plusSeconds(1209600);
 
-		given(authSessionRepository.findByUser_Id(userId))
+		given(authSessionRepository.findByRefreshTokenHash(currentRefreshTokenHash))
 			.willReturn(Optional.empty());
 
 		// when
 		Optional<AuthSession> result = authSessionStore.refresh(
 			userId,
-			"new-refresh-token-hash",
-			refreshedAt.plusSeconds(1800),
-			refreshedAt.plusSeconds(1209600),
+			currentRefreshTokenHash,
+			newRefreshTokenHash,
+			accessExpiresAt,
+			refreshExpiresAt,
 			refreshedAt
 		);
 
 		// then
 		assertThat(result).isEmpty();
 
-		verify(authSessionRepository).findByUser_Id(userId);
+		verify(authSessionRepository).findByRefreshTokenHash(currentRefreshTokenHash);
+		verify(existingSession, never()).refresh(
+			any(String.class),
+			any(Instant.class),
+			any(Instant.class),
+			any(Instant.class)
+		);
+		verifyNoInteractions(entityManager);
+	}
+
+	@Test
+	@DisplayName("인증 세션의 userId가 요청 userId와 다르면 empty를 반환한다")
+	void refresh_returnEmpty_whenUserIdDoesNotMatch() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		UUID sessionUserId = UUID.randomUUID();
+
+		String currentRefreshTokenHash = "current-refresh-token-hash";
+		String newRefreshTokenHash = "new-refresh-token-hash";
+		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
+		Instant accessExpiresAt = refreshedAt.plusSeconds(1800);
+		Instant refreshExpiresAt = refreshedAt.plusSeconds(1209600);
+
+		given(authSessionRepository.findByRefreshTokenHash(currentRefreshTokenHash))
+			.willReturn(Optional.of(existingSession));
+		given(existingSession.getUser()).willReturn(user);
+		given(user.getId()).willReturn(sessionUserId);
+
+		// when
+		Optional<AuthSession> result = authSessionStore.refresh(
+			requestUserId,
+			currentRefreshTokenHash,
+			newRefreshTokenHash,
+			accessExpiresAt,
+			refreshExpiresAt,
+			refreshedAt
+		);
+
+		// then
+		assertThat(result).isEmpty();
+
+		verify(authSessionRepository).findByRefreshTokenHash(currentRefreshTokenHash);
 		verify(existingSession, never()).refresh(
 			any(String.class),
 			any(Instant.class),
@@ -350,6 +468,7 @@ class DbAuthSessionStoreTest {
 		// when
 		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.refresh(
 			null,
+			"current-refresh-token-hash",
 			"new-refresh-token-hash",
 			refreshedAt.plusSeconds(1800),
 			refreshedAt.plusSeconds(1209600),
@@ -360,6 +479,58 @@ class DbAuthSessionStoreTest {
 		assertThatThrownBy(action)
 			.isInstanceOf(NullPointerException.class)
 			.hasMessage("userId는 필수입니다.");
+
+		verifyNoInteractions(entityManager);
+		verifyNoInteractions(authSessionRepository);
+	}
+
+	@Test
+	@DisplayName("현재 refresh token hash가 공백이면 refresh에 실패한다")
+	void refresh_throwIllegalArgumentException_whenCurrentRefreshTokenHashIsBlank() {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
+
+		// when
+		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.refresh(
+			userId,
+			"   ",
+			"new-refresh-token-hash",
+			refreshedAt.plusSeconds(1800),
+			refreshedAt.plusSeconds(1209600),
+			refreshedAt
+		);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("현재 Refresh Token 해시는 필수입니다.");
+
+		verifyNoInteractions(entityManager);
+		verifyNoInteractions(authSessionRepository);
+	}
+
+	@Test
+	@DisplayName("새 refresh token hash가 공백이면 refresh에 실패한다")
+	void refresh_throwIllegalArgumentException_whenNewRefreshTokenHashIsBlank() {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
+
+		// when
+		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.refresh(
+			userId,
+			"current-refresh-token-hash",
+			"   ",
+			refreshedAt.plusSeconds(1800),
+			refreshedAt.plusSeconds(1209600),
+			refreshedAt
+		);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("새 Refresh Token 해시는 필수입니다.");
 
 		verifyNoInteractions(entityManager);
 		verifyNoInteractions(authSessionRepository);
