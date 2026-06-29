@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
+import com.team04.mopl.content.dto.request.ContentPageRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.service.ContentService;
 
@@ -48,5 +50,14 @@ public class ContentController implements ContentControllerDocs {
 		ContentDto contentDto = contentService.createContent(contentCreateRequest, thumbnail);
 
 		return ResponseEntity.status(HttpStatus.CREATED).body(contentDto);
+	}
+
+	@Override
+	@GetMapping
+	public ResponseEntity<CursorResponse<ContentDto>> getContents(@Valid ContentPageRequest contentPageRequest) {
+
+		CursorResponse<ContentDto> contents = contentService.getContents(contentPageRequest);
+
+		return ResponseEntity.status(HttpStatus.OK).body(contents);
 	}
 }

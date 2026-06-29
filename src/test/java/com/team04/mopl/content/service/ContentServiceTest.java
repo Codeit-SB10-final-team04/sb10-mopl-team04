@@ -15,7 +15,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
+import com.team04.mopl.content.dto.request.ContentPageRequest;
+import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.Tag;
@@ -190,6 +193,121 @@ class ContentServiceTest {
 			.isInstanceOf(RuntimeException.class);
 
 		verify(thumbnailStorage).delete(storedUrl);
+	}
+
+	// ========== getContents ==========
+
+	@Test
+	@DisplayName("콘텐츠 목록 조회 시 hasNext=false이면 nextCursor가 null이다.")
+	void getContents_returnNoNextCursor_whenLastPage() {
+		// given
+		ContentPageRequest req = new ContentPageRequest(null, null, null, null, null, 2, "DESC", "watcherCount");
+
+		UUID id1 = UUID.randomUUID();
+		UUID id2 = UUID.randomUUID();
+		Content c1 = mock(Content.class);
+		Content c2 = mock(Content.class);
+		when(c1.getId()).thenReturn(id1);
+		when(c2.getId()).thenReturn(id2);
+
+		ContentDto dto1 = mock(ContentDto.class);
+		ContentDto dto2 = mock(ContentDto.class);
+
+		when(contentRepository.findContents(req)).thenReturn(List.of(c1, c2));
+		when(contentRepository.countContents(req)).thenReturn(2L);
+		when(contentTagRepository.findTagNamesByContentIds(List.of(id1, id2))).thenReturn(List.of());
+		when(contentMapper.toDto(c1, List.of())).thenReturn(dto1);
+		when(contentMapper.toDto(c2, List.of())).thenReturn(dto2);
+
+		// when
+		CursorResponse<ContentDto> result = contentService.getContents(req);
+
+		// then
+		assertThat(result.hasNext()).isFalse();
+		assertThat(result.nextCursor()).isNull();
+		assertThat(result.nextIdAfter()).isNull();
+		assertThat(result.totalCount()).isEqualTo(2L);
+	}
+
+	@Test
+	@DisplayName("콘텐츠 목록 조회 시 limit+1개 조회되면 hasNext=true이고 nextCursor가 설정된다.")
+	void getContents_returnNextCursor_whenMorePagesExist() {
+		// given: limit=2, watcherCount 기준
+		ContentPageRequest req = new ContentPageRequest(null, null, null, null, null, 2, "DESC", "watcherCount");
+
+		UUID id1 = UUID.randomUUID();
+		UUID id2 = UUID.randomUUID();
+		UUID id3 = UUID.randomUUID();
+		Content c1 = mock(Content.class);
+		Content c2 = mock(Content.class);
+		Content c3 = mock(Content.class); // limit+1번째 → hasNext 판단용
+		when(c1.getId()).thenReturn(id1);
+		when(c2.getId()).thenReturn(id2);
+		when(c2.getWatcherCount()).thenReturn(50L);
+
+		ContentDto dto1 = mock(ContentDto.class);
+		ContentDto dto2 = mock(ContentDto.class);
+
+		// limit+1개(3개) 반환 → hasNext=true
+		when(contentRepository.findContents(req)).thenReturn(List.of(c1, c2, c3));
+		when(contentRepository.countContents(req)).thenReturn(5L);
+		when(contentTagRepository.findTagNamesByContentIds(List.of(id1, id2))).thenReturn(List.of());
+		when(contentMapper.toDto(c1, List.of())).thenReturn(dto1);
+		when(contentMapper.toDto(c2, List.of())).thenReturn(dto2);
+
+		// when
+		CursorResponse<ContentDto> result = contentService.getContents(req);
+
+		// then
+		assertThat(result.hasNext()).isTrue();
+		assertThat(result.nextCursor()).isEqualTo("50");
+		assertThat(result.nextIdAfter()).isEqualTo(id2.toString());
+		assertThat(result.totalCount()).isEqualTo(5L);
+		assertThat(result.data().size()).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("콘텐츠 목록 조회 시 태그가 있는 콘텐츠는 태그가 포함된 Dto를 반환한다.")
+	void getContents_returnDtoWithTags_whenContentHasTags() {
+		// given
+		ContentPageRequest req = new ContentPageRequest(null, null, null, null, null, 10, "DESC", "watcherCount");
+
+		UUID id1 = UUID.randomUUID();
+		Content c1 = mock(Content.class);
+		when(c1.getId()).thenReturn(id1);
+
+		TagRow tagRow = new TagRow(id1, "액션");
+		ContentDto expectedDto = mock(ContentDto.class);
+
+		when(contentRepository.findContents(req)).thenReturn(List.of(c1));
+		when(contentRepository.countContents(req)).thenReturn(1L);
+		when(contentTagRepository.findTagNamesByContentIds(List.of(id1))).thenReturn(List.of(tagRow));
+		when(contentMapper.toDto(c1, List.of("액션"))).thenReturn(expectedDto);
+
+		// when
+		CursorResponse<ContentDto> result = contentService.getContents(req);
+
+		// then
+		assertThat(result.data().get(0)).isEqualTo(expectedDto);
+		verify(contentMapper).toDto(c1, List.of("액션"));
+	}
+
+	@Test
+	@DisplayName("콘텐츠 목록이 비어있으면 빈 데이터와 hasNext=false를 반환한다.")
+	void getContents_returnEmpty_whenNoContents() {
+		// given
+		ContentPageRequest req = new ContentPageRequest(null, null, null, null, null, 10, "DESC", "watcherCount");
+
+		when(contentRepository.findContents(req)).thenReturn(List.of());
+		when(contentRepository.countContents(req)).thenReturn(0L);
+
+		// when
+		CursorResponse<ContentDto> result = contentService.getContents(req);
+
+		// then
+		assertThat(result.hasNext()).isFalse();
+		assertThat(result.data().isEmpty()).isTrue();
+		assertThat(result.totalCount()).isEqualTo(0L);
 	}
 
 	@Test

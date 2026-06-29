@@ -10,12 +10,13 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import com.team04.mopl.config.JpaAuditingConfig;
+import com.team04.mopl.config.QuerydslConfig;
 import com.team04.mopl.content.entity.CollectionSource;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
 
 @DataJpaTest
-@Import(JpaAuditingConfig.class)
+@Import({JpaAuditingConfig.class, QuerydslConfig.class})
 @ActiveProfiles("test")
 class ContentRepositoryTest {
 
@@ -55,7 +56,7 @@ class ContentRepositoryTest {
             .thumbnailUrl("")
             .build());
 
-        // when: 같은 externalId이지만 다른 source로 조회
+        // when
         boolean result = contentRepository.existsByExternalIdAndSource("12345", CollectionSource.SPORTS_DB);
 
         // then
