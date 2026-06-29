@@ -13,7 +13,6 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 
 import com.team04.mopl.config.JpaAuditingConfig;
-import com.team04.mopl.config.QuerydslConfig;
 import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentTag;
@@ -21,7 +20,7 @@ import com.team04.mopl.content.entity.ContentType;
 import com.team04.mopl.content.entity.Tag;
 
 @DataJpaTest
-@Import({JpaAuditingConfig.class, QuerydslConfig.class})
+@Import(JpaAuditingConfig.class)
 class ContentTagRepositoryTest {
 
 	@Autowired
