@@ -199,8 +199,6 @@ class PlaylistServiceTest {
 			List.of(contentSummary)
 		);
 
-		when(userRepository.findById(currentUserId))
-			.thenReturn(Optional.of(currentUser));
 		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
 			.thenReturn(Optional.of(playlist));
 		when(playlistSubscriptionRepository.countAllSubscribersByPlaylistIds(List.of(playlistId)))
@@ -229,7 +227,6 @@ class PlaylistServiceTest {
 		// then
 		assertEquals(mapperResult, result);
 
-		verify(userRepository).findById(currentUserId);
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository).countAllSubscribersByPlaylistIds(List.of(playlistId));
 		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(List.of(playlistId), currentUserId);
@@ -254,35 +251,6 @@ class PlaylistServiceTest {
 	}
 
 	@Test
-	@DisplayName("플레이리스트 단건 조회 시 현재 사용자가 존재하지 않으면 예외가 발생한다.")
-	void findPlaylist_throwException_whenUserNotFound() {
-		// given
-		UUID currentUserId = UUID.randomUUID();
-		UUID playlistId = UUID.randomUUID();
-
-		when(userRepository.findById(currentUserId))
-			.thenReturn(Optional.empty());
-
-		// when, then
-		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
-		assertThrows(IllegalArgumentException.class,
-			() -> playlistService.findPlaylist(playlistId, currentUserId));
-
-		verify(userRepository).findById(currentUserId);
-		verify(playlistRepository, never()).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
-		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
-		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
-		verify(playlistMapper, never()).toDto(
-			any(Playlist.class),
-			any(UserSummary.class),
-			anyLong(),
-			anyBoolean(),
-			anyList()
-		);
-	}
-
-	@Test
 	@DisplayName("플레이리스트 단건 조회 시 플레이리스트가 존재하지 않으면 예외가 발생한다.")
 	void findPlaylist_throwException_whenPlaylistNotFound() {
 		// given
@@ -291,8 +259,6 @@ class PlaylistServiceTest {
 
 		User currentUser = createUser(currentUserId);
 
-		when(userRepository.findById(currentUserId))
-			.thenReturn(Optional.of(currentUser));
 		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
 			.thenReturn(Optional.empty());
 
@@ -301,7 +267,6 @@ class PlaylistServiceTest {
 			() -> playlistService.findPlaylist(playlistId, currentUserId));
 		assertEquals(PlaylistErrorCode.PLAYLIST_NOT_FOUND, exception.getErrorCode());
 
-		verify(userRepository).findById(currentUserId);
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
 		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
@@ -417,41 +382,6 @@ class PlaylistServiceTest {
 	}
 
 	@Test
-	@DisplayName("플레이리스트 수정 시에 플레이리스트 소유자가 아니면 예외가 발생한다.")
-	void updatePlaylist_returnException_whenCurrentUserIsNotOwner() {
-		// given
-		UUID currentUserId = UUID.randomUUID();
-		UUID ownerId = UUID.randomUUID();
-		UUID playlistId = UUID.randomUUID();
-
-		PlaylistUpdateRequest request = new PlaylistUpdateRequest("수정 title", "수정 description");
-		User owner = createUser(ownerId);
-		Playlist playlist = createPlaylist(owner, playlistId);
-
-		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
-			.thenReturn(Optional.of(playlist));
-
-		// when, then
-		PlaylistException exception = assertThrows(PlaylistException.class,
-			() -> playlistService.updatePlaylist(playlistId, request, currentUserId));
-
-		assertEquals(PlaylistErrorCode.PLAYLIST_FORBIDDEN, exception.getErrorCode());
-
-		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
-		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
-		verify(playlistSubscriptionRepository, never()).findSubscribedPlaylistIds(anyList(), any(UUID.class));
-		verify(playlistContentRepository, never()).findAllContentsByPlaylistIdsWithDeletedAtNull(anyList());
-
-		verify(playlistMapper, never()).toDto(
-			any(Playlist.class),
-			any(UserSummary.class),
-			anyLong(),
-			anyBoolean(),
-			anyList()
-		);
-	}
-
-	@Test
 	@DisplayName("플레이리스트 수정 시에 플레이리스트 제목과 설명에 변경사항이 없다면 예외가 발생한다.")
 	void updatePlaylist_returnException_whenNotChange() {
 		// given
@@ -519,30 +449,6 @@ class PlaylistServiceTest {
 		// when, then
 		assertThrows(PlaylistException.class,
 			() -> playlistService.softDeletePlaylist(playlistId, currentUserId));
-
-		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
-	}
-
-	@Test
-	@DisplayName("플레이리스트 논리 삭제 시 플레이리스트 소유자가 아니면 예외가 발생한다.")
-	void softDeletePlaylist_throwException_whenCurrentUserIsNotOwner() {
-		// given
-		UUID playlistId = UUID.randomUUID();
-		UUID ownerId = UUID.randomUUID();
-		UUID currentUserId = UUID.randomUUID();
-
-		User owner = createUser(ownerId);
-		Playlist playlist = createPlaylist(owner, playlistId);
-
-		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
-			.thenReturn(Optional.of(playlist));
-
-		// when, then
-		PlaylistException exception = assertThrows(PlaylistException.class,
-			() -> playlistService.softDeletePlaylist(playlistId, currentUserId));
-
-		assertEquals(PlaylistErrorCode.PLAYLIST_FORBIDDEN, exception.getErrorCode());
-		assertNull(playlist.getDeletedAt());
 
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 	}
@@ -646,8 +552,6 @@ class PlaylistServiceTest {
 			SortDirection.DESCENDING
 		);
 
-		when(userRepository.findById(currentUserId))
-			.thenReturn(Optional.of(currentUser));
 		when(playlistRepository.findAllPlaylists(request))
 			.thenReturn(playlistCursorPage);
 		when(playlistSubscriptionRepository.findSubscribedPlaylistIds(
@@ -681,7 +585,6 @@ class PlaylistServiceTest {
 		assertEquals(PlaylistSortBy.updatedAt.toString(), result.sortBy());
 		assertEquals(SortDirection.DESCENDING, result.sortDirection());
 
-		verify(userRepository).findById(currentUserId);
 		verify(playlistRepository).findAllPlaylists(request);
 		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(
 			List.of(playlistId1, playlistId2),
@@ -819,8 +722,6 @@ class PlaylistServiceTest {
 			SortDirection.DESCENDING
 		);
 
-		when(userRepository.findById(currentUserId))
-			.thenReturn(Optional.of(currentUser));
 		when(playlistRepository.findAllPlaylists(request))
 			.thenReturn(playlistCursorPage);
 		when(playlistSubscriptionRepository.findSubscribedPlaylistIds(
@@ -854,7 +755,6 @@ class PlaylistServiceTest {
 		assertEquals(PlaylistSortBy.subscribeCount.toString(), result.sortBy());
 		assertEquals(SortDirection.DESCENDING, result.sortDirection());
 
-		verify(userRepository).findById(currentUserId);
 		verify(playlistRepository).findAllPlaylists(request);
 		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(
 			List.of(playlistId2, playlistId1),
@@ -908,8 +808,6 @@ class PlaylistServiceTest {
 			0L
 		);
 
-		when(userRepository.findById(currentUserId))
-			.thenReturn(Optional.of(currentUser));
 		when(playlistRepository.findAllPlaylists(request))
 			.thenReturn(playlistCursorPage);
 
@@ -925,33 +823,7 @@ class PlaylistServiceTest {
 		assertEquals(PlaylistSortBy.updatedAt.toString(), result.sortBy());
 		assertEquals(SortDirection.DESCENDING, result.sortDirection());
 
-		verify(userRepository).findById(currentUserId);
 		verify(playlistRepository).findAllPlaylists(request);
-	}
-
-	@Test
-	@DisplayName("플레이리스트 목록 조회 시 사용자가 존재하지 않으면 예외가 발생한다.")
-	void findAllPlaylists_throwException_whenUserNotFound() {
-		// given
-		UUID currentUserId = UUID.randomUUID();
-
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
-			"제목",
-			null, null, null, null,
-			2,
-			SortDirection.DESCENDING,
-			PlaylistSortBy.updatedAt
-		);
-
-		when(userRepository.findById(currentUserId))
-			.thenReturn(Optional.empty());
-
-		// when, then
-		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
-		assertThrows(IllegalArgumentException.class,
-			() -> playlistService.findAllPlaylists(request, currentUserId));
-
-		verify(userRepository).findById(currentUserId);
 	}
 
 	private User createUser(UUID userId) {
