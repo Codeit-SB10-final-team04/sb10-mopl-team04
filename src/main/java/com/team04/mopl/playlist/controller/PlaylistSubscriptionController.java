@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +31,18 @@ public class PlaylistSubscriptionController implements PlaylistSubscriptionContr
 	) {
 		UUID currentUserId = moplUserDetails.getUserId();
 		playlistSubscriptionService.subscribePlaylist(playlistId, currentUserId);
+
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+	}
+
+	@DeleteMapping(value = "/{playlistId}/subscription")
+	@Override
+	public ResponseEntity<Void> unsubscribePlaylist(
+		@PathVariable UUID playlistId,
+		@AuthenticationPrincipal MoplUserDetails moplUserDetails
+	) {
+		UUID currentUserId = moplUserDetails.getUserId();
+		playlistSubscriptionService.unSubscribePlaylist(playlistId, currentUserId);
 
 		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 	}

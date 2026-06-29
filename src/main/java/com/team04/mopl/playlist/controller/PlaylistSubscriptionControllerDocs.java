@@ -17,4 +17,10 @@ public interface PlaylistSubscriptionControllerDocs {
 		UUID playlistId,
 		MoplUserDetails moplUserDetails
 	);
+
+	@Operation(summary = "플레이리스트 구독 취소")
+	ResponseEntity<Void> unsubscribePlaylist(
+		UUID playlistId,
+		MoplUserDetails moplUserDetails
+	);
 }
