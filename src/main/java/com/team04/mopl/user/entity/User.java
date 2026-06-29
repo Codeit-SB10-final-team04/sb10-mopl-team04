@@ -1,7 +1,5 @@
 package com.team04.mopl.user.entity;
 
-import java.util.Objects;
-
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 

@@ -11,9 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
+import com.team04.mopl.common.dto.ContentSummary;
+import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
-import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.user.entity.User;
 
@@ -43,24 +43,10 @@ class PlaylistMapperTest {
 			.build();
 		ReflectionTestUtils.setField(playlist, "id", playlistId);
 
-		// TODO: UserSummary 구현 후 변경
-		// UserSummary ownerSummary = new UserSummary(ownerId, owner.getName(), owner.getProfileImageUrl());
-		PlaylistUserSummary ownerSummary = new PlaylistUserSummary(ownerId, owner.getName(),
+		UserSummary ownerSummary = new UserSummary(ownerId, owner.getName(),
 			owner.getProfileImageUrl());
 
-		// TODO: ContentSummary 구현 후 변경
-		// ContentSummary contentSummary = new ContentSummary(
-		// 	UUID.randomUUID(),
-		// 	ContentType.movie,
-		// 	"콘텐츠 제목",
-		// 	"콘텐츠 설명",
-		// 	"https://thumbnail.url",
-		// 	List.of("액션", "드라마"),
-		// 	BigDecimal.valueOf(4.3),
-		// 	10L
-		// );
-		// List<ContentSummary> contents = List.of(contentSummary);
-		List<PlaylistContentSummary> contents = List.of();
+		List<ContentSummary> contents = List.of();
 
 		// when
 		PlaylistDto result = playlistMapper.toDto(
@@ -79,7 +65,5 @@ class PlaylistMapperTest {
 		assertEquals(5L, result.subscriberCount());
 		assertTrue(result.subscribedByMe());
 		assertEquals(List.of(), result.contents());
-		// TODO: ContentSummary 구현 후 변경
-		// assertEquals(List.of(contentSummary), result.contents());
 	}
 }

@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.team04.mopl.content.entity.CollectionSource;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentTag;
 import com.team04.mopl.content.entity.ContentType;
@@ -34,12 +35,19 @@ public class MatchCollectService {
 	 */
 	@Transactional
 	public boolean saveIfNotExists(JsonNode eventDetail, String eventName) {
-		// 중복 체크: title + type 기준 (Todo: QA 대응 후 개선 예정)
-		if (isDuplicateMatch(eventName)) {
+		String externalId = eventDetail.path("idEvent").asText("");
+
+		if (!StringUtils.hasText(externalId)) {
+			log.warn("[Batch] idEvent 누락으로 저장 불가, skip: eventName={}", eventName);
 			return false;
 		}
 
-		Content content = saveContent(eventDetail, eventName);
+		if (contentRepository.existsByExternalIdAndSource(externalId, CollectionSource.SPORTS_DB)) {
+			log.debug("[Batch] 경기 이미 존재, 건너뜀: externalId={}", externalId);
+			return false;
+		}
+
+		Content content = saveContent(eventDetail, eventName, externalId);
 		saveTags(content, eventDetail);
 
 		return true;
@@ -48,7 +56,7 @@ public class MatchCollectService {
 	/**
 	 Content 엔티티 생성 및 저장
 	 */
-	private Content saveContent(JsonNode eventDetail, String eventName) {
+	private Content saveContent(JsonNode eventDetail, String eventName, String externalId) {
 		String description = eventDetail.path("strFilename").asText("");
 
 		// thumbnailUrl fallback: strThumb → strLeagueBadge → 빈 문자열
@@ -59,6 +67,8 @@ public class MatchCollectService {
 		String thumbnailUrl = StringUtils.hasText(rawUrl) ? rawUrl + "/small" : "";
 
 		return contentRepository.save(Content.builder()
+			.externalId(externalId)
+			.source(CollectionSource.SPORTS_DB)
 			.title(eventDetail.path("strEvent").asText(eventName))
 			.type(ContentType.sport)
 			.description(description)
@@ -102,12 +112,4 @@ public class MatchCollectService {
 			.build());
 	}
 
-	// Todo: 중복 검증, QA 후에 로직 수정
-	private boolean isDuplicateMatch(String eventName) {
-		boolean exists = contentRepository.existsByTitleAndType(eventName, ContentType.sport);
-		if (exists) {
-			log.debug("[Batch] 경기 이미 존재, 건너뜀: {}", eventName);
-		}
-		return exists;
-	}
 }
