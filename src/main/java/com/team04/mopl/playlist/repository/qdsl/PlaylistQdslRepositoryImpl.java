@@ -26,16 +26,27 @@ import com.team04.mopl.playlist.exception.PlaylistErrorCode;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.repository.PlaylistQdslRepository;
 
-import lombok.RequiredArgsConstructor;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 @Repository
-@RequiredArgsConstructor
 public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 
 	private final JPAQueryFactory jpaQueryFactory;
 
+	// SpotBugs EI_EXPOSE_REP2:
+	// JPAQueryFactory는 요청 데이터나 컬렉션처럼 방어 복사할 객체가 아니라
+	// Spring 컨테이너가 생명 주기를 관리하는 QueryDSL 실행용 Bean
+	// Repository는 이 Bean을 의존성으로 주입 받아 사용하는 것이 의도된 사용 방식 -> 경고 억제
+	@SuppressFBWarnings(
+		value = "EI_EXPOSE_REP2",
+		justification = "JPAQueryFactory는 Spring에서 관리하는 Bean으로 주입받아 사용하기에 방어 복사 필요 없음"
+	)
+	public PlaylistQdslRepositoryImpl(JPAQueryFactory jpaQueryFactory) {
+		this.jpaQueryFactory = jpaQueryFactory;
+	}
+
 	@Override
-	public PlaylistCursorPage findPlaylists(PlaylistSearchRequest request) {
+	public PlaylistCursorPage findAllPlaylists(PlaylistSearchRequest request) {
 		String cursor = request.cursor();
 		PlaylistSortBy sortBy = request.sortBy();
 		SortDirection sortDirection = request.sortDirection();
