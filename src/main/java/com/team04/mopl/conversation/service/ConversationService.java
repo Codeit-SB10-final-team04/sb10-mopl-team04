@@ -99,6 +99,16 @@ public class ConversationService {
 		conversationParticipantRepository.saveAll(participants);
 	}
 
+	public ConversationDto findConversationById(UUID conversationId) {
+
+		// 1. 유효성 검증: 대화 존재 여부
+
+		// 2. 대화 상대방 정보 조회
+
+		// 3. 마지막 메시지 내용 조회
+
+	}
+
 	// 유효성 검증: 대화 중복 검사
 	private void validateDuplicateConversation(UUID requestUserId, UUID withUserId) {
 		conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
