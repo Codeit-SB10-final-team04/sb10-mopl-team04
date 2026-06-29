@@ -38,7 +38,7 @@ CREATE TABLE tags (
 CREATE TABLE contents (
                           id              UUID                NOT NULL,
                           external_id     VARCHAR(100)        NULL,
-                          source          collection_source   NULL,
+                          source          collection_source   NOT NULL DEFAULT 'MANUAL',
                           title           VARCHAR(200)        NOT NULL,
                           type            content_type        NOT NULL,
                           description     TEXT                NOT NULL,
