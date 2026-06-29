@@ -5,10 +5,10 @@ import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import com.team04.mopl.common.dto.ContentSummary;
+import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.config.MapStructConfig;
-import com.team04.mopl.playlist.dto.response.PlaylistContentSummary;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
-import com.team04.mopl.playlist.dto.response.PlaylistUserSummary;
 import com.team04.mopl.playlist.entity.Playlist;
 
 @Mapper(config = MapStructConfig.class)
@@ -24,13 +24,9 @@ public interface PlaylistMapper {
 	@Mapping(target = "contents", source = "contents")
 	PlaylistDto toDto(
 		Playlist playlist,
-		// TODO: UserSummary 구현 후 변경
-		// UserSummary owner,
-		PlaylistUserSummary owner,
+		UserSummary owner,
 		long subscriberCount,
 		boolean subscribedByMe,
-		// TODO: ContentSummary 구현 후 변경
-		// List<ContentSummary> contents
-		List<PlaylistContentSummary> contents
+		List<ContentSummary> contents
 	);
 }

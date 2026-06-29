@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.team04.mopl.playlist.entity.Playlist;
 
-public interface PlaylistRepository extends JpaRepository<Playlist, UUID> {
+public interface PlaylistRepository extends JpaRepository<Playlist, UUID>, PlaylistQdslRepository {
 
 	@Query(value = """
 		SELECT p FROM Playlist AS p
