@@ -61,8 +61,6 @@ class PlaylistControllerTest {
 
 		PlaylistDto response = new PlaylistDto(
 			playlistId,
-			// TODO: UserSummary 구현 후 변경
-			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new UserSummary(currentUserId, "테스트 사용자", null),
 			request.title(),
 			request.description(),
@@ -115,8 +113,6 @@ class PlaylistControllerTest {
 
 		PlaylistDto response = new PlaylistDto(
 			playlistId,
-			// TODO: UserSummary 구현 후 변경
-			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new UserSummary(currentUserId, "테스트 사용자", null),
 			"테스트 제목",
 			"테스트 설명",
@@ -178,8 +174,6 @@ class PlaylistControllerTest {
 		PlaylistUpdateRequest request = new PlaylistUpdateRequest("수정 title", "수정 description");
 		PlaylistDto response = new PlaylistDto(
 			playlistId,
-			// TODO: UserSummary 구현 후 변경
-			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new UserSummary(currentUserId, "테스트 사용자", null),
 			"수정 title",
 			"수정 description",
@@ -267,8 +261,6 @@ class PlaylistControllerTest {
 
 		PlaylistDto playlistDto1 = new PlaylistDto(
 			playlistId1,
-			// TODO: UserSummary 구현 후 변경
-			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new UserSummary(currentUserId, "currentUserId 사용자", null),
 			"테스트 제목1",
 			"테스트 설명1",
@@ -280,8 +272,6 @@ class PlaylistControllerTest {
 
 		PlaylistDto playlistDto2 = new PlaylistDto(
 			playlistId2,
-			// TODO: UserSummary 구현 후 변경
-			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new UserSummary(ownerId1, "ownerId1 사용자", null),
 			"테스트 제목2",
 			"테스트 설명2",
