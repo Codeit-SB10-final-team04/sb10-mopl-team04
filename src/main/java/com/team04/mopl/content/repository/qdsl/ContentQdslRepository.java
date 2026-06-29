@@ -7,5 +7,6 @@ import com.team04.mopl.content.entity.Content;
 
 public interface ContentQdslRepository {
 	List<Content> findContents(ContentPageRequest contentPageRequest);
+
 	long countContents(ContentPageRequest contentPageRequest);
 }
