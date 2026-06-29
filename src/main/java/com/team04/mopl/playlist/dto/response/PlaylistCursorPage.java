@@ -7,7 +7,13 @@ import com.team04.mopl.playlist.dto.row.PlaylistRow;
 public record PlaylistCursorPage(
 
 	List<PlaylistRow> playlistRows,
-	Boolean hasNext,
-	Long totalCount
+	boolean hasNext,
+	long totalCount
 ) {
+
+	public PlaylistCursorPage {
+		playlistRows = (playlistRows == null)
+			? List.of()
+			: List.copyOf(playlistRows);
+	}
 }
