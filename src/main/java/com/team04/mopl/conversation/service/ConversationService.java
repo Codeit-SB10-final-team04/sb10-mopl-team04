@@ -101,14 +101,20 @@ public class ConversationService {
 		conversationParticipantRepository.saveAll(participants);
 	}
 
-	public ConversationDto findConversationById(UUID conversationId) {
+	public ConversationDto findConversationById(UUID conversationId, MoplUserDetails moplUserDetails) {
+		log.debug("[FIND_CONVERSATION] 대화 단건 조회 시작: conversationId={}", conversationId);
 
-		// 1. 유효성 검증: 대화 존재 여부
+		// 1. 로그인 정보로부터 요청자 ID 추출
+		UUID requestUserId = moplUserDetails.getUserId();
+
+		// 2. 유효성 검증: 대화 존재 여부
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
-		// 2. 대화 상대방 정보 조회
+		// 3. 대화 상대방 정보 조회
+		User withUser = getUserEntityOrThrow(requestUserId);
+		UserSummary with = getUserSummary(withUser);
 
-		// 3. 마지막 메시지 내용 조회
+		// 4. 마지막 메시지 내용 조회
 
 	}
 
@@ -133,6 +139,15 @@ public class ConversationService {
 		return userRepository.findById(userId)
 			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
 				.addDetail("userId", userId));
+	}
+
+	// 대화 상대 정보 조회
+	private User getWithUserEntityOrThrow(UUID conversationId, UUID requestUserId) {
+		return conversationParticipantRepository.findByConversationId(conversationId).stream()
+			.map(ConversationParticipant::getUser)
+			.filter(user -> !user.getId().equals(requestUserId))
+			.findFirst()
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 	}
 
 	// 사용자 요약 정보 반환
