@@ -36,4 +36,20 @@ public class RefreshTokenCookieWriter {
 
 		response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 	}
+
+	// 로그아웃 시 refresh token 쿠키 즉시 만료
+	public void expire(HttpServletResponse response) {
+		ResponseCookie cookie = ResponseCookie.from(
+				jwtProperties.refreshTokenCookieName(),
+				""
+			)
+			.httpOnly(true)
+			.secure(jwtProperties.refreshTokenCookieSecure())
+			.path("/")
+			.maxAge(0)
+			.sameSite(jwtProperties.refreshTokenCookieSameSite())
+			.build();
+
+		response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+	}
 }

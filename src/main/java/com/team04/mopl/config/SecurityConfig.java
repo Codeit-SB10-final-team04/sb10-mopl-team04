@@ -30,8 +30,10 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.auth.security.handler.LoginFailureHandler;
 import com.team04.mopl.auth.security.handler.LoginSuccessHandler;
+import com.team04.mopl.auth.security.handler.AuthSessionLogoutHandler;
 import com.team04.mopl.auth.security.handler.RestAccessDeniedHandler;
 import com.team04.mopl.auth.security.handler.RestAuthenticationEntryPoint;
+import com.team04.mopl.auth.security.handler.RestLogoutSuccessHandler;
 import com.team04.mopl.auth.security.jwt.JwtExpiredTokenValidator;
 import com.team04.mopl.auth.security.jwt.JwtProperties;
 
@@ -45,6 +47,8 @@ public class SecurityConfig {
 		HttpSecurity http,
 		LoginSuccessHandler loginSuccessHandler,
 		LoginFailureHandler loginFailureHandler,
+		AuthSessionLogoutHandler authSessionLogoutHandler,
+		RestLogoutSuccessHandler restLogoutSuccessHandler,
 		JwtAuthenticationFilter jwtAuthenticationFilter,
 		RestAuthenticationEntryPoint restAuthenticationEntryPoint,
 		RestAccessDeniedHandler restAccessDeniedHandler
@@ -67,6 +71,18 @@ public class SecurityConfig {
 				.successHandler(loginSuccessHandler)
 				.failureHandler(loginFailureHandler))
 
+			// 로그아웃 요청
+			.logout(logout -> logout
+				.logoutRequestMatcher(request ->
+					"/api/auth/sign-out".equals(request.getServletPath())
+						&& HttpMethod.POST.matches(request.getMethod())
+				)
+				.addLogoutHandler(authSessionLogoutHandler)
+				.logoutSuccessHandler(restLogoutSuccessHandler)
+				.clearAuthentication(true)
+				.invalidateHttpSession(false) // HttpSession이 아니라 AuthSessionStore의 인증 세션을 삭제해야 함
+				.permitAll())
+
 			// 인증/인가 실패 시 ErrorResponse로 응답
 			.exceptionHandling(exceptionHandling -> exceptionHandling
 				.authenticationEntryPoint(restAuthenticationEntryPoint)
@@ -76,6 +92,7 @@ public class SecurityConfig {
 			.authorizeHttpRequests(authorize -> authorize
 				.requestMatchers(HttpMethod.POST, "/api/users").permitAll() // 회원가입
 				.requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll() // 로그인
+				.requestMatchers(HttpMethod.POST, "/api/auth/sign-out").permitAll() // 로그아웃
 				.requestMatchers(
 					"/swagger-ui/**",
 					"/v3/api-docs/**",
@@ -124,6 +141,7 @@ public class SecurityConfig {
 		return jwtDecoder;
 	}
 
+	// JWT 서명과 검증에 사용할 SecretKey 생성
 	private SecretKey createSecretKey(JwtProperties jwtProperties) {
 		byte[] secretBytes = jwtProperties.secret().getBytes(StandardCharsets.UTF_8);
 
