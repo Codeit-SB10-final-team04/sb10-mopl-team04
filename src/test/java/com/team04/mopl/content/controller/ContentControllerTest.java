@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
+import com.team04.mopl.common.dto.CursorPageResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.entity.ContentType;
@@ -141,6 +142,55 @@ class ContentControllerTest {
 			.andExpect(jsonPath("$.id").value(contentId.toString()))
 			.andExpect(jsonPath("$.title").value("인터스텔라"))
 			.andExpect(jsonPath("$.tags[0]").value("액션"));
+	}
+
+	// ========== getContents ==========
+
+	@Test
+	@DisplayName("콘텐츠 목록 조회 요청에 성공하면 200 OK와 페이지 응답을 반환한다.")
+	void getContents_returnOK_whenValidRequest() throws Exception {
+		// given
+		UUID contentId = UUID.randomUUID();
+		ContentDto contentDto = new ContentDto(
+			contentId, ContentType.movie, "인터스텔라", "우주 이야기",
+			"https://image.tmdb.org/t/p/w500/abc.jpg",
+			List.of("SF"), new BigDecimal("4.50"), 100L, 5000L
+		);
+		CursorPageResponse<ContentDto> response = new CursorPageResponse<>(
+			List.of(contentDto), null, null, false, 1L, "watcherCount", "DESC"
+		);
+
+		when(contentService.getContents(any())).thenReturn(response);
+
+		// when & then
+		mockMvc.perform(get("/api/contents")
+				.param("limit", "10")
+				.param("sortBy", "watcherCount")
+				.param("sortDirection", "DESC"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data[0].id").value(contentId.toString()))
+			.andExpect(jsonPath("$.data[0].title").value("인터스텔라"))
+			.andExpect(jsonPath("$.hasNext").value(false))
+			.andExpect(jsonPath("$.totalCount").value(1));
+	}
+
+	@Test
+	@DisplayName("콘텐츠 목록 조회 시 hasNext=true이면 nextCursor와 nextIdAfter가 포함된다.")
+	void getContents_returnNextCursor_whenHasNextPage() throws Exception {
+		// given
+		UUID nextId = UUID.randomUUID();
+		CursorPageResponse<ContentDto> response = new CursorPageResponse<>(
+			List.of(), "100", nextId.toString(), true, 10L, "watcherCount", "DESC"
+		);
+
+		when(contentService.getContents(any())).thenReturn(response);
+
+		// when & then
+		mockMvc.perform(get("/api/contents").param("limit", "5"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.hasNext").value(true))
+			.andExpect(jsonPath("$.nextCursor").value("100"))
+			.andExpect(jsonPath("$.nextIdAfter").value(nextId.toString()));
 	}
 
 	@Test
