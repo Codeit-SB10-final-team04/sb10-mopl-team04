@@ -125,7 +125,7 @@ public class DataCollectScheduler {
 	/**
 	 * 매주 월요일 새벽 3시 SportsDB 주기 수집 (현재 시즌)
 	 */
-	@Scheduled(cron = "0 0 3 * * MON")
+	@Scheduled(cron = "0 0 3 * * MON", zone = "Asia/Seoul")
 	public void runSportsWeeklyCollectJob() {
 		log.info("[Scheduler] SportsDB 주기 수집 시작 (시즌: {})", CURRENT_SEASON);
 		try {
@@ -139,7 +139,7 @@ public class DataCollectScheduler {
 	/**
 	 * 매일 새벽 4시 TMDB 주기 수집
 	 */
-	@Scheduled(cron = "0 0 4 * * *")
+	@Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
 	public void runTmdbDailyCollectJob() {
 		log.info("[Scheduler] TMDB 주기 수집 시작");
 		try {
