@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
-import com.team04.mopl.common.dto.CursorPageResponse;
+import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.entity.ContentType;
@@ -156,7 +156,7 @@ class ContentControllerTest {
 			"https://image.tmdb.org/t/p/w500/abc.jpg",
 			List.of("SF"), new BigDecimal("4.50"), 100L, 5000L
 		);
-		CursorPageResponse<ContentDto> response = new CursorPageResponse<>(
+		CursorResponse<ContentDto> response = new CursorResponse<>(
 			List.of(contentDto), null, null, false, 1L, "watcherCount", "DESC"
 		);
 
@@ -179,7 +179,7 @@ class ContentControllerTest {
 	void getContents_returnNextCursor_whenHasNextPage() throws Exception {
 		// given
 		UUID nextId = UUID.randomUUID();
-		CursorPageResponse<ContentDto> response = new CursorPageResponse<>(
+		CursorResponse<ContentDto> response = new CursorResponse<>(
 			List.of(), "100", nextId.toString(), true, 10L, "watcherCount", "DESC"
 		);
 

@@ -3,8 +3,6 @@ package com.team04.mopl.content.service;
 import static org.assertj.core.api.AssertionsForClassTypes.*;
 import static org.mockito.Mockito.*;
 
-import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,7 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
-import com.team04.mopl.common.dto.CursorPageResponse;
+import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
 import com.team04.mopl.content.dto.row.TagRow;
@@ -222,7 +220,7 @@ class ContentServiceTest {
 		when(contentMapper.toDto(c2, List.of())).thenReturn(dto2);
 
 		// when
-		CursorPageResponse<ContentDto> result = contentService.getContents(req);
+		CursorResponse<ContentDto> result = contentService.getContents(req);
 
 		// then
 		assertThat(result.hasNext()).isFalse();
@@ -258,7 +256,7 @@ class ContentServiceTest {
 		when(contentMapper.toDto(c2, List.of())).thenReturn(dto2);
 
 		// when
-		CursorPageResponse<ContentDto> result = contentService.getContents(req);
+		CursorResponse<ContentDto> result = contentService.getContents(req);
 
 		// then
 		assertThat(result.hasNext()).isTrue();
@@ -287,7 +285,7 @@ class ContentServiceTest {
 		when(contentMapper.toDto(c1, List.of("액션"))).thenReturn(expectedDto);
 
 		// when
-		CursorPageResponse<ContentDto> result = contentService.getContents(req);
+		CursorResponse<ContentDto> result = contentService.getContents(req);
 
 		// then
 		assertThat(result.data().get(0)).isEqualTo(expectedDto);
@@ -304,7 +302,7 @@ class ContentServiceTest {
 		when(contentRepository.countContents(req)).thenReturn(0L);
 
 		// when
-		CursorPageResponse<ContentDto> result = contentService.getContents(req);
+		CursorResponse<ContentDto> result = contentService.getContents(req);
 
 		// then
 		assertThat(result.hasNext()).isFalse();

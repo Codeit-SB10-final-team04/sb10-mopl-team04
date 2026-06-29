@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.team04.mopl.common.dto.CursorPageResponse;
+import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
@@ -22,5 +22,5 @@ public interface ContentControllerDocs {
 	ResponseEntity<ContentDto> createContent(ContentCreateRequest contentCreateRequest, MultipartFile thumbnail);
 
 	@Operation(summary = "콘텐츠 목록 조회")
-	ResponseEntity<CursorPageResponse<ContentDto>> getContents(ContentPageRequest contentPageRequest);
+	ResponseEntity<CursorResponse<ContentDto>> getContents(ContentPageRequest contentPageRequest);
 }

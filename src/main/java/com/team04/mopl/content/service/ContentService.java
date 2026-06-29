@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.team04.mopl.common.dto.CursorPageResponse;
+import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
@@ -97,7 +97,7 @@ public class ContentService {
 		}
 	}
 
-	public CursorPageResponse<ContentDto> getContents(ContentPageRequest req) {
+	public CursorResponse<ContentDto> getContents(ContentPageRequest req) {
 		int limit = req.limit() != null ? req.limit() : 20;
 		String sortBy = req.sortBy() != null ? req.sortBy() : "watcherCount";
 		String sortDirection = req.sortDirection() != null ? req.sortDirection() : "DESC";
@@ -127,7 +127,7 @@ public class ContentService {
 
 		long totalCount = contentRepository.countContents(req);
 
-		return new CursorPageResponse<>(data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, sortDirection);
+		return new CursorResponse<>(data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, sortDirection);
 	}
 
 	// contentIds로 태그명 조회 메서드

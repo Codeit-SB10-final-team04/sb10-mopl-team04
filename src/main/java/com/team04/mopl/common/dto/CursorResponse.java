@@ -2,7 +2,7 @@ package com.team04.mopl.common.dto;
 
 import java.util.List;
 
-public record CursorPageResponse<T>(
+public record CursorResponse<T>(
 	List<T> data,
 	String nextCursor,
 	String nextIdAfter,
