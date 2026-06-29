@@ -1,4 +1,4 @@
-package com.team04.mopl.follow.mapper;
+package com.team04.mopl.conversation.mapper;
 
 import org.mapstruct.Mapper;
 
