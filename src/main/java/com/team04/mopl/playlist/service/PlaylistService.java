@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -195,8 +196,7 @@ public class PlaylistService {
 		return cursorResponsePlaylistDto;
 	}
 
-	// TODO: `@PreAuthorize`는 Security 구현 후 추가
-	// @PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
+	@PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
 	@Transactional
 	public PlaylistDto updatePlaylist(
 		UUID playlistId,
@@ -216,12 +216,6 @@ public class PlaylistService {
 
 		// 플레이리스트 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
-
-		// TODO: Security 추가로 `@PreAuthorize`가 사용 가능해지면 삭제
-		if (!playlist.getOwner().getId().equals(currentUserId)) {
-			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_FORBIDDEN)
-				.addDetail("requestUserId", currentUserId);
-		}
 
 		// 요청과 현재의 title과 description을 비교하고,
 		// 같으면 `null` / 다르면 요청값
@@ -249,8 +243,7 @@ public class PlaylistService {
 		return playlistDto;
 	}
 
-	// TODO: `@PreAuthorize`는 Security 구현 후 추가
-	// @PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
+	@PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
 	@Transactional
 	public void softDeletePlaylist(UUID playlistId, UUID currentUserId) {
 		log.info("[PLAYLIST_SOFT_DELETE] 플레이리스트 논리 삭제 시작: currentUserId={}, playlistId={}",
@@ -258,12 +251,6 @@ public class PlaylistService {
 
 		// 플레이리스트 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
-
-		// TODO: Security 추가로 `@PreAuthorize`가 사용 가능해지면 삭제
-		if (!playlist.getOwner().getId().equals(currentUserId)) {
-			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_FORBIDDEN)
-				.addDetail("requestUserId", currentUserId);
-		}
 
 		// 논리 삭제
 		playlist.markDeleted(Instant.now());
