@@ -13,4 +13,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "conversations")
 public class Conversation extends BaseUpdatableEntity {
+
+	// 정적 팩토리 메서드
+	public static Conversation create() {
+		return new Conversation();
+	}
 }
