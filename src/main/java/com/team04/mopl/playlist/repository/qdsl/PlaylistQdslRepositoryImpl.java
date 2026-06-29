@@ -24,13 +24,13 @@ import com.team04.mopl.playlist.entity.QPlaylistSubscription;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
 import com.team04.mopl.playlist.exception.PlaylistErrorCode;
 import com.team04.mopl.playlist.exception.PlaylistException;
-import com.team04.mopl.playlist.repository.PlaylistQueryRepository;
+import com.team04.mopl.playlist.repository.PlaylistQdslRepository;
 
 import lombok.RequiredArgsConstructor;
 
 @Repository
 @RequiredArgsConstructor
-public class PlaylistQdslRepositoryImpl implements PlaylistQueryRepository {
+public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 
 	private final JPAQueryFactory jpaQueryFactory;
 
