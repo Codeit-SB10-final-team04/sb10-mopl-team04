@@ -1,6 +1,8 @@
 package com.team04.mopl.content.scheduler;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
@@ -22,22 +24,36 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <h3>실행 목록</h3>
  * <ul>
- *   <li>TMDB 초기 수집: 애플리케이션 최초 기동 시 1회 자동 실행 ({@code tmdbInitialCollectJob})</li>
- *   <li>스포츠 데이터: 매일 새벽 3시 ({@code sportsDataCollectJob})</li>
- *   <li>TMDB 주기 수집: 매일 새벽 4시 ({@code tmdbDailyCollectJob})</li>
+ *   <li>TMDB 초기 수집: 앱 최초 기동 시 1회 자동 실행</li>
+ *   <li>SportsDB 초기 수집: 앱 최초 기동 시 20-21 ~ 25-26 시즌 순차 수집</li>
+ *   <li>SportsDB 주기 수집: 매주 월요일 새벽 3시 (현재 시즌 25-26)</li>
+ *   <li>TMDB 주기 수집: 매일 새벽 4시</li>
  * </ul>
  *
- * <p>자동 실행 방지: {@code spring.batch.job.enabled=false} 설정으로
- * 애플리케이션 시작 시 배치 자동 실행을 막고 스케줄러에서만 실행.
- *
- * <p>매 실행마다 {@code timestamp}를 JobParameter로 추가하는 이유:
- * Spring Batch는 동일한 JobParameters로 완료된 Job을 재실행하지 않으므로
- * 매 실행을 별도 인스턴스로 처리하기 위함.
+ * <h3>동시 실행 방지</h3>
+ * <ul>
+ *   <li>{@code sportsCollectLock}: 초기 수집과 주기 수집이 동시에 실행되지 않도록 프로세스 레벨에서 차단</li>
+ *   <li>{@link #isSeasonSkippable}: COMPLETED + RUNNING 상태 모두 확인해 시즌 단위 중복 실행 방지</li>
+ * </ul>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataCollectScheduler {
+
+	private static final List<String> INITIAL_SEASONS = List.of(
+		"2020-2021",
+		"2021-2022",
+		"2022-2023",
+		"2023-2024",
+		"2024-2025",
+		"2025-2026"
+	);
+
+	private static final String CURRENT_SEASON = "2025-2026";
+
+	// 초기 수집 ↔ 주기 수집 동시 실행 방지용 락
+	private final ReentrantLock sportsCollectLock = new ReentrantLock();
 
 	private final JobLauncher jobLauncher;
 	private final JobExplorer jobExplorer;
@@ -46,24 +62,11 @@ public class DataCollectScheduler {
 	private final Job tmdbDailyCollectJob;
 
 	/**
-	 * 애플리케이션 최초 기동 시 TMDB 초기 수집 Job 실행
-	 *
-	 * <p>{@link ApplicationReadyEvent}: 애플리케이션이 완전히 기동된 후 발생.
-	 *
-	 * <p>기동 스레드 블로킹 방지: {@link CompletableFuture#runAsync}로 별도 스레드에서 실행.
-	 * 초기 수집은 수만 건 처리로 오래 걸릴 수 있어 메인 스레드와 분리.
-	 *
-	 * <p>{@link JobExplorer}로 전체 실행 이력 중 COMPLETED 여부 확인:
-	 * <ul>
-	 *   <li>이력 있음 → skip (한 번이라도 성공했으면 영구 skip)</li>
-	 *   <li>이력 없음 → 최초 실행으로 판단, 전체 수집 실행</li>
-	 * </ul>
+	 * 앱 기동 시 TMDB 초기 수집 (최초 1회)
 	 */
 	@EventListener(ApplicationReadyEvent.class)
 	public void runTmdbInitialCollectIfNeeded() {
 		CompletableFuture.runAsync(() -> {
-			// 전체 이력 조회: timestamp로 매 실행마다 새 인스턴스가 생기므로
-			// 최신 1개만 보면 과거 성공 이력을 놓칠 수 있음 → Integer.MAX_VALUE로 전체 확인
 			boolean hasCompleted = jobExplorer.getJobInstances("tmdbInitialCollectJob", 0, Integer.MAX_VALUE)
 				.stream()
 				.flatMap(instance -> jobExplorer.getJobExecutions(instance).stream())
@@ -81,10 +84,8 @@ public class DataCollectScheduler {
 					.toJobParameters();
 
 				JobExecution jobExecution = jobLauncher.run(tmdbInitialCollectJob, params);
-				log.info("[Scheduler] TMDB 초기 수집 완료 - status: {}, exitCode: {}, jobId: {}",
-					jobExecution.getStatus(),
-					jobExecution.getExitStatus().getExitCode(),
-					jobExecution.getJobId());
+				log.info("[Scheduler] TMDB 초기 수집 완료 - status: {}, jobId: {}",
+					jobExecution.getStatus(), jobExecution.getJobId());
 			} catch (Exception e) {
 				log.error("[Scheduler] TMDB 초기 수집 실패: {}", e.getMessage(), e);
 			}
@@ -92,50 +93,104 @@ public class DataCollectScheduler {
 	}
 
 	/**
-	 * 매일 새벽 3시 스포츠 데이터 수집 Job 실행
+	 * 앱 기동 시 SportsDB 초기 수집 (시즌별 최초 1회)
 	 *
-	 * <p>실패 시 예외를 catch하여 로그만 기록, 다음 스케줄 실행에 영향 없음.
+	 * <p>COMPLETED 또는 RUNNING 상태인 시즌은 skip.
+	 * 락 획득 실패 시 주기 수집이 실행 중인 것으로 판단하고 전체 초기 수집을 포기한다.
 	 */
-	@Scheduled(cron = "0 0 3 * * *")
-	public void runSportsDataCollectJob() {
-		log.info("[Scheduler] 스포츠 데이터 수집 Job 실행 시작");
-		try {
-			JobParameters params = new JobParametersBuilder()
-				.addLong("timestamp", System.currentTimeMillis())
-				.toJobParameters();
+	@EventListener(ApplicationReadyEvent.class)
+	public void runSportsInitialCollectIfNeeded() {
+		CompletableFuture.runAsync(() -> {
+			log.info("[Scheduler] SportsDB 초기 수집 확인 시작");
 
-			JobExecution jobExecution = jobLauncher.run(sportsDataCollectJob, params);
-			log.info("[Scheduler] 스포츠 데이터 수집 Job 실행 완료 - status: {}, exitCode: {}, jobId: {}",
-				jobExecution.getStatus(),
-				jobExecution.getExitStatus().getExitCode(),
-				jobExecution.getJobId());
+			for (String season : INITIAL_SEASONS) {
+				if (isSeasonSkippable(season)) {
+					log.info("[Scheduler] SportsDB 시즌 {} 이미 실행 중이거나 완료 → skip", season);
+					continue;
+				}
+
+				log.info("[Scheduler] SportsDB 시즌 {} 수집 시작", season);
+				try {
+					runSportsJobWithLock(season);
+					log.info("[Scheduler] SportsDB 시즌 {} 수집 완료", season);
+				} catch (Exception e) {
+					log.error("[Scheduler] SportsDB 시즌 {} 수집 실패: {}", season, e.getMessage(), e);
+				}
+			}
+
+			log.info("[Scheduler] SportsDB 초기 수집 전체 완료");
+		});
+	}
+
+	/**
+	 * 매주 월요일 새벽 3시 SportsDB 주기 수집 (현재 시즌)
+	 */
+	@Scheduled(cron = "0 0 3 * * MON", zone = "Asia/Seoul")
+	public void runSportsWeeklyCollectJob() {
+		log.info("[Scheduler] SportsDB 주기 수집 시작 (시즌: {})", CURRENT_SEASON);
+		try {
+			runSportsJobWithLock(CURRENT_SEASON);
+			log.info("[Scheduler] SportsDB 주기 수집 완료");
 		} catch (Exception e) {
-			log.error("[Scheduler] 스포츠 데이터 수집 Job 실행 실패: {}", e.getMessage(), e);
+			log.error("[Scheduler] SportsDB 주기 수집 실패: {}", e.getMessage(), e);
 		}
 	}
 
 	/**
-	 * 매일 새벽 4시 TMDB 주기 수집 Job 실행
-	 *
-	 * <p>수집 대상: {@code movie/upcoming}, {@code tv/on_the_air}
-	 *
-	 * <p>실패 시 예외를 catch하여 로그만 기록, 다음 스케줄 실행에 영향 없음.
+	 * 매일 새벽 4시 TMDB 주기 수집
 	 */
-	@Scheduled(cron = "0 0 4 * * *")
+	@Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
 	public void runTmdbDailyCollectJob() {
-		log.info("[Scheduler] TMDB 주기 수집 Job 실행 시작");
+		log.info("[Scheduler] TMDB 주기 수집 시작");
 		try {
 			JobParameters params = new JobParametersBuilder()
 				.addLong("timestamp", System.currentTimeMillis())
 				.toJobParameters();
 
 			JobExecution jobExecution = jobLauncher.run(tmdbDailyCollectJob, params);
-			log.info("[Scheduler] TMDB 주기 수집 Job 실행 완료 - status: {}, exitCode: {}, jobId: {}",
-				jobExecution.getStatus(),
-				jobExecution.getExitStatus().getExitCode(),
-				jobExecution.getJobId());
+			log.info("[Scheduler] TMDB 주기 수집 완료 - status: {}, jobId: {}",
+				jobExecution.getStatus(), jobExecution.getJobId());
 		} catch (Exception e) {
-			log.error("[Scheduler] TMDB 주기 수집 Job 실행 실패: {}", e.getMessage(), e);
+			log.error("[Scheduler] TMDB 주기 수집 실패: {}", e.getMessage(), e);
 		}
+	}
+
+	/**
+	 * 락을 획득한 뒤 sportsDataCollectJob을 실행한다.
+	 * 락 획득 실패(다른 수집이 진행 중)이면 즉시 skip한다.
+	 */
+	void runSportsJobWithLock(String season) throws Exception {
+		if (!sportsCollectLock.tryLock()) {
+			log.warn("[Scheduler] SportsDB 다른 수집이 실행 중, skip: season={}", season);
+			return;
+		}
+		try {
+			JobParameters params = new JobParametersBuilder()
+				.addString("season", season)
+				.addLong("timestamp", System.currentTimeMillis())
+				.toJobParameters();
+
+			JobExecution jobExecution = jobLauncher.run(sportsDataCollectJob, params);
+			log.info("[Scheduler] sportsDataCollectJob 완료 - season: {}, status: {}, jobId: {}",
+				season, jobExecution.getStatus(), jobExecution.getJobId());
+		} finally {
+			sportsCollectLock.unlock();
+		}
+	}
+
+	/**
+	 * 해당 시즌이 이미 실행 중이거나 완료된 경우 true를 반환한다.
+	 * COMPLETED / STARTED / STARTING 상태를 모두 확인해 중복 실행을 방지한다.
+	 */
+	boolean isSeasonSkippable(String season) {
+		return jobExplorer.getJobInstances("sportsDataCollectJob", 0, Integer.MAX_VALUE)
+			.stream()
+			.flatMap(instance -> jobExplorer.getJobExecutions(instance).stream())
+			.filter(exec -> season.equals(exec.getJobParameters().getString("season")))
+			.anyMatch(exec ->
+				exec.getStatus() == BatchStatus.COMPLETED ||
+				exec.getStatus() == BatchStatus.STARTED ||
+				exec.getStatus() == BatchStatus.STARTING
+			);
 	}
 }

@@ -10,16 +10,32 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "contents")
+@Table(
+	name = "contents",
+	uniqueConstraints = @UniqueConstraint(
+		name = "uq_contents_external_id_source",
+		columnNames = {"external_id", "source"}
+	)
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Content extends BaseUpdatableEntity {
+	// 외부 API ID (TMDB: movie/tv id, SportsDB: idEvent)
+	@Column(length = 100)
+	private String externalId;
+
+	// 수집 출처
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 20)
+	private CollectionSource source;
+
 	// 제목
 	@Column(nullable = false, length = 200)
 	private String title;
@@ -55,11 +71,15 @@ public class Content extends BaseUpdatableEntity {
 
 	@Builder
 	protected Content(
+		String externalId,
+		CollectionSource source,
 		String title,
 		ContentType type,
 		String description,
 		String thumbnailUrl
 	) {
+		this.externalId = externalId;
+		this.source = source != null ? source : CollectionSource.MANUAL; // 관리자가 수동 등록 시
 		this.title = title;
 		this.type = type;
 		this.description = description;
