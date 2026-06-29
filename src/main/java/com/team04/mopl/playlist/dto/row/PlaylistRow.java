@@ -1,4 +1,4 @@
-package com.team04.mopl.playlist.dto.response;
+package com.team04.mopl.playlist.dto.row;
 
 import java.util.UUID;
 

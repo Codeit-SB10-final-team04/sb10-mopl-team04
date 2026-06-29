@@ -19,7 +19,7 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
-import com.team04.mopl.playlist.dto.response.PlaylistRow;
+import com.team04.mopl.playlist.dto.row.PlaylistRow;
 import com.team04.mopl.playlist.entity.QPlaylistSubscription;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
 import com.team04.mopl.playlist.exception.PlaylistErrorCode;
