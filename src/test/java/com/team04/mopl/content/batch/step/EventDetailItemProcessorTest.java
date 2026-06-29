@@ -52,4 +52,20 @@ class EventDetailItemProcessorTest {
             .isInstanceOf(EventDetailNotFoundException.class)
             .hasMessageContaining("99999");
     }
+
+    @Test
+    @DisplayName("API 응답에 idEvent가 없으면 Reader의 eventId를 주입한다")
+    void process_injectsEventId_whenIdEventMissingInResponse() throws Exception {
+        // given
+        ObjectNode detail = JsonNodeFactory.instance.objectNode();
+        detail.put("strEvent", "Arsenal vs Chelsea");
+        // idEvent 필드 없음
+        when(sportsDbClient.getEventDetail("12345")).thenReturn(Optional.of(detail));
+
+        // when
+        JsonNode result = processor.process("12345");
+
+        // then
+        assertThat(result.path("idEvent").asText()).isEqualTo("12345");
+    }
 }

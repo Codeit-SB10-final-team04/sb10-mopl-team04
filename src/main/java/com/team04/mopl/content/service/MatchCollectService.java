@@ -37,6 +37,11 @@ public class MatchCollectService {
 	public boolean saveIfNotExists(JsonNode eventDetail, String eventName) {
 		String externalId = eventDetail.path("idEvent").asText("");
 
+		if (!StringUtils.hasText(externalId)) {
+			log.warn("[Batch] idEvent 누락으로 저장 불가, skip: eventName={}", eventName);
+			return false;
+		}
+
 		if (contentRepository.existsByExternalIdAndSource(externalId, CollectionSource.SPORTS_DB)) {
 			log.debug("[Batch] 경기 이미 존재, 건너뜀: externalId={}", externalId);
 			return false;

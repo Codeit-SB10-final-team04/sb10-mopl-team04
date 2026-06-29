@@ -36,6 +36,23 @@ class MatchCollectServiceTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    @DisplayName("idEvent가 비어있으면 저장하지 않고 false를 반환한다")
+    void saveIfNotExists_returnsFalse_whenIdEventIsBlank() {
+        // given
+        ObjectNode eventDetail = objectMapper.createObjectNode();
+        eventDetail.put("idEvent", "");
+        eventDetail.put("strEvent", "Arsenal vs Chelsea");
+
+        // when
+        boolean result = matchCollectService.saveIfNotExists(eventDetail, "Arsenal vs Chelsea");
+
+        // then
+        assertThat(result).isFalse();
+        verify(contentRepository, never()).existsByExternalIdAndSource(any(), any());
+        verify(contentRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("이미 존재하는 경기(externalId 중복)는 저장하지 않고 false를 반환한다")
     void saveIfNotExists_returnsFalse_whenDuplicateMatchExists() {
         // given
