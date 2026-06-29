@@ -55,6 +55,9 @@ public class ContentController implements ContentControllerDocs {
 	@Override
 	@GetMapping
 	public ResponseEntity<CursorPageResponse<ContentDto>> getContents(@Valid ContentPageRequest contentPageRequest) {
-		return null;
+
+		CursorPageResponse<ContentDto> contents = contentService.getContents(contentPageRequest);
+
+		return ResponseEntity.status(HttpStatus.OK).body(contents);
 	}
 }
