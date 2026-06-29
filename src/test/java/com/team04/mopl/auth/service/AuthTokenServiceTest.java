@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.*;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -20,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.team04.mopl.auth.dto.response.JwtDto;
 import com.team04.mopl.auth.entity.AuthSession;
 import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.exception.AuthException;
@@ -29,8 +30,10 @@ import com.team04.mopl.auth.security.jwt.RefreshTokenGenerator;
 import com.team04.mopl.auth.security.jwt.TokenHasher;
 import com.team04.mopl.auth.service.dto.TokenRefreshResult;
 import com.team04.mopl.auth.session.AuthSessionStore;
+import com.team04.mopl.user.dto.response.UserDto;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.mapper.UserMapper;
 
 @ExtendWith(MockitoExtension.class)
 class AuthTokenServiceTest {
@@ -46,6 +49,9 @@ class AuthTokenServiceTest {
 
 	@Mock
 	private AuthSessionStore authSessionStore;
+
+	@Mock
+	private UserMapper userMapper;
 
 	@Mock
 	private AuthSession authSession;
@@ -69,8 +75,19 @@ class AuthTokenServiceTest {
 		String newRefreshTokenHash = "new-refresh-token-hash";
 		String newAccessToken = "new-access-token";
 
+		Instant createdAt = Instant.parse("2026-06-29T01:00:00Z");
 		Instant accessExpiresAt = Instant.parse("2026-06-29T01:30:00Z");
 		Instant refreshExpiresAt = Instant.parse("2026-07-13T01:00:00Z");
+
+		UserDto userDto = new UserDto(
+			userId,
+			createdAt,
+			"test@test.com",
+			"사용자",
+			"https://example.com/profile.png",
+			UserRole.USER,
+			false
+		);
 
 		given(tokenHasher.hash(refreshToken)).willReturn(currentRefreshTokenHash);
 		given(authSessionStore.findByRefreshTokenHash(currentRefreshTokenHash))
@@ -80,7 +97,7 @@ class AuthTokenServiceTest {
 		given(authSession.getUser()).willReturn(user);
 		given(authSession.getSessionId()).willReturn(sessionId);
 
-		givenUser(userId, false);
+		givenUser(userId, createdAt, false);
 
 		given(jwtTokenProvider.calculateAccessExpiresAt(any(Instant.class)))
 			.willReturn(accessExpiresAt);
@@ -105,13 +122,14 @@ class AuthTokenServiceTest {
 			any(Instant.class)
 		)).willReturn(Optional.of(authSession));
 
+		given(userMapper.toDto(user)).willReturn(userDto);
+
 		// when
 		TokenRefreshResult result = authTokenService.refresh(refreshToken);
 
 		// then
 		assertThat(result.refreshToken()).isEqualTo(newRefreshToken);
-		assertThat(result.jwtDto().accessToken()).isEqualTo(newAccessToken);
-		assertThat(result.jwtDto().userDto().id()).isEqualTo(userId);
+		assertThat(result.jwtDto()).isEqualTo(new JwtDto(userDto, newAccessToken));
 
 		verify(jwtTokenProvider).generateAccessToken(
 			any(MoplUserDetails.class),
@@ -127,13 +145,12 @@ class AuthTokenServiceTest {
 			eq(refreshExpiresAt),
 			any(Instant.class)
 		);
+		verify(userMapper).toDto(user);
 	}
 
 	@Test
 	@DisplayName("refresh token이 없으면 토큰 재발급에 실패한다")
 	void refresh_throwMissingRefreshToken_whenRefreshTokenIsNull() {
-		// given
-
 		// when & then
 		assertThatThrownBy(() -> authTokenService.refresh(null))
 			.isInstanceOfSatisfying(AuthException.class, exception ->
@@ -142,13 +159,12 @@ class AuthTokenServiceTest {
 
 		verifyNoInteractions(tokenHasher);
 		verifyNoInteractions(authSessionStore);
+		verifyNoInteractions(userMapper);
 	}
 
 	@Test
 	@DisplayName("refresh token이 공백이면 토큰 재발급에 실패한다")
 	void refresh_throwMissingRefreshToken_whenRefreshTokenIsBlank() {
-		// given
-
 		// when & then
 		assertThatThrownBy(() -> authTokenService.refresh("   "))
 			.isInstanceOfSatisfying(AuthException.class, exception ->
@@ -157,6 +173,7 @@ class AuthTokenServiceTest {
 
 		verifyNoInteractions(tokenHasher);
 		verifyNoInteractions(authSessionStore);
+		verifyNoInteractions(userMapper);
 	}
 
 	@Test
@@ -184,6 +201,9 @@ class AuthTokenServiceTest {
 			any(),
 			any()
 		);
+		verifyNoInteractions(jwtTokenProvider);
+		verifyNoInteractions(refreshTokenGenerator);
+		verifyNoInteractions(userMapper);
 	}
 
 	@Test
@@ -218,6 +238,8 @@ class AuthTokenServiceTest {
 			any(),
 			any()
 		);
+		verifyNoInteractions(refreshTokenGenerator);
+		verifyNoInteractions(userMapper);
 	}
 
 	@Test
@@ -251,6 +273,8 @@ class AuthTokenServiceTest {
 			any(),
 			any()
 		);
+		verifyNoInteractions(refreshTokenGenerator);
+		verifyNoInteractions(userMapper);
 	}
 
 	@Test
@@ -266,6 +290,7 @@ class AuthTokenServiceTest {
 		String newRefreshTokenHash = "new-refresh-token-hash";
 		String newAccessToken = "new-access-token";
 
+		Instant createdAt = Instant.parse("2026-06-29T01:00:00Z");
 		Instant accessExpiresAt = Instant.parse("2026-06-29T01:30:00Z");
 		Instant refreshExpiresAt = Instant.parse("2026-07-13T01:00:00Z");
 
@@ -277,7 +302,7 @@ class AuthTokenServiceTest {
 		given(authSession.getUser()).willReturn(user);
 		given(authSession.getSessionId()).willReturn(sessionId);
 
-		givenUser(userId, false);
+		givenUser(userId, createdAt, false);
 
 		given(jwtTokenProvider.calculateAccessExpiresAt(any(Instant.class)))
 			.willReturn(accessExpiresAt);
@@ -307,12 +332,14 @@ class AuthTokenServiceTest {
 			.isInstanceOfSatisfying(AuthException.class, exception ->
 				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.AUTH_INVALID_REFRESH_TOKEN)
 			);
+
+		verify(userMapper, never()).toDto(any());
 	}
 
 	// 테스트용 사용자 mock 기본값 설정
-	private void givenUser(UUID userId, boolean locked) {
+	private void givenUser(UUID userId, Instant createdAt, boolean locked) {
 		given(user.getId()).willReturn(userId);
-		given(user.getCreatedAt()).willReturn(Instant.parse("2026-06-29T01:00:00Z"));
+		given(user.getCreatedAt()).willReturn(createdAt);
 		given(user.getEmail()).willReturn("test@test.com");
 		given(user.getName()).willReturn("사용자");
 		given(user.getPasswordHashForAuthentication()).willReturn("encoded-password");

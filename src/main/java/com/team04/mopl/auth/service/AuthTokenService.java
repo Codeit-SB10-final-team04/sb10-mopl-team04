@@ -16,6 +16,7 @@ import com.team04.mopl.auth.security.jwt.RefreshTokenGenerator;
 import com.team04.mopl.auth.security.jwt.TokenHasher;
 import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.mapper.UserMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ public class AuthTokenService {
 	private final RefreshTokenGenerator refreshTokenGenerator;
 	private final TokenHasher tokenHasher;
 	private final AuthSessionStore authSessionStore;
+	private final UserMapper userMapper;
 
 	// refresh token으로 access token과 refresh token을 재발급
 	@Transactional
@@ -82,7 +84,7 @@ public class AuthTokenService {
 		log.info("[AUTH_REFRESH_TOKEN] 토큰 재발급 성공: userId={}, sessionId={}", user.getId(), authSession.getSessionId());
 
 		JwtDto jwtDto = new JwtDto(
-			userDetails.toUserDto(),
+			userMapper.toDto(user),
 			newAccessToken
 		);
 
@@ -94,16 +96,18 @@ public class AuthTokenService {
 
 	// refresh token 만료 여부를 검증하고 만료된 세션은 삭제
 	private void validateRefreshTokenNotExpired(AuthSession authSession, Instant refreshedAt) {
+		User user = authSession.getUser();
+
 		if (!authSession.isRefreshTokenExpired(refreshedAt)) {
 			return;
 		}
 
 		authSessionStore.delete(
-			authSession.getUser().getId(),
+			user.getId(),
 			authSession.getSessionId()
 		);
 
-		log.warn("[AUTH_REFRESH_TOKEN] 토큰 재발급 실패: 만료된 refresh token, userId={}, sessionId={}", authSession.getUser().getId(), authSession.getSessionId());
+		log.warn("[AUTH_REFRESH_TOKEN] 토큰 재발급 실패: 만료된 refresh token, userId={}, sessionId={}", user.getId(), authSession.getSessionId());
 
 		throw new AuthException(AuthErrorCode.AUTH_EXPIRED_REFRESH_TOKEN);
 	}
