@@ -4,9 +4,11 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
@@ -37,15 +39,20 @@ public class ConversationService {
 	private final ConversationMapper conversationMapper;
 	private final ConversationParticipantMapper conversationParticipantMapper;
 
-	public ConversationDto createConversation(ConversationCreateRequest conversationCreateRequest, UUID currentUserId) {
-		log.info("[CONVERSATION CREATE] 대화 생성 시작: requestUserid={}, withUserId={}",
-			currentUserId, conversationCreateRequest.withUserId());
+	@Transactional
+	@PreAuthorize("#conversationCreateRequest.withUserId() != #moplUserDetails.userId")
+	public ConversationDto createConversation(
+		ConversationCreateRequest conversationCreateRequest,
+		MoplUserDetails moplUserDetails
+	) {
+		// 1. 로그인 정보로부터 요청자의 ID 추출
+		UUID requestUserId = moplUserDetails.getUserId();
 
-		// 1. 유효성 검증: 개인 채팅방 생성 시도
-		validateSelfConversation(currentUserId, conversationCreateRequest.withUserId());
+		log.info("[CONVERSATION CREATE] 대화 생성 시작: requestUserid={}, withUserId={}",
+			requestUserId, conversationCreateRequest.withUserId());
 
 		// 2. 유효성 검증: 요청자 및 사용자 존재 여부
-		User requestUser = getUserEntityOrThrow(currentUserId);
+		User requestUser = getUserEntityOrThrow(requestUserId);
 		User withUser = getUserEntityOrThrow(conversationCreateRequest.withUserId());
 
 		// 3. 유효성 검증: 중복 검사
@@ -73,7 +80,7 @@ public class ConversationService {
 		} catch (DataIntegrityViolationException e) {
 			// DB 제약조건 위반 시, 이미 중복인 상황으로 간주
 			throw new ConversationException(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS)
-				.addDetail("requestUserId", currentUserId)
+				.addDetail("requestUserId", requestUserId)
 				.addDetail("withUserId", conversationCreateRequest.withUserId());
 		}
 	}
@@ -99,16 +106,6 @@ public class ConversationService {
 				throw new ConversationException(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS)
 					.addDetail("existingConversationId", conversationId);
 			});
-	}
-
-	// 유효성 검증: 개인 채팅방 생성 검증
-	// TODO: Security 도입 시 @PreAuthorize 로 대체
-	private void validateSelfConversation(UUID requestUserId, UUID userId) {
-		if (requestUserId.equals(userId)) {
-			throw new ConversationException(ConversationErrorCode.CONVERSATION_CANNOT_CHAT_WITH_SELF)
-				.addDetail("requestUserId", requestUserId)
-				.addDetail("userId", userId);
-		}
 	}
 
 	// 사용자 엔티티 반환

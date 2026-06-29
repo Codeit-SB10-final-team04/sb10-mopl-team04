@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "conversations")
 public class Conversation extends BaseUpdatableEntity {
 
-	// 정적 팩토리 메서드
+	// 생성자 대신 Conversation 객체를 생성하는 정적 메서드
 	public static Conversation create() {
 		return new Conversation();
 	}

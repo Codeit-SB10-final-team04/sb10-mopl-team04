@@ -1,9 +1,8 @@
 package com.team04.mopl.conversation.controller;
 
-import java.util.UUID;
-
 import org.springframework.http.ResponseEntity;
 
+import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
 
@@ -19,7 +18,6 @@ public interface ConversationControllerDocs {
 	)
 	ResponseEntity<ConversationDto> createConversation(
 		ConversationCreateRequest conversationCreateRequest,
-		UUID currentUserId
-		// MoplUserDetails moplUserDetails
+		MoplUserDetails moplUserDetails
 	);
 }
