@@ -551,8 +551,8 @@ class PlaylistServiceTest {
 	}
 
 	@Test
-	@DisplayName("플레이리스트 목록 조회에 성공하면 플레이리스트 커서 페이지네이션 응답 DTO를 반환한다.")
-	void findAllPlaylists_returnCursorResponse_whenValidRequest() {
+	@DisplayName("정렬 조건이 updatedAt인 플레이리스트 목록 조회에 성공하면 플레이리스트 커서 페이지네이션 응답 DTO를 반환한다.")
+	void findAllPlaylists_returnCursorResponse_whenSortByUpdatedAt() {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 		UUID playlistId1 = UUID.randomUUID();
@@ -713,6 +713,179 @@ class PlaylistServiceTest {
 		assertEquals(List.of(2L, 3L), subscriberCountCaptor.getAllValues());
 		assertEquals(List.of(false, false), subscribedByMeCaptor.getAllValues());
 		assertEquals(List.of(List.of(), List.of(contentSummary)), contentCaptor.getAllValues());
+	}
+
+	@Test
+	@DisplayName("정렬 조건이 subscribeCount인 플레이리스트 목록 조회에 성공하면 플레이리스트 커서 페이지네이션 응답 DTO를 반환한다.")
+	void findAllPlaylists_returnCursorResponse_whenSortBySubscribeCount() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID playlist2OwnerId = UUID.randomUUID();
+		UUID playlistId1 = UUID.randomUUID();
+		UUID playlistId2 = UUID.randomUUID();
+		UUID contentId = UUID.randomUUID();
+		Instant updatedAt1 = Instant.parse("2026-06-24T01:00:00Z");
+		Instant updatedAt2 = Instant.parse("2026-06-24T00:00:00Z");
+
+		User currentUser = createUser(currentUserId);
+		User playlist2Owner = createUser(playlist2OwnerId);
+		Playlist playlist1 = createPlaylist(currentUser, playlistId1);
+		Playlist playlist2 = createPlaylist(playlist2Owner, playlistId2);
+		ReflectionTestUtils.setField(playlist1, "updatedAt", updatedAt1);
+		ReflectionTestUtils.setField(playlist2, "updatedAt", updatedAt2);
+
+		Content content = createContent(contentId);
+
+		PlaylistSearchRequest request = new PlaylistSearchRequest(
+			"제목",
+			null, null, null, null,
+			2,
+			SortDirection.DESCENDING,
+			PlaylistSortBy.subscribeCount
+		);
+
+		PlaylistRow playlistRow1 = new PlaylistRow(
+			playlist1,
+			2L,
+			currentUserId,
+			currentUser.getName(),
+			currentUser.getProfileImageUrl()
+		);
+		PlaylistRow playlistRow2 = new PlaylistRow(
+			playlist2,
+			3L,
+			playlist2OwnerId,
+			playlist2Owner.getName(),
+			playlist2Owner.getProfileImageUrl()
+		);
+
+		PlaylistCursorPage playlistCursorPage = new PlaylistCursorPage(
+			List.of(playlistRow2, playlistRow1),
+			true,
+			3L
+		);
+
+		PlaylistContentRow playlistContentRow = new PlaylistContentRow(playlistId2, content);
+
+		UserSummary userSummary1 = new UserSummary(
+			currentUserId,
+			currentUser.getName(),
+			currentUser.getProfileImageUrl()
+		);
+
+		UserSummary userSummary2 = new UserSummary(
+			playlist2OwnerId,
+			playlist2Owner.getName(),
+			playlist2Owner.getProfileImageUrl()
+		);
+
+		ContentSummary contentSummary = new ContentSummary(
+			contentId,
+			content.getType(),
+			content.getTitle(),
+			content.getDescription(),
+			content.getThumbnailUrl(),
+			List.of(),
+			content.getAverageRating(),
+			content.getReviewCount()
+		);
+
+		PlaylistDto playlistDto1 = new PlaylistDto(
+			playlistId1,
+			userSummary1,
+			playlist1.getTitle(),
+			playlist1.getDescription(),
+			updatedAt1,
+			2L,
+			false,
+			List.of()
+		);
+
+		PlaylistDto playlistDto2 = new PlaylistDto(
+			playlistId2,
+			userSummary2,
+			playlist2.getTitle(),
+			playlist2.getDescription(),
+			updatedAt2,
+			3L,
+			true,
+			List.of(contentSummary)
+		);
+
+		CursorResponsePlaylistDto cursorResponsePlaylistDtoResult = new CursorResponsePlaylistDto(
+			List.of(playlistDto2, playlistDto1),
+			playlistDto1.subscriberCount().toString(),
+			playlist1.getId(),
+			true,
+			3L,
+			PlaylistSortBy.subscribeCount.toString(),
+			SortDirection.DESCENDING
+		);
+
+		when(userRepository.findById(currentUserId))
+			.thenReturn(Optional.of(currentUser));
+		when(playlistRepository.findAllPlaylists(request))
+			.thenReturn(playlistCursorPage);
+		when(playlistSubscriptionRepository.findSubscribedPlaylistIds(
+			List.of(playlistId2, playlistId1),
+			currentUserId)
+		).thenReturn(Set.of(playlistId2));
+		when(playlistContentRepository.findAllContentsByPlaylistIdsWithDeletedAtNull(
+			List.of(playlistId2, playlistId1))
+		).thenReturn(List.of(playlistContentRow));
+		when(contentTagRepository.findTagNamesByContentIds(List.of(contentId)))
+			.thenReturn(List.of());
+		when(playlistMapper.toDto(
+				any(Playlist.class),
+				any(UserSummary.class),
+				anyLong(),
+				anyBoolean(),
+				anyList()
+			)
+		).thenReturn(playlistDto2, playlistDto1);
+
+		// when
+		CursorResponsePlaylistDto result = playlistService.findAllPlaylists(request, currentUserId);
+
+		// then
+		assertEquals(cursorResponsePlaylistDtoResult, result);
+		assertEquals(List.of(playlistDto2, playlistDto1), result.data());
+		assertEquals(playlistDto1.subscriberCount().toString(), result.nextCursor());
+		assertEquals(playlist1.getId(), result.nextIdAfter());
+		assertEquals(true, result.hasNext());
+		assertEquals(3L, result.totalCount());
+		assertEquals(PlaylistSortBy.subscribeCount.toString(), result.sortBy());
+		assertEquals(SortDirection.DESCENDING, result.sortDirection());
+
+		verify(userRepository).findById(currentUserId);
+		verify(playlistRepository).findAllPlaylists(request);
+		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(
+			List.of(playlistId2, playlistId1),
+			currentUserId
+		);
+		verify(playlistContentRepository).findAllContentsByPlaylistIdsWithDeletedAtNull(
+			List.of(playlistId2, playlistId1)
+		);
+		verify(contentTagRepository).findTagNamesByContentIds(List.of(contentId));
+
+		ArgumentCaptor<Playlist> playlistCaptor = ArgumentCaptor.forClass(Playlist.class);
+		ArgumentCaptor<UserSummary> ownerUserSummary = ArgumentCaptor.forClass(UserSummary.class);
+		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
+		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
+		ArgumentCaptor<List<ContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
+
+		verify(playlistMapper, times(2)).toDto(
+			playlistCaptor.capture(),
+			ownerUserSummary.capture(),
+			subscriberCountCaptor.capture(),
+			subscribedByMeCaptor.capture(),
+			contentCaptor.capture()
+		);
+
+		assertEquals(List.of(playlist2, playlist1), playlistCaptor.getAllValues());
+		assertEquals(List.of(3L, 2L), subscriberCountCaptor.getAllValues());
+		assertEquals(List.of(true, false), subscribedByMeCaptor.getAllValues());
+		assertEquals(List.of(List.of(contentSummary), List.of()), contentCaptor.getAllValues());
 	}
 
 	@Test
