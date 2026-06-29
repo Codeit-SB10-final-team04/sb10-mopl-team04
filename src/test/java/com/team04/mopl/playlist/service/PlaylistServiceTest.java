@@ -883,6 +883,7 @@ class PlaylistServiceTest {
 		);
 
 		assertEquals(List.of(playlist2, playlist1), playlistCaptor.getAllValues());
+		assertEquals(List.of(userSummary2, userSummary1), ownerUserSummary.getAllValues());
 		assertEquals(List.of(3L, 2L), subscriberCountCaptor.getAllValues());
 		assertEquals(List.of(true, false), subscribedByMeCaptor.getAllValues());
 		assertEquals(List.of(List.of(contentSummary), List.of()), contentCaptor.getAllValues());
