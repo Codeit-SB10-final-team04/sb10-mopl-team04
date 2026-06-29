@@ -33,7 +33,7 @@ public class Content extends BaseUpdatableEntity {
 
 	// 수집 출처
 	@Enumerated(EnumType.STRING)
-	@Column(length = 20)
+	@Column(nullable = false, length = 20)
 	private CollectionSource source;
 
 	// 제목
