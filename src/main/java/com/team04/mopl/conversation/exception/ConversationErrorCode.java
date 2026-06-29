@@ -16,16 +16,16 @@ public enum ConversationErrorCode implements ErrorCode {
 
 	@Override
 	public HttpStatus getHttpStatus() {
-		return null;
+		return this.httpStatus;
 	}
 
 	@Override
 	public String getCode() {
-		return "";
+		return this.code;
 	}
 
 	@Override
 	public String getMessage() {
-		return "";
+		return this.description;
 	}
 }
