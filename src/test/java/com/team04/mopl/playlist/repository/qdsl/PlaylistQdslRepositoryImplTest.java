@@ -20,8 +20,6 @@ import com.team04.mopl.config.QuerydslConfig;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
-import com.team04.mopl.playlist.exception.PlaylistErrorCode;
-import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 
 @DataJpaTest(properties = {
@@ -178,26 +176,6 @@ class PlaylistQdslRepositoryImplTest {
 			.extracting(row -> row.subscriberCount())
 			.containsExactly(1L);
 		assertEquals(3L, result.totalCount());
-	}
-
-	@Test
-	@DisplayName("cursor와 idAfter 중 하나만 있으면 예외가 발생한다.")
-	void findPlaylists_throwException_whenOnlyCursorOrIdAfterProvided() {
-		// given
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
-			null, null, null, updatedAt2.toString(), null,
-			5,
-			SortDirection.DESCENDING,
-			PlaylistSortBy.updatedAt
-		);
-
-		Throwable throwable = catchThrowable(() ->
-			playlistRepository.findPlaylists(request)
-		);
-		PlaylistException playlistException = (PlaylistException)throwable;
-
-		assertThat(throwable).isInstanceOf(PlaylistException.class);
-		assertEquals(PlaylistErrorCode.INVALID_INPUT, playlistException.getErrorCode());
 	}
 
 	private void insertFixtures() {

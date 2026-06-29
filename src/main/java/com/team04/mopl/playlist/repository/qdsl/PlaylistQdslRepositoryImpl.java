@@ -42,15 +42,6 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQueryRepository {
 		UUID idAfter = request.idAfter();
 		int limit = request.limit();
 
-		if ((cursor != null && idAfter == null)
-			|| (cursor == null && idAfter != null)
-		) {
-			throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT)
-				.addDetail("reason", "cursor와 idAfter는 함께 요청되어야 합니다.")
-				.addDetail("isProvidedCursor", cursor != null)
-				.addDetail("isProvidedIdAfter", idAfter != null);
-		}
-
 		// 구독자 수를 세는 SQL 집계식을 Java 객체로 표현 = `COUNT(playlist_subscription.id)`
 		// playlist_subscriptions table을 구독자 수 집계를 위
 		NumberExpression<Long> subscriberCount = playlistSubscription.id.count();

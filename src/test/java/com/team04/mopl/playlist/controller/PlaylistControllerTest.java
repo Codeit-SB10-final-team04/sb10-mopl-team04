@@ -343,4 +343,38 @@ class PlaylistControllerTest {
 				.header("X-MOPL-USER-ID", currentUserId))
 			.andExpect(status().isBadRequest());
 	}
+
+	@Test
+	@DisplayName("플레이리스트 목록 조회 요청에서 cursor만 있고 idAfter가 없다면 400 Bad Request로 실패한다")
+	void findAllPlaylists_returnBadRequest_whenOnlyCursorProvided() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		// when, then
+		mockMvc.perform(get("/api/playlists")
+				.param("keywordLike", "제목")
+				.param("cursor", "2026-06-24T01:00:00Z")
+				.param("limit", "2")
+				.param("sortDirection", SortDirection.DESCENDING.toString())
+				.param("sortBy", PlaylistSortBy.updatedAt.toString())
+				.header("X-MOPL-USER-ID", currentUserId))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("플레이리스트 목록 조회 요청에서 idAfter만 있고, cursor가 없다면 400 Bad Request로 실패한다.")
+	void findAllPlaylists_returnBadRequest_whenOnlyIdAfterProvided() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		// when, then
+		mockMvc.perform(get("/api/playlists")
+				.param("keywordLike", "제목")
+				.param("idAfter", UUID.randomUUID().toString())
+				.param("limit", "2")
+				.param("sortDirection", SortDirection.DESCENDING.toString())
+				.param("sortBy", PlaylistSortBy.updatedAt.toString())
+				.header("X-MOPL-USER-ID", currentUserId))
+			.andExpect(status().isBadRequest());
+	}
 }

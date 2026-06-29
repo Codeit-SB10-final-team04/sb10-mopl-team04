@@ -7,6 +7,7 @@ import org.springframework.util.StringUtils;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
@@ -37,5 +38,10 @@ public record PlaylistSearchRequest(
 		return StringUtils.hasText(keywordLike)
 			? keywordLike.strip()
 			: null;
+	}
+
+	@AssertTrue(message = "cursor와 idAfter는 함께 요청되어야 합니다.")
+	public boolean isCursorAndIdAfterPaired() {
+		return (cursor == null) == (idAfter == null);
 	}
 }
