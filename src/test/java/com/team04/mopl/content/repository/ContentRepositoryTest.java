@@ -10,12 +10,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import com.team04.mopl.config.JpaAuditingConfig;
-import com.team04.mopl.config.QuerydslConfig;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
 
 @DataJpaTest
-@Import({JpaAuditingConfig.class, QuerydslConfig.class})
+@Import(JpaAuditingConfig.class)
 @ActiveProfiles("test")
 class ContentRepositoryTest {
 
