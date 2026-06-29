@@ -21,6 +21,8 @@ import com.team04.mopl.conversation.mapper.ConversationParticipantMapper;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -129,10 +131,8 @@ public class ConversationService {
 	// 사용자 엔티티 반환
 	private User getUserEntityOrThrow(UUID userId) {
 		return userRepository.findById(userId)
-			// TODO: User 도메인의 최상위 예외 클래스 구현 시 주석 제거 예정
-			.orElseThrow(/*() -> new Userxception(
-				UserErrorCode
-			)*/);
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
+				.addDetail("userId", userId));
 	}
 
 	// 사용자 요약 정보 반환
