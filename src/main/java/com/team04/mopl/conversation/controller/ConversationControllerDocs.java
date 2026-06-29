@@ -1,5 +1,7 @@
 package com.team04.mopl.conversation.controller;
 
+import java.util.UUID;
+
 import org.springframework.http.ResponseEntity;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
@@ -20,4 +22,10 @@ public interface ConversationControllerDocs {
 		ConversationCreateRequest conversationCreateRequest,
 		MoplUserDetails moplUserDetails
 	);
+
+	@Operation(
+		summary = "대화 단건 조회",
+		description = "대화 ID를 통해 특정 대화방을 조회합니다."
+	)
+	ResponseEntity<ConversationDto> findConversationById(UUID conversationId);
 }
