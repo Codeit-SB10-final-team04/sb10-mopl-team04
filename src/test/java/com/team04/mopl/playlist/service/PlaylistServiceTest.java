@@ -140,7 +140,6 @@ class PlaylistServiceTest {
 		UUID currentUserId = UUID.randomUUID();
 		PlaylistCreateRequest request = new PlaylistCreateRequest("테스트 제목", "테스트 설명");
 
-		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
 		when(userRepository.findById(currentUserId))
 			.thenReturn(Optional.empty());
 
@@ -261,7 +260,6 @@ class PlaylistServiceTest {
 		UUID currentUserId = UUID.randomUUID();
 		UUID playlistId = UUID.randomUUID();
 
-		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
 		when(userRepository.findById(currentUserId))
 			.thenReturn(Optional.empty());
 
@@ -293,7 +291,6 @@ class PlaylistServiceTest {
 
 		User currentUser = createUser(currentUserId);
 
-		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
 		when(userRepository.findById(currentUserId))
 			.thenReturn(Optional.of(currentUser));
 		when(playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId))
@@ -946,7 +943,6 @@ class PlaylistServiceTest {
 			PlaylistSortBy.updatedAt
 		);
 
-		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
 		when(userRepository.findById(currentUserId))
 			.thenReturn(Optional.empty());
 
