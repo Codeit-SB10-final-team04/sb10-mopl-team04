@@ -7,6 +7,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
 import com.team04.mopl.conversation.entity.Conversation;
@@ -14,6 +15,7 @@ import com.team04.mopl.conversation.entity.ConversationParticipant;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.mapper.ConversationMapper;
+import com.team04.mopl.conversation.mapper.ConversationParticipantMapper;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
 import com.team04.mopl.user.entity.User;
@@ -33,6 +35,7 @@ public class ConversationService {
 	private final UserRepository userRepository;
 
 	private final ConversationMapper conversationMapper;
+	private final ConversationParticipantMapper conversationParticipantMapper;
 
 	public ConversationDto createConversation(ConversationCreateRequest conversationCreateRequest, UUID currentUserId) {
 		log.info("[CONVERSATION CREATE] 대화 생성 시작: requestUserid={}, withUserId={}",
@@ -57,19 +60,14 @@ public class ConversationService {
 			conversationRepository.save(newConversation);
 
 			// 대화 참여자 생성 및 저장
-			List<ConversationParticipant> participants = createConversationParticipant(
-				newConversation,
-				requestUser,
-				withUser
-			);
+			createConversationParticipant(newConversation, requestUser, withUser);
 
-			log.info("[CONVERSATION CREATE] 대화 생성 완료: conversationId={}, 대화 참여 인원 수={}명",
-				newConversation.getId(), participants.size());
+			log.info("[CONVERSATION CREATE] 대화 생성 완료: conversationId={}",
+				newConversation.getId());
 
 			// 응답 DTO 변환 (대화방, 대화 상대 정보, 마지막 메시지 내용)
 			// 대화방 생성 로직이므로 마지막 메시지 내용은 null 처리
 			UserSummary with = getUserSummary(withUser);
-
 			return conversationMapper.toDto(newConversation, with, null);
 
 		} catch (DataIntegrityViolationException e) {
@@ -78,31 +76,29 @@ public class ConversationService {
 				.addDetail("requestUserId", currentUserId)
 				.addDetail("withUserId", conversationCreateRequest.withUserId());
 		}
-
-		return null;
 	}
 
 	// 대화 참여자 생성 및 저장
-	private List<ConversationParticipant> createConversationParticipant(
+	private void createConversationParticipant(
 		Conversation conversation,
 		User requestUser,
 		User withUser
 	) {
 		List<ConversationParticipant> participants = List.of(
-			new ConversationParticipant(conversation, requestUser),
-			new ConversationParticipant(conversation, withUser)
+			conversationParticipantMapper.toEntity(conversation, requestUser),
+			conversationParticipantMapper.toEntity(conversation, withUser)
 		);
 
 		conversationParticipantRepository.saveAll(participants);
-
-		return participants;
 	}
 
 	// 유효성 검증: 대화 중복 검사
-	private void validateDuplicateConversation(UUID requestUserId, UUID currentUserId) {
-		if (conversationParticipantRepository.findExistingConversationId(requestUserId, currentUserId).isEmpty()) {
-			throw new ConversationException(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS);
-		}
+	private void validateDuplicateConversation(UUID requestUserId, UUID withUserId) {
+		conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
+			.ifPresent(conversationId -> {
+				throw new ConversationException(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS)
+					.addDetail("existingConversationId", conversationId);
+			});
 	}
 
 	// 유효성 검증: 개인 채팅방 생성 검증
