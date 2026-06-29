@@ -32,6 +32,9 @@ public interface AuthSessionStore {
 		Instant refreshedAt
 	);
 
-	// 사용자 인증 세션 삭제
+	// 사용자 인증 세션 삭제 (계정 잠금, 권한 변경, 관리자 강제 로그아웃 시 사용)
 	void deleteByUserId(UUID userId);
+
+	// 특정 인증 세션 삭제 (로그아웃 시 사용)
+	void delete(UUID userId, UUID sessionId);
 }

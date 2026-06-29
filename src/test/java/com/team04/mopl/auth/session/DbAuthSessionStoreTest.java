@@ -36,9 +36,6 @@ class DbAuthSessionStoreTest {
 	private User user;
 
 	@Mock
-	private User userReference;
-
-	@Mock
 	private AuthSession existingSession;
 
 	@InjectMocks
@@ -394,6 +391,56 @@ class DbAuthSessionStoreTest {
 		assertThatThrownBy(action)
 			.isInstanceOf(NullPointerException.class)
 			.hasMessage("userId는 필수입니다.");
+
+		verifyNoInteractions(entityManager);
+		verifyNoInteractions(authSessionRepository);
+	}
+
+	@Test
+	@DisplayName("userId와 sessionId 기준으로 특정 인증 세션 삭제를 repository에 위임한다")
+	void delete_deleteSession_whenUserIdAndSessionIdAreProvided() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID sessionId = UUID.randomUUID();
+
+		// when
+		authSessionStore.delete(userId, sessionId);
+
+		// then
+		verify(authSessionRepository).deleteByUser_IdAndSessionId(userId, sessionId);
+		verifyNoInteractions(entityManager);
+	}
+	@Test
+	@DisplayName("userId가 null이면 특정 인증 세션 삭제에 실패한다")
+	void delete_throwNullPointerException_whenUserIdIsNull() {
+		// given
+		UUID sessionId = UUID.randomUUID();
+
+		// when
+		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.delete(null, sessionId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOf(NullPointerException.class)
+			.hasMessage("userId는 필수입니다.");
+
+		verifyNoInteractions(entityManager);
+		verifyNoInteractions(authSessionRepository);
+	}
+
+	@Test
+	@DisplayName("sessionId가 null이면 특정 인증 세션 삭제에 실패한다")
+	void delete_throwNullPointerException_whenSessionIdIsNull() {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		// when
+		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.delete(userId, null);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOf(NullPointerException.class)
+			.hasMessage("sessionId는 필수입니다.");
 
 		verifyNoInteractions(entityManager);
 		verifyNoInteractions(authSessionRepository);

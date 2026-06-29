@@ -69,4 +69,34 @@ class RefreshTokenCookieWriterTest {
 
 		assertThat(setCookie).contains("Secure");
 	}
+
+	@Test
+	@DisplayName("Refresh Token 쿠키를 즉시 만료한다")
+	void expire_expiresRefreshTokenCookie_whenLogoutSucceeds() {
+		// given
+		JwtProperties jwtProperties = new JwtProperties(
+			SECRET,
+			"mopl",
+			1800,
+			1209600,
+			"REFRESH_TOKEN",
+			false,
+			"Lax"
+		);
+
+		RefreshTokenCookieWriter cookieWriter = new RefreshTokenCookieWriter(jwtProperties);
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		// when
+		cookieWriter.expire(response);
+
+		// then
+		String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
+
+		assertThat(setCookie).contains("REFRESH_TOKEN=");
+		assertThat(setCookie).contains("Max-Age=0");
+		assertThat(setCookie).contains("HttpOnly");
+		assertThat(setCookie).contains("Path=/");
+		assertThat(setCookie).contains("SameSite=Lax");
+	}
 }

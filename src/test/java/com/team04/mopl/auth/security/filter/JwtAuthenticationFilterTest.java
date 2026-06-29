@@ -13,6 +13,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -62,11 +63,12 @@ class JwtAuthenticationFilterTest {
 	}
 
 	@Test
-	@DisplayName("로그인 요청이면 JWT 필터를 적용하지 않는다")
-	void doFilterInternal_passesRequest_whenRequestIsSignInPath() throws Exception {
+	@DisplayName("POST 로그인 요청이면 JWT 필터를 적용하지 않는다")
+	void doFilterInternal_passesRequest_whenRequestIsPostSignInPath() throws Exception {
 		// given
 		MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/sign-in");
 		request.setServletPath("/api/auth/sign-in");
+		request.addHeader("Authorization", "Bearer invalid-token");
 
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		MockFilterChain filterChain = new MockFilterChain();
@@ -80,15 +82,34 @@ class JwtAuthenticationFilterTest {
 	}
 
 	@Test
-	@DisplayName("로그인 경로라도 POST가 아니면 JWT 필터를 적용한다")
-	void doFilterInternal_savesAuthentication_whenSignInPathMethodIsNotPost() throws Exception {
+	@DisplayName("POST 로그아웃 요청이면 JWT 필터를 적용하지 않는다")
+	void doFilterInternal_passesRequest_whenRequestIsPostSignOutPath() throws Exception {
+		// given
+		MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/sign-out");
+		request.setServletPath("/api/auth/sign-out");
+		request.addHeader("Authorization", "Bearer invalid-token");
+
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		MockFilterChain filterChain = new MockFilterChain();
+
+		// when
+		jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+		// then
+		assertThat(filterChain.getRequest()).isSameAs(request);
+		verify(jwtTokenProvider, never()).parseAccessToken(any());
+	}
+
+	@Test
+	@DisplayName("로그아웃 경로라도 POST가 아니면 JWT 필터를 적용한다")
+	void doFilterInternal_savesAuthentication_whenSignOutPathMethodIsNotPost() throws Exception {
 		// given
 		UUID userId = UUID.randomUUID();
 		UUID sessionId = UUID.randomUUID();
 		String accessToken = "valid-access-token";
 
-		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/sign-in");
-		request.setServletPath("/api/auth/sign-in");
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/sign-out");
+		request.setServletPath("/api/auth/sign-out");
 		request.addHeader("Authorization", "Bearer " + accessToken);
 
 		MockHttpServletResponse response = new MockHttpServletResponse();
@@ -122,12 +143,18 @@ class JwtAuthenticationFilterTest {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		MockFilterChain filterChain = new MockFilterChain();
 
+		ArgumentCaptor<AuthException> exceptionCaptor = ArgumentCaptor.forClass(AuthException.class);
+
 		// when
 		jwtAuthenticationFilter.doFilter(request, response, filterChain);
 
 		// then
-		verify(authResponseWriter).writeError(same(response), any(AuthException.class));
+		verify(authResponseWriter).writeError(same(response), exceptionCaptor.capture());
 		verify(jwtTokenProvider, never()).parseAccessToken(any());
+
+		assertThat(exceptionCaptor.getValue())
+			.extracting("errorCode")
+			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 	}
 
@@ -141,12 +168,18 @@ class JwtAuthenticationFilterTest {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		MockFilterChain filterChain = new MockFilterChain();
 
+		ArgumentCaptor<AuthException> exceptionCaptor = ArgumentCaptor.forClass(AuthException.class);
+
 		// when
 		jwtAuthenticationFilter.doFilter(request, response, filterChain);
 
 		// then
-		verify(authResponseWriter).writeError(same(response), any(AuthException.class));
+		verify(authResponseWriter).writeError(same(response), exceptionCaptor.capture());
 		verify(jwtTokenProvider, never()).parseAccessToken(any());
+
+		assertThat(exceptionCaptor.getValue())
+			.extracting("errorCode")
+			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 	}
 
@@ -192,12 +225,12 @@ class JwtAuthenticationFilterTest {
 	}
 
 	@Test
-	@DisplayName("서버 인증 세션이 비활성 상태이면 인증 에러 응답을 반환한다")
-	void doFilterInternal_writesError_whenAuthSessionIsInactive() throws Exception {
+	@DisplayName("로그아웃으로 세션이 삭제된 Access Token이면 인증 에러 응답을 반환한다")
+	void doFilterInternal_writesError_whenLoggedOutAccessTokenUsed() throws Exception {
 		// given
 		UUID userId = UUID.randomUUID();
 		UUID sessionId = UUID.randomUUID();
-		String accessToken = "valid-access-token";
+		String accessToken = "logged-out-access-token";
 
 		MockHttpServletRequest request = new MockHttpServletRequest();
 		request.addHeader("Authorization", "Bearer " + accessToken);
@@ -215,11 +248,17 @@ class JwtAuthenticationFilterTest {
 		when(jwtTokenProvider.parseAccessToken(accessToken)).thenReturn(claims);
 		when(authSessionStore.isActive(userId, sessionId)).thenReturn(false);
 
+		ArgumentCaptor<AuthException> exceptionCaptor = ArgumentCaptor.forClass(AuthException.class);
+
 		// when
 		jwtAuthenticationFilter.doFilter(request, response, filterChain);
 
 		// then
-		verify(authResponseWriter).writeError(same(response), any(AuthException.class));
+		verify(authResponseWriter).writeError(same(response), exceptionCaptor.capture());
+
+		assertThat(exceptionCaptor.getValue())
+			.extracting("errorCode")
+			.isEqualTo(AuthErrorCode.AUTH_SESSION_INVALID);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 	}
 
@@ -238,11 +277,17 @@ class JwtAuthenticationFilterTest {
 		when(jwtTokenProvider.parseAccessToken(accessToken))
 			.thenThrow(new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN));
 
+		ArgumentCaptor<AuthException> exceptionCaptor = ArgumentCaptor.forClass(AuthException.class);
+
 		// when
 		jwtAuthenticationFilter.doFilter(request, response, filterChain);
 
 		// then
-		verify(authResponseWriter).writeError(same(response), any(AuthException.class));
+		verify(authResponseWriter).writeError(same(response), exceptionCaptor.capture());
+
+		assertThat(exceptionCaptor.getValue())
+			.extracting("errorCode")
+			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 	}
 }

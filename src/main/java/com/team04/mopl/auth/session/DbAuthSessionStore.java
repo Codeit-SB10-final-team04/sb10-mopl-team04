@@ -103,7 +103,7 @@ public class DbAuthSessionStore implements AuthSessionStore {
 			});
 	}
 
-	// 사용자 인증 세션 삭제
+	// 사용자 인증 세션 삭제 (계정 잠금, 권한 변경, 관리자 강제 로그아웃 시 사용)
 	@Override
 	@Transactional
 	public void deleteByUserId(UUID userId) {
@@ -112,6 +112,18 @@ public class DbAuthSessionStore implements AuthSessionStore {
 		// 세션이 없어도 예외를 던지지 않음
 		// 로그아웃/강제 로그아웃 흐름에서 멱등하게 호출 가능해야 함
 		authSessionRepository.deleteByUser_Id(userId);
+	}
+
+	// 특정 인증 세션 삭제 (로그아웃 시 사용)
+	@Override
+	@Transactional
+	public void delete(UUID userId, UUID sessionId) {
+		Objects.requireNonNull(userId, "userId는 필수입니다.");
+		Objects.requireNonNull(sessionId, "sessionId는 필수입니다.");
+
+		// 세션이 없어도 예외를 던지지 않음
+		// 로그아웃은 멱등하게 호출 가능해야 함
+		authSessionRepository.deleteByUser_IdAndSessionId(userId, sessionId);
 	}
 
 	private User findUserForUpdate(UUID userId) {
