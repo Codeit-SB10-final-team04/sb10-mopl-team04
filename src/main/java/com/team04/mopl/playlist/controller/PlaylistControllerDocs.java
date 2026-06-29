@@ -5,7 +5,9 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
+import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +26,13 @@ public interface PlaylistControllerDocs {
 	@Operation(summary = "플레이리스트 단건 조회")
 	ResponseEntity<PlaylistDto> findPlaylist(
 		UUID playlistId,
+		UUID currentUserId
+		// MoplUserDetails moplUserDetails
+	);
+
+	@Operation(summary = "플레이리스트 목록 조회 (커서 페이지네이션)")
+	ResponseEntity<CursorResponsePlaylistDto> findAllPlaylists(
+		PlaylistSearchRequest request,
 		UUID currentUserId
 		// MoplUserDetails moplUserDetails
 	);
