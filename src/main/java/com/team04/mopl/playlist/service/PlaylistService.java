@@ -428,14 +428,14 @@ public class PlaylistService {
 	// blank가 아님을 검증
 	private void validateNotBlank(String fieldName, String value) {
 		if (value != null && value.isBlank()) {
-			throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT)
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
 				.addDetail(fieldName, value);
 		}
 	}
 
 	private void validateAllRequestExistingOrNull(String normalizedTitle, String normalizedDescription) {
 		if (normalizedTitle == null && normalizedDescription == null) {
-			throw new PlaylistException(PlaylistErrorCode.NO_CHANGE_VALUE);
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_NO_CHANGE_VALUE);
 		}
 	}
 }

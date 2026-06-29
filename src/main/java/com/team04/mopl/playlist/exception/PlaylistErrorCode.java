@@ -9,8 +9,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum PlaylistErrorCode implements ErrorCode {
 
-	INVALID_INPUT(HttpStatus.BAD_REQUEST, "PL01", "잘못된 입력값입니다."),
-	NO_CHANGE_VALUE(HttpStatus.BAD_REQUEST, "PL02", "변경사항이 없습니다."),
+	PLAYLIST_INVALID_INPUT(HttpStatus.BAD_REQUEST, "PL01", "잘못된 입력값입니다."),
+	PLAYLIST_NO_CHANGE_VALUE(HttpStatus.BAD_REQUEST, "PL02", "변경사항이 없습니다."),
 	PLAYLIST_FORBIDDEN(HttpStatus.FORBIDDEN, "PL03", "플레이리스트 소유자가 아닙니다."),
 	PLAYLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PL04", "플레이리스트를 찾을 수 없습니다."),
 	PLAYLIST_UNSUBSCRIBED(HttpStatus.BAD_REQUEST, "PL05", "구독하지 않은 플레이리스트입니다."),

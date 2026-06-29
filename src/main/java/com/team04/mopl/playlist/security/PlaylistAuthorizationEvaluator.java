@@ -22,7 +22,7 @@ public class PlaylistAuthorizationEvaluator {
 	// 플레이리스트 소유자 여부 확인
 	public boolean isOwner(UUID playlistId, MoplUserDetails moplUserDetails) {
 		if (playlistId == null) {
-			throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT)
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
 				.addDetail("isPlaylistIdProvided", false);
 		}
 

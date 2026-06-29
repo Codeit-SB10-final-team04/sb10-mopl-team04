@@ -365,7 +365,7 @@ class PlaylistServiceTest {
 		// when, then
 		PlaylistException exception = assertThrows(PlaylistException.class,
 			() -> playlistService.updatePlaylist(playlistId, request, currentUserId));
-		assertEquals(PlaylistErrorCode.INVALID_INPUT, exception.getErrorCode());
+		assertEquals(PlaylistErrorCode.PLAYLIST_INVALID_INPUT, exception.getErrorCode());
 
 		verify(playlistRepository, never()).findByIdWithOwnerAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
@@ -398,7 +398,7 @@ class PlaylistServiceTest {
 		// when, then
 		PlaylistException exception = assertThrows(PlaylistException.class,
 			() -> playlistService.updatePlaylist(playlistId, request, currentUserId));
-		assertEquals(PlaylistErrorCode.NO_CHANGE_VALUE, exception.getErrorCode());
+		assertEquals(PlaylistErrorCode.PLAYLIST_NO_CHANGE_VALUE, exception.getErrorCode());
 
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository, never()).countAllSubscribersByPlaylistIds(anyList());
