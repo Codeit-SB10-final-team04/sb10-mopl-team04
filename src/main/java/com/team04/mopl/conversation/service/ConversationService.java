@@ -102,6 +102,7 @@ public class ConversationService {
 	public ConversationDto findConversationById(UUID conversationId) {
 
 		// 1. 유효성 검증: 대화 존재 여부
+		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
 		// 2. 대화 상대방 정보 조회
 
@@ -116,6 +117,13 @@ public class ConversationService {
 				throw new ConversationException(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS)
 					.addDetail("existingConversationId", conversationId);
 			});
+	}
+
+	// 대화 엔티티 반환
+	private Conversation getConversationEntityOrThrow(UUID conversationId) {
+		return conversationRepository.findById(conversationId)
+			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND)
+				.addDetail("conversationId", conversationId));
 	}
 
 	// 사용자 엔티티 반환
