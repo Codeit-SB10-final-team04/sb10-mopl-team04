@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
+import com.team04.mopl.conversation.exception.ConversationErrorCode;
+import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.repository.ConversationRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -24,14 +26,25 @@ public class ConversationService {
 		log.info("[CONVERSATION CREATE] 대화 생성 시작: requestUserid={}, withUserId={}",
 			currentUserId, conversationCreateRequest.withUserId());
 
-		// 1. 유효성 검증: 요청자 및 사용자 존재 여부
+		// 1. 유효성 검증: 개인 채팅방 생성 시도
+		validateSelfConversation(currentUserId, conversationCreateRequest.withUserId());
 
-		// 2. 유효성 검증: 개인 채팅방 생성 시도
+		// 2. 유효성 검증: 요청자 및 사용자 존재 여부
 
 		// 3. 유효성 검증: 중복 검사
 
 		// 3. 대화 생성 및 저장 (try-catch문으로 동시성 방어)
 
 		return null;
+	}
+
+	// 유효성 검증: 개인 채팅방 생성 검증
+	// TODO: Security 도입 시 @PreAuthorize 로 대체
+	private void validateSelfConversation(UUID requestUserId, UUID userId) {
+		if (requestUserId.equals(userId)) {
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_CANNOT_CHAT_WITH_SELF)
+				.addDetail("requestUserId", requestUserId)
+				.addDetail("userId", userId);
+		}
 	}
 }
