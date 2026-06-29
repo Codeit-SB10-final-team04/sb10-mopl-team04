@@ -31,4 +31,6 @@ public interface PlaylistSubscriptionRepository extends JpaRepository<PlaylistSu
 		@Param("playlistIds") List<UUID> playlistIds,
 		@Param("currentUserId") UUID currentUserId
 	);
+
+	boolean existsByPlaylistIdAndSubscriberId(UUID playlistId, UUID subscriberId);
 }
