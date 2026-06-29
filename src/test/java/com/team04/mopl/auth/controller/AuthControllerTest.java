@@ -130,10 +130,13 @@ class AuthControllerTest {
 		// when & then
 		mockMvc.perform(post("/api/auth/refresh")
 				.cookie(new Cookie("REFRESH_TOKEN", refreshToken)))
-			.andExpect(status().isOk());
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.accessToken").value(accessToken))
+			.andExpect(jsonPath("$.userDto.email").value("test@test.com"));
 
+		verify(authTokenService).refresh(refreshToken);
 		verify(refreshTokenCookieWriter).write(
-			any(MockHttpServletResponse.class),
+			any(HttpServletResponse.class),
 			eq(newRefreshToken)
 		);
 	}
