@@ -13,11 +13,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
@@ -28,7 +31,13 @@ import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
 import com.team04.mopl.playlist.service.PlaylistService;
 
-@WebMvcTest(PlaylistController.class)
+@WebMvcTest(
+	controllers = PlaylistController.class,
+	excludeFilters = @ComponentScan.Filter( // 컨트롤러 테스트에서 JWT 인증 필터 제외
+		type = FilterType.ASSIGNABLE_TYPE,
+		classes = JwtAuthenticationFilter.class
+	)
+)
 @AutoConfigureMockMvc(addFilters = false)
 class PlaylistControllerTest {
 

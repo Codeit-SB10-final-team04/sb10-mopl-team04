@@ -44,3 +44,6 @@ out/
 .logs/
 logs/
 thumbnails/
+
+### Generated Sources ###
+src/main/generated/
