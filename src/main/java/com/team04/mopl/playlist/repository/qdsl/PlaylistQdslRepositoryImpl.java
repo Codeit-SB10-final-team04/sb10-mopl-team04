@@ -1,4 +1,4 @@
-package com.team04.mopl.playlist.repository.impl;
+package com.team04.mopl.playlist.repository.qdsl;
 
 import static com.team04.mopl.playlist.entity.QPlaylist.*;
 import static com.team04.mopl.playlist.entity.QPlaylistSubscription.*;
@@ -30,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 
 @Repository
 @RequiredArgsConstructor
-public class PlaylistQueryRepositoryImpl implements PlaylistQueryRepository {
+public class PlaylistQdslRepositoryImpl implements PlaylistQueryRepository {
 
 	private final JPAQueryFactory jpaQueryFactory;
 

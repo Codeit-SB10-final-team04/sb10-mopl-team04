@@ -1,4 +1,4 @@
-package com.team04.mopl.playlist.repository.impl;
+package com.team04.mopl.playlist.repository.qdsl;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,7 +31,7 @@ import com.team04.mopl.playlist.repository.PlaylistRepository;
 	"spring.sql.init.schema-locations=classpath:schema-h2-playlist_querydsl-test.sql"
 })
 @Import(QuerydslConfig.class)
-class PlaylistQueryRepositoryImplTest {
+class PlaylistQdslRepositoryImplTest {
 
 	@Autowired
 	private PlaylistRepository playlistRepository;
