@@ -184,7 +184,7 @@ class PlaylistQdslRepositoryImplTest {
 		// given
 		PlaylistSearchRequest request = new PlaylistSearchRequest(
 			"설명",
-			null, null, null, playlist1,
+			null, null, null, null,
 			5,
 			SortDirection.DESCENDING,
 			PlaylistSortBy.updatedAt
