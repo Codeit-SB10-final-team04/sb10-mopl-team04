@@ -10,6 +10,8 @@ import com.team04.mopl.conversation.dto.response.ConversationDto;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.repository.ConversationRepository;
+import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ConversationService {
 
 	private final ConversationRepository conversationRepository;
+	private final UserRepository userRepository;
 
 	public ConversationDto createConversation(ConversationCreateRequest conversationCreateRequest, UUID currentUserId) {
 		log.info("[CONVERSATION CREATE] 대화 생성 시작: requestUserid={}, withUserId={}",
@@ -30,6 +33,8 @@ public class ConversationService {
 		validateSelfConversation(currentUserId, conversationCreateRequest.withUserId());
 
 		// 2. 유효성 검증: 요청자 및 사용자 존재 여부
+		User requestUser = getUserEntityOrThrow(currentUserId);
+		User withUser = getUserEntityOrThrow(conversationCreateRequest.withUserId());
 
 		// 3. 유효성 검증: 중복 검사
 
@@ -46,5 +51,14 @@ public class ConversationService {
 				.addDetail("requestUserId", requestUserId)
 				.addDetail("userId", userId);
 		}
+	}
+
+	// 사용자 엔티티 반환
+	private User getUserEntityOrThrow(UUID userId) {
+		return userRepository.findById(userId)
+			// TODO: User 도메인의 최상위 예외 클래스 구현 시 주석 제거 예정
+			.orElseThrow(/*() -> new Userxception(
+				UserErrorCode
+			)*/);
 	}
 }
