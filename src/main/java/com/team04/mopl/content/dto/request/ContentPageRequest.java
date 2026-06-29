@@ -5,7 +5,6 @@ import java.util.UUID;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 
 public record ContentPageRequest(
 	String typeEqual, // movie, tv_series, sports
@@ -16,9 +15,15 @@ public record ContentPageRequest(
 	@Min(1)
 	@Max(100)
 	Integer limit, // 기본값: 20
-	@NotBlank(message = "정렬 방향은 필수입니다.")
-	String sortDirection, // DESCENDING
-	@NotBlank(message = "정렬 기준은 필수입니다.")
-	String sortBy // 기본값: watcherCount
+	String sortDirection,
+	String sortBy
 ) {
+	public ContentPageRequest {
+		if (sortBy == null || sortBy.isBlank()) {
+			sortBy = "watcherCount";
+		}
+		if (sortDirection == null || sortDirection.isBlank()) {
+			sortDirection = "DESCENDING";
+		}
+	}
 }
