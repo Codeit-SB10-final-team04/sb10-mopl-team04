@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.team04.mopl.content.batch.step.EventDetailItemProcessor;
 import com.team04.mopl.content.batch.step.EventDetailItemReader;
 import com.team04.mopl.content.batch.step.EventDetailItemWriter;
+import com.team04.mopl.content.batch.step.EventDetailNotFoundException;
 import com.team04.mopl.content.batch.step.LeagueCollectTasklet;
 import com.team04.mopl.content.batch.step.MatchListCollectTasklet;
 
@@ -94,7 +95,8 @@ public class SportsDataBatchConfig {
 
 	/**
 	 * Step 3: 경기 상세 조회 → chunk 단위 DB 저장
-	 * faultTolerant + skip 으로 개별 경기 API 실패 시 해당 건만 넘어간다.
+	 * faultTolerant + skip 으로 개별 경기 API 조회 실패(EventDetailNotFoundException)만 넘어간다.
+	 * DB 오류 등 예상치 못한 예외는 step 실패로 처리된다.
 	 */
 	@Bean
 	public Step eventDetailCollectStep(
@@ -108,7 +110,7 @@ public class SportsDataBatchConfig {
 			.processor(eventDetailItemProcessor)
 			.writer(eventDetailItemWriter)
 			.faultTolerant()
-			.skip(Exception.class)
+			.skip(EventDetailNotFoundException.class)
 			.skipLimit(50)
 			.build();
 	}
