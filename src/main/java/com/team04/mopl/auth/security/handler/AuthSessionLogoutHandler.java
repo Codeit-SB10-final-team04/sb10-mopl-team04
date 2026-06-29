@@ -64,11 +64,13 @@ public class AuthSessionLogoutHandler implements LogoutHandler {
 			return Optional.empty();
 		}
 
-		if (!authorizationHeader.startsWith(BEARER_PREFIX)) {
+		String trimmedAuthorizationHeader = authorizationHeader.trim();
+
+		if (!trimmedAuthorizationHeader.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
 			return Optional.empty();
 		}
 
-		String accessToken = authorizationHeader.substring(BEARER_PREFIX.length());
+		String accessToken = trimmedAuthorizationHeader.substring(BEARER_PREFIX.length()).trim();
 
 		if (accessToken.isBlank()) {
 			return Optional.empty();

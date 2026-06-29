@@ -2,6 +2,7 @@ package com.team04.mopl.auth.security.handler;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,6 +13,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -109,6 +111,67 @@ class AuthSessionLogoutHandlerTest {
 		verifyNoInteractions(jwtTokenProvider);
 		verifyNoInteractions(authSessionStore);
 	}
+
+	@Test
+	@DisplayName("Authorization scheme이 소문자 bearer여도 인증 세션을 삭제한다")
+	void logout_deletesAuthSession_whenAuthorizationSchemeIsLowerCaseBearer() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID sessionId = UUID.randomUUID();
+		String accessToken = "access-token";
+
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.addHeader(HttpHeaders.AUTHORIZATION, "bearer " + accessToken);
+
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		JwtAuthenticationClaims claims = new JwtAuthenticationClaims(
+			userId,
+			sessionId,
+			"test@test.com",
+			UserRole.USER
+		);
+
+		given(jwtTokenProvider.parseAccessToken(accessToken)).willReturn(claims);
+
+		// when
+		authSessionLogoutHandler.logout(request, response, null);
+
+		// then
+		verify(jwtTokenProvider).parseAccessToken(accessToken);
+		verify(authSessionStore).delete(userId, sessionId);
+	}
+
+	@Test
+	@DisplayName("Bearer와 Access Token 사이에 공백이 여러 개 있어도 인증 세션을 삭제한다")
+	void logout_deletesAuthSession_whenAuthorizationHeaderHasMultipleSpaces() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID sessionId = UUID.randomUUID();
+		String accessToken = "access-token";
+
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer    " + accessToken);
+
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		JwtAuthenticationClaims claims = new JwtAuthenticationClaims(
+			userId,
+			sessionId,
+			"test@test.com",
+			UserRole.USER
+		);
+
+		given(jwtTokenProvider.parseAccessToken(accessToken)).willReturn(claims);
+
+		// when
+		authSessionLogoutHandler.logout(request, response, null);
+
+		// then
+		verify(jwtTokenProvider).parseAccessToken(accessToken);
+		verify(authSessionStore).delete(userId, sessionId);
+	}
+
 
 	@Test
 	@DisplayName("Access Token이 유효하지 않아도 예외를 전파하지 않는다")
