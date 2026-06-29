@@ -1,13 +1,18 @@
 package com.team04.mopl.content.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.team04.mopl.common.dto.CursorPageResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
+import com.team04.mopl.content.dto.request.ContentPageRequest;
+import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentTag;
@@ -90,6 +95,59 @@ public class ContentService {
 			}
 			throw e;
 		}
+	}
+
+	public CursorPageResponse<ContentDto> getContents(ContentPageRequest req) {
+		int limit = req.limit() != null ? req.limit() : 20;
+		String sortBy = req.sortBy() != null ? req.sortBy() : "watcherCount";
+		String sortDirection = req.sortDirection() != null ? req.sortDirection() : "DESC";
+
+		// limit + 1개 조회로 다음 페이지 존재 여부 판별
+		List<Content> fetched = contentRepository.findContents(req);
+
+		boolean hasNext = fetched.size() > limit;
+		List<Content> page = hasNext ? fetched.subList(0, limit) : fetched;
+
+		// 태그 일괄 조회
+		List<UUID> contentIds = page.stream().map(Content::getId).toList();
+		Map<UUID, List<String>> tagMap = buildTagMap(contentIds);
+
+		List<ContentDto> data = page.stream()
+			.map(c -> contentMapper.toDto(c, tagMap.getOrDefault(c.getId(), List.of())))
+			.toList();
+
+		// 다음 커서 추출
+		String nextCursor = null;
+		String nextIdAfter = null;
+		if (hasNext) {
+			Content last = page.get(page.size() - 1);
+			nextCursor = extractCursor(last, sortBy);
+			nextIdAfter = last.getId().toString();
+		}
+
+		long totalCount = contentRepository.countContents(req);
+
+		return new CursorPageResponse<>(data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, sortDirection);
+	}
+
+	private Map<UUID, List<String>> buildTagMap(List<UUID> contentIds) {
+		if (contentIds.isEmpty()) {
+			return Map.of();
+		}
+		return contentTagRepository.findTagNamesByContentIds(contentIds)
+			.stream()
+			.collect(Collectors.groupingBy(
+				TagRow::contentId,
+				Collectors.mapping(TagRow::tagName, Collectors.toList())
+			));
+	}
+
+	private String extractCursor(Content content, String sortBy) {
+		return switch (sortBy) {
+			case "averageRating" -> content.getAverageRating().toPlainString();
+			case "createdAt" -> content.getCreatedAt().toString();
+			default -> String.valueOf(content.getWatcherCount());
+		};
 	}
 
 	// content 조회 메서드
