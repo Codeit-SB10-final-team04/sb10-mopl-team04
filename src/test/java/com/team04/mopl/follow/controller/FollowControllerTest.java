@@ -28,6 +28,8 @@ import com.team04.mopl.follow.exception.FollowErrorCode;
 import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.service.FollowService;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 
 @WebMvcTest(
 	controllers = FollowController.class,
@@ -205,22 +207,22 @@ class FollowControllerTest {
 			.andExpect(status().isBadRequest());
 	}
 
-	// @Test
-	// @DisplayName("실패: 서비스 계층에서 유저를 찾지 못한 예외가 올라오면 알맞은 에러 코드를 반환한다.")
-	// void getFollowerCount_UserNotFound_Return404_Fail() throws Exception {
-	// 	// given
-	// 	UUID invalidFolloweeId = UUID.randomUUID();
-	//
-	// 	given(followService.getFollowerCount(any(FollowRequest.class)))
-	// 		.willThrow(new UserException(UserErrorCode.USER_NOT_FOUND));
-	//
-	// 	// when & then
-	// 	// 프로젝트 GlobalExceptionHandler 세팅에 맞게 isNotFound() 등 확인
-	// 	mockMvc.perform(get("/api/follows/count")
-	// 			.param("followeeId", invalidFolloweeId.toString())
-	// 			.contentType(MediaType.APPLICATION_JSON))
-	// 		.andExpect(status().isNotFound());
-	// }
+	@Test
+	@DisplayName("실패: 서비스 계층에서 유저를 찾지 못한 예외가 올라오면 알맞은 에러 코드를 반환한다.")
+	void getFollowerCount_UserNotFound_Return404_Fail() throws Exception {
+		// given
+		UUID invalidFolloweeId = UUID.randomUUID();
+
+		given(followService.getFollowerCount(eq(invalidFolloweeId)))
+			.willThrow(new UserException(UserErrorCode.USER_NOT_FOUND));
+
+		// when & then
+		// 프로젝트 GlobalExceptionHandler 세팅에 맞게 isNotFound() 등 확인
+		mockMvc.perform(get("/api/follows/count")
+				.param("followeeId", invalidFolloweeId.toString())
+				.contentType(MediaType.APPLICATION_JSON))
+			.andExpect(status().isNotFound());
+	}
 
 	/*
 	=========================

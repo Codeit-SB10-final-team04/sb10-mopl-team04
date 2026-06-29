@@ -25,10 +25,9 @@ import com.team04.mopl.follow.mapper.FollowMapper;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
-
-// import com.team04.mopl.user.exception.UserErrorCode;
-// import com.team04.mopl.user.exception.UserException;
 
 @ExtendWith(MockitoExtension.class)
 class FollowServiceTest {
@@ -90,26 +89,26 @@ class FollowServiceTest {
 		verify(followRepository, times(1)).save(mockFollow);
 	}
 
-	// @Test
-	// @DisplayName("실패: 팔로우 대상(Followee)이 존재하지 않으면 예외가 발생한다.")
-	// void createFollow_FolloweeNotFound_Fail() {
-	//     // given
-	//     UUID requestUserId = UUID.randomUUID();
-	//     MoplUserDetails userDetails = MoplUserDetails.authenticated(
-	// 			requestUserId,
-	// 			"test@test.com",
-	// 			UserRole.USER
-	// 		);
-	//     UUID followeeId = UUID.randomUUID();
-	//     FollowRequest request = new FollowRequest(followeeId);
-	//
-	//     given(userRepository.findById(followeeId)).willReturn(Optional.empty());
-	//
-	//     // when & then
-	//     // TODO: User 도메인의 최상위 예외 클래스 구현 시 주석 제거 예정
-	//     assertThatThrownBy(() -> followService.createFollow(request, userDetails))
-	//        .isInstanceOf(/*UserException.class*/);
-	// }
+	@Test
+	@DisplayName("실패: 팔로우 대상(Followee)이 존재하지 않으면 예외가 발생한다.")
+	void createFollow_FolloweeNotFound_Fail() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		UUID followeeId = UUID.randomUUID();
+		FollowRequest request = new FollowRequest(followeeId);
+
+		given(userRepository.findById(followeeId)).willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> followService.createFollow(request, userDetails))
+			.isInstanceOf(UserException.class)
+			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
+	}
 
 	@Test
 	@DisplayName("실패: 이미 팔로우 중인 대상이면 FollowException이 발생한다.")
@@ -222,29 +221,28 @@ class FollowServiceTest {
 		verify(followRepository, times(1)).findByFolloweeIdAndFollowerId(followeeId, requestUserId);
 	}
 
-	// @Test
-	// @DisplayName("실패: 팔로우 대상(Followee)이 존재하지 않으면 예외가 발생한다.")
-	// void isFollowing_UserNotFound_Fail() {
-	//     // given
-	//     UUID requestUserId = UUID.randomUUID();
-	//     MoplUserDetails userDetails = MoplUserDetails.authenticated(
-	// 			requestUserId,
-	// 			"test@test.com",
-	// 			UserRole.USER
-	// 		);
-	//     UUID followeeId = UUID.randomUUID();
-	//
-	//     // 타겟 유저 조회 시 Optional.empty() 반환
-	//     given(userRepository.findById(followeeId)).willReturn(Optional.empty());
-	//
-	//     // when & then
-	//     // TODO: 향후 User 도메인 예외 도입 시 해당 예외 타입으로 검증 강화
-	//     assertThatThrownBy(() -> followService.isFollowing(followeeId, userDetails))
-	//        .isInstanceOf();
-	//
-	//     // 유저가 없으면 팔로우 조회 쿼리가 실행되지 않아야 함 (조기 차단 검증)
-	//     verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
-	// }
+	@Test
+	@DisplayName("실패: 팔로우 대상(Followee)이 존재하지 않으면 예외가 발생한다.")
+	void isFollowing_UserNotFound_Fail() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		UUID followeeId = UUID.randomUUID();
+
+		// 타겟 유저 조회 시 Optional.empty() 반환
+		given(userRepository.findById(followeeId)).willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, userDetails))
+			.isInstanceOf(UserException.class)
+			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
+
+		verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
+	}
 
 	@Test
 	@DisplayName("실패: 팔로우 관계가 존재하지 않으면 FOLLOW_NOT_FOUND 예외가 발생한다.")
@@ -302,20 +300,21 @@ class FollowServiceTest {
 		verify(followRepository).countByFolloweeId(followeeId);
 	}
 
-	// @Test
-	// @DisplayName("실패: 조회하려는 유저가 존재하지 않으면 예외가 발생한다.")
-	// void getFollowerCount_UserNotFound_ThrowException_Fail() {
-	//     // given
-	//     UUID invalidUserId = UUID.randomUUID();
-	//     FollowRequest request = new FollowRequest(invalidUserId);
-	//
-	//     given(userRepository.findById(invalidUserId)).willReturn(Optional.empty());
-	//
-	//     // when & then
-	//     assertThatThrownBy(() -> followService.getFollowerCount(request))
-	//        .isInstanceOf(UserException.class)
-	//        .hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
-	// }
+	@Test
+	@DisplayName("실패: 조회하려는 유저가 존재하지 않으면 UserException이 발생한다.")
+	void getFollowerCount_UserNotFound_Fail() {
+		// given
+		UUID invalidUserId = UUID.randomUUID();
+
+		given(userRepository.findById(invalidUserId)).willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> followService.getFollowerCount(invalidUserId))
+			.isInstanceOf(UserException.class)
+			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
+
+		verify(userRepository, times(1)).findById(invalidUserId);
+	}
 
 	/*
 	==================
