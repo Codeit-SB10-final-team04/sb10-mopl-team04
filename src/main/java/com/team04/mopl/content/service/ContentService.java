@@ -12,8 +12,8 @@ import org.springframework.web.multipart.MultipartFile;
 import com.team04.mopl.common.dto.CursorPageResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
-import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.dto.response.ContentDto;
+import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentTag;
 import com.team04.mopl.content.entity.ContentType;
@@ -130,6 +130,7 @@ public class ContentService {
 		return new CursorPageResponse<>(data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, sortDirection);
 	}
 
+	// contentIds로 태그명 조회 메서드
 	private Map<UUID, List<String>> buildTagMap(List<UUID> contentIds) {
 		if (contentIds.isEmpty()) {
 			return Map.of();
@@ -142,6 +143,7 @@ public class ContentService {
 			));
 	}
 
+	// cursor 추출 메서드
 	private String extractCursor(Content content, String sortBy) {
 		return switch (sortBy) {
 			case "averageRating" -> content.getAverageRating().toPlainString();
