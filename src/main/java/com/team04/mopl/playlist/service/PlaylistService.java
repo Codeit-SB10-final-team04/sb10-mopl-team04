@@ -99,9 +99,6 @@ public class PlaylistService {
 		log.debug("[PLAYLIST_FIND] 플레이리스트 단건 조회 시작: currentUserId={}, playlistId={}",
 			currentUserId, playlistId);
 
-		// 현재 로그인한 인증된 사용자 조회
-		getUserOrThrow(currentUserId);
-
 		// 삭제되지 않은 플레이리스트를 소유자 정보와 함께 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
 
@@ -127,9 +124,6 @@ public class PlaylistService {
 			"[PLAYLIST_FIND_ALL] 플레이리스트 목록 조회 시작: keyword={}, ownerIdEqual={}, subscriberIdEqual={}, cursor={}, idAfter={}, limit={}, sortDirection={}, sortBy={}",
 			request.normalizedKeyword(), request.ownerIdEqual(), request.subscriberIdEqual(), request.cursor(),
 			request.idAfter(), limit, sortDirection, sortBy);
-
-		// 현재 로그인한 인증된 사용자 조회
-		getUserOrThrow(currentUserId);
 
 		// 조건에 따라 플레이리스트 목록 조회
 		// 정렬 조건에 구독자 수 포함 -> 플레이리스트 조회 시 구독자 수도 같이 조회
