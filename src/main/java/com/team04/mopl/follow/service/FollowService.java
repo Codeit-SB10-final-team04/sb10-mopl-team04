@@ -3,9 +3,11 @@ package com.team04.mopl.follow.service;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
 import com.team04.mopl.follow.entity.Follow;
@@ -14,6 +16,8 @@ import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -32,16 +36,17 @@ public class FollowService {
 
 	// 팔로우 생성
 	@Transactional
-	public FollowDto createFollow(FollowRequest followRequest, UUID currentUserId) {
+	@PreAuthorize("#followRequest.followeeId() != #moplUserDetails.userId")
+	public FollowDto createFollow(FollowRequest followRequest, MoplUserDetails moplUserDetails) {
+		// 1. 로그인 정보로부터 요청자 ID 추출
+		UUID requestUserId = moplUserDetails.getUserId();
+
 		log.info("[FOLLOW_CREATE] 팔로우 생성 시작: followeeId={}, followerId={}",
-			followRequest.followeeId(), currentUserId);
+			followRequest.followeeId(), requestUserId);
 
-		// 1. 유효성 검증: 로그인 사용자(팔로워) 및 팔로우 대상 존재 여부
+		// 2. 유효성 검증: 로그인 사용자(팔로워) 및 팔로우 대상 존재 여부
 		User followeeUser = getUserEntityOrThrow(followRequest.followeeId());
-		User followerUser = getUserEntityOrThrow(currentUserId);
-
-		// 2. 유효성 검증: 본인 팔로우 검사
-		validateSelfFollow(followeeUser.getId(), followerUser.getId());
+		User followerUser = getUserEntityOrThrow(requestUserId);
 
 		// 3. 유효성 검증: 중복 팔로우 검사
 		validateDuplicateFollow(followeeUser.getId(), followerUser.getId());
@@ -66,20 +71,23 @@ public class FollowService {
 	}
 
 	// 사용자의 특정 사용자 팔로우 여부 조회
-	public FollowDto getFollowConnection(UUID followeeId, UUID currentUserId) {
-		log.debug("[FOLLOW_FIND_IS_FOLLWING] 특정 사용자 팔로우 여부 조회 시작: followeeId={}, userId={}",
-			followeeId, currentUserId);
+	public FollowDto getFollowConnection(UUID followeeId, MoplUserDetails moplUserDetails) {
+		// 1. 로그인 정보로부터 요청자 ID 추출
+		UUID requestUserId = moplUserDetails.getUserId();
 
-		// 1. 유효성 검증: 요청자와 특정 사용자 존재 여부
+		log.debug("[FOLLOW_FIND_IS_FOLLWING] 특정 사용자 팔로우 여부 조회 시작: followeeId={}, requestUserId={}",
+			followeeId, requestUserId);
+
+		// 2. 유효성 검증: 요청자와 특정 사용자 존재 여부
 		User targetUser = getUserEntityOrThrow(followeeId);          // 특정 사용자
-		User requestedUser = getUserEntityOrThrow(currentUserId);    // 요청자
+		User requestedUser = getUserEntityOrThrow(requestUserId);    // 요청자
 
-		// 2. 팔로우 여부 조회
+		// 3. 팔로우 여부 조회
 		Follow followConnection = getFollowEntityByFolloweeIdAndFollowerIdOrThrow(targetUser.getId(),
 			requestedUser.getId());
 
-		log.debug("[FOLLOW_FIND_IS_FOLLWING] 특정 사용자 팔로우 여부 조회 완료: followId={}. followeeId={}, userId={}",
-			followConnection.getId(), followeeId, currentUserId);
+		log.debug("[FOLLOW_FIND_IS_FOLLWING] 특정 사용자 팔로우 여부 조회 완료: followId={}. followeeId={}, requestUserId={}",
+			followConnection.getId(), followeeId, requestUserId);
 
 		return followMapper.toDto(followConnection);
 	}
@@ -101,16 +109,19 @@ public class FollowService {
 
 	// 팔로우 취소
 	@Transactional
-	public void deleteFollow(UUID followId, UUID currentUserId) {
+	public void deleteFollow(UUID followId, MoplUserDetails moplUserDetails) {
+		// 1. 로그인 정보로부터 요청자 ID 추출
+		UUID requestUserId = moplUserDetails.getUserId();
+
 		log.info("[FOLLOW_DELETE] 팔로우 취소 시작: followId={}", followId);
 
-		// 1. 유효성 검증: 팔로우 존재
+		// 2. 유효성 검증: 팔로우 존재
 		Follow targetFollow = getFollowEntityOrThrow(followId);
 
-		// 2. 유효성 검증: 팔로우 소유자
-		validateFollowOwner(targetFollow, currentUserId);
+		// 3. 유효성 검증: 팔로우 소유자
+		validateFollowOwner(targetFollow, requestUserId);
 
-		// 3. 팔로우 삭제 (Hard Delete)
+		// 4. 팔로우 삭제 (Hard Delete)
 		followRepository.delete(targetFollow);
 
 		log.info("[FOLLOW_DELETE] 팔로우 취소 완료: followId={}", followId);
@@ -125,18 +136,7 @@ public class FollowService {
 		}
 	}
 
-	// 유효성 검증: 본인 팔로우 검사
-	// TODO: Security 도입 시 @PreAuthorize 로 대체
-	private void validateSelfFollow(UUID followeeId, UUID followerId) {
-		if (followerId.equals(followeeId)) {
-			throw new FollowException(FollowErrorCode.FOLLOW_SELF_NOT_ALLOWED)
-				.addDetail("followeeId", followeeId)
-				.addDetail("followerId", followerId);
-		}
-	}
-
 	// 유효성 검증: 팔로우 소유자 검사
-	// TODO: Security 도입 시 @PreAuthorize 로 대체
 	private void validateFollowOwner(Follow follow, UUID requestedUserId) {
 		if (!follow.getFollower().getId().equals(requestedUserId)) {
 			throw new FollowException(FollowErrorCode.FOLLOW_ACCESS_DENIED)
@@ -148,10 +148,8 @@ public class FollowService {
 	// 사용자 엔티티 반환
 	private User getUserEntityOrThrow(UUID userId) {
 		return userRepository.findById(userId)
-			// TODO: User 도메인의 최상위 예외 클래스 구현 시 주석 제거 예정
-			.orElseThrow(/*() -> new Userxception(
-				UserErrorCode
-			)*/);
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
+				.addDetail("userId", userId));
 	}
 
 	// 팔로우 엔티티 반환 (팔로우 Id)
