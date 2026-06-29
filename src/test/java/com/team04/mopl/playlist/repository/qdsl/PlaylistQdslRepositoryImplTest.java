@@ -69,7 +69,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findPlaylists(request);
+		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertEquals(2, result.playlistRows().size());
@@ -95,7 +95,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findPlaylists(request);
+		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertThat(result.playlistRows())
@@ -120,7 +120,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findPlaylists(request);
+		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertThat(result.playlistRows())
@@ -144,7 +144,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findPlaylists(request);
+		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertThat(result.playlistRows())
@@ -166,7 +166,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findPlaylists(request);
+		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertThat(result.playlistRows())
@@ -176,6 +176,30 @@ class PlaylistQdslRepositoryImplTest {
 			.extracting(row -> row.subscriberCount())
 			.containsExactly(1L);
 		assertEquals(3L, result.totalCount());
+	}
+
+	@Test
+	@DisplayName("keywordLike 쿼리 파리미터가 있으면 해당 keywordLike를 제목이나 설명에 포함한 데이터를 조회한다.")
+	void findPlaylists_returnCursorPage_whenInputKeywordLike() {
+		// given
+		PlaylistSearchRequest request = new PlaylistSearchRequest(
+			"설명",
+			null, null, null, playlist1,
+			5,
+			SortDirection.DESCENDING,
+			PlaylistSortBy.updatedAt
+		);
+
+		// when
+		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
+
+		// then
+		assertThat(result.playlistRows())
+			.extracting(row -> row.playlist().getId())
+			.containsExactly(playlist1, playlist2);
+		assertThat(result.playlistRows())
+			.extracting(row -> row.playlist().getDescription())
+			.containsExactly("영화 설명", "드라마 설명");
 	}
 
 	private void insertFixtures() {

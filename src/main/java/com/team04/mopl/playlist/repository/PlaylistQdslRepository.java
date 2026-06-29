@@ -5,5 +5,5 @@ import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
 
 public interface PlaylistQdslRepository {
 
-	PlaylistCursorPage findPlaylists(PlaylistSearchRequest request);
+	PlaylistCursorPage findAllPlaylists(PlaylistSearchRequest request);
 }

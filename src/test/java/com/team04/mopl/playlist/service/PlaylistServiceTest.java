@@ -651,7 +651,7 @@ class PlaylistServiceTest {
 
 		when(userRepository.findById(currentUserId))
 			.thenReturn(Optional.of(currentUser));
-		when(playlistRepository.findPlaylists(request))
+		when(playlistRepository.findAllPlaylists(request))
 			.thenReturn(playlistCursorPage);
 		when(playlistSubscriptionRepository.findSubscribedPlaylistIds(
 			List.of(playlistId1, playlistId2),
@@ -685,7 +685,7 @@ class PlaylistServiceTest {
 		assertEquals(SortDirection.DESCENDING, result.sortDirection());
 
 		verify(userRepository).findById(currentUserId);
-		verify(playlistRepository).findPlaylists(request);
+		verify(playlistRepository).findAllPlaylists(request);
 		verify(playlistSubscriptionRepository).findSubscribedPlaylistIds(
 			List.of(playlistId1, playlistId2),
 			currentUserId
@@ -739,7 +739,7 @@ class PlaylistServiceTest {
 
 		when(userRepository.findById(currentUserId))
 			.thenReturn(Optional.of(currentUser));
-		when(playlistRepository.findPlaylists(request))
+		when(playlistRepository.findAllPlaylists(request))
 			.thenReturn(playlistCursorPage);
 
 		// when
@@ -755,7 +755,7 @@ class PlaylistServiceTest {
 		assertEquals(SortDirection.DESCENDING, result.sortDirection());
 
 		verify(userRepository).findById(currentUserId);
-		verify(playlistRepository).findPlaylists(request);
+		verify(playlistRepository).findAllPlaylists(request);
 	}
 
 	@Test

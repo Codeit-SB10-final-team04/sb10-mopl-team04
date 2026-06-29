@@ -132,7 +132,7 @@ public class PlaylistService {
 
 		// 조건에 따라 플레이리스트 목록 조회
 		// 정렬 조건에 구독자 수 포함 -> 플레이리스트 조회 시 구독자 수도 같이 조회
-		PlaylistCursorPage playlistCursorPage = playlistRepository.findPlaylists(request);
+		PlaylistCursorPage playlistCursorPage = playlistRepository.findAllPlaylists(request);
 
 		List<UUID> playlistIds = playlistCursorPage.playlistRows().stream()
 			.map(row -> row.playlist().getId())
@@ -162,7 +162,7 @@ public class PlaylistService {
 
 		// 조회된 플레이리스트 수
 		int playlistDtoListSize = playlistDtoList.size();
-		Boolean hasNext = playlistCursorPage.hasNext();
+		boolean hasNext = playlistCursorPage.hasNext();
 
 		// 마지막 요소
 		PlaylistDto lastPlaylistDto = playlistDtoList.isEmpty()
