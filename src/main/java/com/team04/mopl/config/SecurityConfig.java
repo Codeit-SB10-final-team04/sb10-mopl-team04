@@ -11,7 +11,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,9 +23,11 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import com.team04.mopl.auth.security.csrf.SpaCsrfTokenRequestHandler;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.auth.security.handler.AuthSessionLogoutHandler;
 import com.team04.mopl.auth.security.handler.LoginFailureHandler;
@@ -54,8 +55,10 @@ public class SecurityConfig {
 		RestAccessDeniedHandler restAccessDeniedHandler
 	) throws Exception {
 		return http
-			// CSRF 토큰 발급 API는 아직 구현 전이므로 현재는 비활성화
-			.csrf(AbstractHttpConfigurer::disable)
+			// CSRF 토큰 발급
+			.csrf(csrf -> csrf
+				.csrfTokenRepository(csrfTokenRepository())
+				.csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
 
 			// 서버 세션을 생성하지 않도록 설정
 			.sessionManagement(session -> session
@@ -94,10 +97,17 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll() // 로그인
 				.requestMatchers(HttpMethod.POST, "/api/auth/sign-out").permitAll() // 로그아웃
 				.requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll() // 토큰 재발급
+				.requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll() // CSRF 토큰 조회
 				.requestMatchers(
 					"/swagger-ui/**",
 					"/v3/api-docs/**",
-					"/actuator/health"
+					"/actuator/health",
+					"/api/sse",
+					"/thumbnails/**",
+					"/",
+					"/index.html",
+					"/favicon.svg",
+					"/assets/**"
 				).permitAll()
 				.anyRequest().authenticated())
 
@@ -140,6 +150,18 @@ public class SecurityConfig {
 		);
 
 		return jwtDecoder;
+	}
+
+	// CSRF 토큰을 XSRF-TOKEN 쿠키와 X-XSRF-TOKEN 헤더로 주고받도록 설정
+	@Bean
+	public CookieCsrfTokenRepository csrfTokenRepository() {
+		CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+
+		repository.setCookieName("XSRF-TOKEN");
+		repository.setHeaderName("X-XSRF-TOKEN");
+		repository.setCookiePath("/");
+
+		return repository;
 	}
 
 	// JWT 서명과 검증에 사용할 SecretKey 생성

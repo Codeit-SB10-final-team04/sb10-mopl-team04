@@ -49,8 +49,13 @@ public class Notification extends BaseEntity {
 	private Instant readAt;
 
 	@Builder
-	protected Notification(User receiver, String title, String content, NotificationType type,
-		NotificationLevel level) {
+	protected Notification(
+		User receiver,
+		String title,
+		String content,
+		NotificationType type,
+		NotificationLevel level
+	) {
 		this.receiver = receiver;
 		this.title = title;
 		this.content = content;

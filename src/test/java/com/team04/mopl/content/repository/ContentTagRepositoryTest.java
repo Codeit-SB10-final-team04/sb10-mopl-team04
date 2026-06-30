@@ -93,4 +93,26 @@ class ContentTagRepositoryTest {
 		assertThat(result).hasSize(2);
 		assertThat(result).containsExactlyInAnyOrder("액션", "드라마");
 	}
+
+	// ========== existsByContentAndTag ==========
+
+	@Test
+	@DisplayName("콘텐츠와 태그 연결이 존재하면 true를 반환한다")
+	void existsByContentAndTag_returnTrue_whenRelationExists() {
+		// when
+		boolean result = contentTagRepository.existsByContentAndTag(content1, tag1);
+
+		// then
+		assertThat(result).isTrue();
+	}
+
+	@Test
+	@DisplayName("콘텐츠와 태그 연결이 존재하지 않으면 false를 반환한다")
+	void existsByContentAndTag_returnFalse_whenRelationNotExists() {
+		// when: content1에는 tag3이 없음
+		boolean result = contentTagRepository.existsByContentAndTag(content1, tag3);
+
+		// then
+		assertThat(result).isFalse();
+	}
 }

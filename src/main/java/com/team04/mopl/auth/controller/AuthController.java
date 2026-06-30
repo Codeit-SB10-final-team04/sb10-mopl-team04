@@ -2,6 +2,7 @@ package com.team04.mopl.auth.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,6 +39,13 @@ public class AuthController implements AuthControllerDocs {
 		refreshTokenCookieWriter.write(response, result.refreshToken());
 
 		return ResponseEntity.status(HttpStatus.OK).body(result.jwtDto());
+	}
+
+	// CSRF 토큰 조회
+	@Override
+	@GetMapping("/api/auth/csrf-token")
+	public ResponseEntity<Void> getCsrfToken() {
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 	}
 
 	// 요청 쿠키에서 refresh token 값을 추출
