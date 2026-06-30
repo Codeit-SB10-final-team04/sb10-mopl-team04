@@ -293,6 +293,7 @@ class ConversationServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
+		verifyNoInteractions(directMessageMapper);
 	}
 
 	@Test

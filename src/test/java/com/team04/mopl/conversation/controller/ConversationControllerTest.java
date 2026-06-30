@@ -132,7 +132,8 @@ class ConversationControllerTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(request)))
 			.andDo(print())
-			.andExpect(status().isConflict());
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS.getMessage()));
 	}
 
 	/*
@@ -197,7 +198,8 @@ class ConversationControllerTest {
 		mockMvc.perform(get("/api/conversations/{conversationId}", invalidConversationId)
 				.contentType(MediaType.APPLICATION_JSON))
 			.andDo(print())
-			.andExpect(status().isNotFound());
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage()));
 	}
 
 	@Test
@@ -213,6 +215,7 @@ class ConversationControllerTest {
 		mockMvc.perform(get("/api/conversations/{conversationId}", conversationId)
 				.contentType(MediaType.APPLICATION_JSON))
 			.andDo(print())
-			.andExpect(status().isNotFound());
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.message").value(UserErrorCode.USER_NOT_FOUND.getMessage()));
 	}
 }
