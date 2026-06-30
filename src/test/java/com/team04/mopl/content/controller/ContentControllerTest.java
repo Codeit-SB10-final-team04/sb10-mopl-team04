@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
+import com.team04.mopl.content.dto.request.ContentUpdateRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.entity.ContentType;
 import com.team04.mopl.content.exception.ContentErrorCode;
@@ -214,5 +215,91 @@ class ContentControllerTest {
 				.file(thumbnail)
 				.file(requestPart))
 			.andExpect(status().isBadRequest());
+	}
+
+	// ========== updateContent ==========
+
+	@Test
+	@DisplayName("콘텐츠 수정 요청에 성공하면 200 OK와 수정된 콘텐츠 Dto를 반환한다.")
+	void updateContent_returnOK_whenValidRequest() throws Exception {
+		// given
+		UUID contentId = UUID.randomUUID();
+		ContentUpdateRequest request = new ContentUpdateRequest("새 제목", "새 설명", List.of("액션"));
+		ContentDto response = new ContentDto(
+			contentId, ContentType.movie, "새 제목", "새 설명",
+			"http://localhost:8080/thumbnails/abc.png",
+			List.of("액션"), BigDecimal.ZERO, 0L, 0L
+		);
+
+		MockMultipartFile requestPart = new MockMultipartFile(
+			"contentUpdateRequest", "", MediaType.APPLICATION_JSON_VALUE,
+			objectMapper.writeValueAsBytes(request)
+		);
+
+		when(contentService.updateContent(eq(contentId), any(), any())).thenReturn(response);
+
+		// when & then
+		mockMvc.perform(multipart("/api/contents/{contentId}", contentId)
+				.file(requestPart)
+				.with(req -> { req.setMethod("PATCH"); return req; }))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(contentId.toString()))
+			.andExpect(jsonPath("$.title").value("새 제목"))
+			.andExpect(jsonPath("$.description").value("새 설명"))
+			.andExpect(jsonPath("$.tags[0]").value("액션"));
+	}
+
+	@Test
+	@DisplayName("썸네일과 함께 수정 요청하면 200 OK와 수정된 콘텐츠 Dto를 반환한다.")
+	void updateContent_returnOK_whenThumbnailProvided() throws Exception {
+		// given
+		UUID contentId = UUID.randomUUID();
+		ContentUpdateRequest request = new ContentUpdateRequest(null, null, null);
+		ContentDto response = new ContentDto(
+			contentId, ContentType.movie, "인터스텔라", "우주 이야기",
+			"http://localhost:8080/thumbnails/new.png",
+			List.of(), BigDecimal.ZERO, 0L, 0L
+		);
+
+		MockMultipartFile thumbnail = new MockMultipartFile(
+			"thumbnail", "new.png", MediaType.IMAGE_PNG_VALUE, "image-data".getBytes()
+		);
+		MockMultipartFile requestPart = new MockMultipartFile(
+			"contentUpdateRequest", "", MediaType.APPLICATION_JSON_VALUE,
+			objectMapper.writeValueAsBytes(request)
+		);
+
+		when(contentService.updateContent(eq(contentId), any(), any())).thenReturn(response);
+
+		// when & then
+		mockMvc.perform(multipart("/api/contents/{contentId}", contentId)
+				.file(thumbnail)
+				.file(requestPart)
+				.with(req -> { req.setMethod("PATCH"); return req; }))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.thumbnailUrl").value("http://localhost:8080/thumbnails/new.png"));
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 콘텐츠를 수정하면 404 Not Found를 반환한다.")
+	void updateContent_returnNotFound_whenContentNotExists() throws Exception {
+		// given
+		UUID contentId = UUID.randomUUID();
+		ContentUpdateRequest request = new ContentUpdateRequest("새 제목", null, null);
+		MockMultipartFile requestPart = new MockMultipartFile(
+			"contentUpdateRequest", "", MediaType.APPLICATION_JSON_VALUE,
+			objectMapper.writeValueAsBytes(request)
+		);
+
+		when(contentService.updateContent(eq(contentId), any(), any()))
+			.thenThrow(new ContentException(ContentErrorCode.CONTENT_NOT_FOUND));
+
+		// when & then
+		mockMvc.perform(multipart("/api/contents/{contentId}", contentId)
+				.file(requestPart)
+				.with(req -> { req.setMethod("PATCH"); return req; }))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("ContentException"))
+			.andExpect(jsonPath("$.message").value("콘텐츠를 찾을 수 없습니다."));
 	}
 }
