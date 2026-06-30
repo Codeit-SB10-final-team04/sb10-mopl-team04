@@ -190,7 +190,7 @@ public class ConversationService {
 
 	// 마지막 메시지 조회
 	private Optional<DirectMessage> getLatestMessageEntity(UUID conversationId) {
-		return directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId);
+		return directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId);
 	}
 
 	// 사용자 요약 정보 반환

@@ -233,7 +233,7 @@ class ConversationServiceTest {
 		given(participant1.getUser()).willReturn(requestUser);
 		given(participant2.getUser()).willReturn(withUser);
 
-		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId)).willReturn(
+		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId)).willReturn(
 			Optional.of(latestMessage));
 		given(directMessageMapper.toDto(latestMessage)).willReturn(latestMessageDto);
 
@@ -278,7 +278,7 @@ class ConversationServiceTest {
 		given(participant2.getUser()).willReturn(withUser);
 
 		// 마지막 메시지 없음
-		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId)).willReturn(
+		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId)).willReturn(
 			Optional.empty());
 
 		ConversationDto expectedDto = mock(ConversationDto.class);
