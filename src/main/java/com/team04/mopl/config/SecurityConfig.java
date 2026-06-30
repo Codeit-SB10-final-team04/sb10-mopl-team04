@@ -97,7 +97,13 @@ public class SecurityConfig {
 				.requestMatchers(
 					"/swagger-ui/**",
 					"/v3/api-docs/**",
-					"/actuator/health"
+					"/actuator/health",
+					"/api/sse",
+					"/thumbnails/**",
+					"/",
+					"/index.html",
+					"/favicon.svg",
+					"/assets/**"
 				).permitAll()
 				.anyRequest().authenticated())
 

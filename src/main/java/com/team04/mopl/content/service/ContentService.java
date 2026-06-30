@@ -1,7 +1,9 @@
 package com.team04.mopl.content.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -12,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
+import com.team04.mopl.content.dto.request.ContentUpdateRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.entity.Content;
@@ -71,10 +74,7 @@ public class ContentService {
 			List<String> tagNames = List.of();
 
 			if (contentCreateRequest.tags() != null && !contentCreateRequest.tags().isEmpty()) {
-				List<Tag> tags = contentCreateRequest.tags().stream()
-					.map(name -> tagRepository.findByName(name)
-						.orElseGet(() -> tagRepository.save(Tag.builder().name(name).build())))
-					.toList();
+				List<Tag> tags = findOrCreateTags(contentCreateRequest.tags());
 
 				List<ContentTag> contentTags = tags.stream()
 					.map(tag -> ContentTag.builder().content(content).tag(tag).build())
@@ -128,6 +128,96 @@ public class ContentService {
 		long totalCount = contentRepository.countContents(req);
 
 		return new CursorResponse<>(data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, sortDirection);
+	}
+
+	@Transactional
+	public ContentDto updateContent(UUID contentId, ContentUpdateRequest contentUpdateRequest,
+		MultipartFile thumbnail) {
+		log.info("[콘텐츠 수정 시작] contentId={}", contentId);
+
+		// 콘텐츠 조회
+		Content content = getNotDeletedContentEntityOrThrow(contentId);
+
+		// 썸네일 저장
+		String newThumbnailUrl = null;
+		String oldThumbnailUrl = content.getThumbnailUrl();
+
+		if (thumbnail != null) {
+			newThumbnailUrl = thumbnailStorage.store(thumbnail);
+			log.info("[콘텐츠 수정] 썸네일 교체 예정: contentId={}, oldUrl={}, newUrl={}", contentId, oldThumbnailUrl, newThumbnailUrl);
+		}
+
+		try {
+			// 콘텐츠 업데이트 - title, description, thumbnailUrl
+			content.updateTitle(contentUpdateRequest.title());
+			content.updateDescription(contentUpdateRequest.description());
+			if (newThumbnailUrl != null) {
+				content.updateThumbnailUrl(newThumbnailUrl);
+			}
+
+			// 태그 return, 중간 태그 콘텐츠 테이블 생성
+			List<String> tagNames;
+
+			if (contentUpdateRequest.tags() != null) {
+				log.debug("[콘텐츠 수정] 태그 갱신: contentId={}, tags={}", contentId, contentUpdateRequest.tags());
+
+				// 기존 태그 연결 전부 삭제 후 교체
+				contentTagRepository.deleteAllByContent(content);
+
+				List<Tag> tags = findOrCreateTags(contentUpdateRequest.tags());
+
+				List<ContentTag> contentTags = tags.stream()
+					.map(tag -> ContentTag.builder().content(content).tag(tag).build())
+					.toList();
+				contentTagRepository.saveAll(contentTags);
+
+				tagNames = tags.stream().map(Tag::getName).toList();
+			} else {
+				// tags가 null이면 기존 태그 유지
+				tagNames = contentTagRepository.findTagNamesByContentId(contentId);
+			}
+
+			// 썸네일 교체 성공 후 기존 파일 삭제
+			if (newThumbnailUrl != null) {
+				try {
+					thumbnailStorage.delete(oldThumbnailUrl);
+				} catch (Exception e) {
+					log.error("기존 썸네일 삭제 실패, 배치 정리 필요. url={}", oldThumbnailUrl, e);
+				}
+			}
+
+			log.info("[콘텐츠 수정 완료] contentId={}", contentId);
+
+			return contentMapper.toDto(content, tagNames);
+
+		} catch (Exception e) {
+			// DB 저장 실패 시 새로 저장한 썸네일 롤백
+			if (newThumbnailUrl != null) {
+				try {
+					thumbnailStorage.delete(newThumbnailUrl);
+				} catch (Exception deleteEx) {
+					log.error("파일 삭제 실패, 배치 정리 필요. url={}", newThumbnailUrl, deleteEx);
+				}
+			}
+			throw e;
+		}
+	}
+
+	// 태그명 목록으로 태그 조회 or 생성 (N+1 방지)
+	private List<Tag> findOrCreateTags(List<String> tagNames) {
+		List<Tag> existingTags = tagRepository.findAllByNameIn(tagNames);
+		Set<String> existingNames = existingTags.stream()
+			.map(Tag::getName)
+			.collect(Collectors.toSet());
+
+		List<Tag> newTags = tagNames.stream()
+			.filter(name -> !existingNames.contains(name))
+			.map(name -> tagRepository.save(Tag.builder().name(name).build()))
+			.toList();
+
+		List<Tag> allTags = new ArrayList<>(existingTags);
+		allTags.addAll(newTags);
+		return allTags;
 	}
 
 	// contentIds로 태그명 조회 메서드
