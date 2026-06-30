@@ -150,7 +150,10 @@ public class ConversationService {
 		// 2. 유효성 검증: 대화 상대 존재 여부
 		User withUser = getUserEntityOrThrow(userId);
 
-		// 3. 유효성 검증: 대화 존재 유무
+		// 3. 유효성 검증: 자기 자신 조회
+		validateSelfReadConversation(requestUserId, withUser.getId());
+
+		// 4. 유효성 검증: 대화 존재 유무
 		UUID conversationId = findExistingConversationId(requestUserId, withUser.getId());
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
@@ -180,6 +183,13 @@ public class ConversationService {
 
 		if (!isParticipant) {
 			throw new ConversationException(ConversationErrorCode.CONVERSATION_ACCESS_DENIED);
+		}
+	}
+
+	// 유효성 검증: 자기 자신 조회
+	private void validateSelfReadConversation(UUID requestUserId, UUID withUserId) {
+		if (requestUserId.equals(withUserId)) {
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_SELF_SELECT_MOT_ALLOWED);
 		}
 	}
 
