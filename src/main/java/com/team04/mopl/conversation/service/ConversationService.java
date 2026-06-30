@@ -160,8 +160,6 @@ public class ConversationService {
 		return directMessageRepository.existsByConversationIdAndReceiverIdAndReadFalse(conversationId, receiverId);
 	}
 
-	@Transactional
-	@PreAuthorize("#userId != #moplUserDetails.userId")
 	// 특정 사용자와의 대화 조회
 	public ConversationDto findConversationByUserId(UUID userId, MoplUserDetails moplUserDetails) {
 		log.debug("[CONVERSATION_FIND_BY_USER_ID] 특정 사용자와의 대화 조회 시작: userId={}", userId);
@@ -173,22 +171,17 @@ public class ConversationService {
 		User withUser = getUserEntityOrThrow(userId);
 
 		// 3. 유효성 검증: 대화 존재 유무
-		Optional<UUID> conversationId = findExistingConversationId(requestUserId, withUser.getId());
+		UUID conversationId = findExistingConversationId(requestUserId, withUser.getId());
 
 		// 특정 사용자와의 대화방이 존재할 경우, 대화 조회 메서드로 위임
-		if (conversationId.isPresent()) {
-			log.debug("[CONVERSATION_FIND_BY_USER_ID] 기존 대화방 존재, 조회로 위임: conversationId={}", conversationId);
-			return findConversationById(conversationId.get(), moplUserDetails);
-		}
-
-		// 특정 사용자와의 대화방이 존재하지 않을 경우, 생성 메서드로 위임 (@Transaction, @PreAuthorize)
-		log.debug("[CONVERSATION_FIND_BY_USER_ID] 기존 대화 없음, 신규 생성으로 위임: conversationId={}", conversationId);
-		return createConversation(new ConversationCreateRequest(withUser.getId()), moplUserDetails);
+		log.debug("[CONVERSATION_FIND_BY_USER_ID] 기존 대화방 존재, 조회로 위임: conversationId={}", conversationId);
+		return findConversationById(conversationId, moplUserDetails);
 	}
 
 	// 대화 ID 반환
-	private Optional<UUID> findExistingConversationId(UUID requestUserId, UUID withUserId) {
-		return conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId);
+	private UUID findExistingConversationId(UUID requestUserId, UUID withUserId) {
+		return conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
+			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
 	}
 
 	// 유효성 검증: 대화 중복 검사
