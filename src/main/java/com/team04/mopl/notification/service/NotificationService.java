@@ -33,6 +33,7 @@ public class NotificationService {
 	private final NotificationMapper notificationMapper;
 
 	// TODO: 도메인 이벤트 Listener를 AFTER_COMMIT으로 확정한 뒤 @Transactional 삭제 및 private 메서드로 변경 검토
+	// TODO: 아마 private 메서드가 되지 않을까?
 	@Transactional
 	public NotificationDto createNotification(
 		UUID receiverId,
