@@ -25,3 +25,21 @@ CREATE TABLE IF NOT EXISTS playlists
                               PRIMARY KEY (id),
     CONSTRAINT fk_playlists_owner FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE
     );
+
+CREATE TABLE IF NOT EXISTS contents
+(
+    id             UUID                     NOT NULL,
+    external_id    VARCHAR(100),
+    source         VARCHAR(20)              NOT NULL,
+    title          VARCHAR(200)             NOT NULL,
+    type           VARCHAR(50)              NOT NULL,
+    description    TEXT                     NOT NULL,
+    thumbnail_url  VARCHAR(500)             NOT NULL,
+    average_rating DECIMAL(3, 2)            NOT NULL,
+    review_count   BIGINT                   NOT NULL,
+    watcher_count  BIGINT                   NOT NULL,
+    deleted_at     TIMESTAMP WITH TIME ZONE,
+    created_at     TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at     TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (id)
+);

@@ -2,6 +2,7 @@ package com.team04.mopl.content.entity;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Objects;
 
 import com.team04.mopl.common.entity.BaseUpdatableEntity;
 
@@ -105,6 +106,12 @@ public class Content extends BaseUpdatableEntity {
 	public void updateThumbnailUrl(String thumbnailUrl) {
 		if (thumbnailUrl != null) {
 			this.thumbnailUrl = thumbnailUrl;
+		}
+	}
+
+	public void markDeleted(Instant deletedAt) {
+		if (this.deletedAt == null) {
+			this.deletedAt = Objects.requireNonNull(deletedAt);
 		}
 	}
 }
