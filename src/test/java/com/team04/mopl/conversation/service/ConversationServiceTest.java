@@ -368,13 +368,15 @@ class ConversationServiceTest {
 			.willReturn(Optional.of(conversationId));
 
 		// 위임
-		doReturn(mock(ConversationDto.class)).when(conversationServiceSpy)
-			.findConversationById(eq(conversationId), any());
+		ConversationDto expectedDto = mock(ConversationDto.class);
+		doReturn(expectedDto).when(conversationServiceSpy)
+			.findConversationById(eq(conversationId), same(moplUserDetails));
 
 		// when
-		conversationServiceSpy.findConversationByUserId(withUserId, moplUserDetails);
+		ConversationDto result = conversationServiceSpy.findConversationByUserId(withUserId, moplUserDetails);
 
 		// then
+		assertThat(result).isSameAs(expectedDto);
 		verify(conversationServiceSpy).findConversationById(eq(conversationId), any());
 	}
 
