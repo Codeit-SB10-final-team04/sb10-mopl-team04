@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.team04.mopl.common.batch.BatchTimeZone;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,10 +25,10 @@ public class PlaylistHardDeleteBatchScheduler {
 
 	@Scheduled(
 		cron = "${playlist.hard-delete.cron}",
-		zone = PlaylistBatchTimeZone.ZONE_ID
+		zone = BatchTimeZone.ZONE_ID
 	)
 	public void runPlaylistHardDeleteBatch() {
-		LocalDate deleteDate = LocalDate.now(PlaylistBatchTimeZone.KST).minusMonths(retentionMonths);
+		LocalDate deleteDate = LocalDate.now(BatchTimeZone.KST).minusMonths(retentionMonths);
 
 		log.info("[PLAYLIST_HARD_DELETE_BATCH] 플레이리스트 물리 삭제 스케줄 시작: deleteDate={}", deleteDate);
 
