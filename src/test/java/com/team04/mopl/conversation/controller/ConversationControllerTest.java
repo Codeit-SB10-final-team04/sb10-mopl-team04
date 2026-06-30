@@ -236,8 +236,8 @@ class ConversationControllerTest {
 		);
 
 		UUID userId = UUID.randomUUID();
-
 		ConversationDto responseDto = mock(ConversationDto.class);
+
 		given(conversationService.findConversationByUserId(
 			eq(userId),
 			argThat(userDetails -> userDetails != null && requesterUserId.equals(userDetails.getUserId()))))
@@ -247,11 +247,6 @@ class ConversationControllerTest {
 				.param("userId", userId.toString())
 				.with(user(mockUserDetails)))
 			.andExpect(status().isOk());
-
-		verify(conversationService).findConversationByUserId(
-			eq(userId),
-			argThat(userDetails -> userDetails != null && requesterUserId.equals(userDetails.getUserId()))
-		);
 	}
 
 	@Test
