@@ -78,7 +78,7 @@ class NotificationServiceTest {
 			.thenReturn(notificationDto1, notificationDto2);
 
 		// when
-		List<NotificationDto> result = notificationService.createNotificationList(
+		List<NotificationDto> result = notificationService.saveNotificationList(
 			Set.of(receiverId1, receiverId2),
 			"알림 제목",
 			"알림 내용",
@@ -116,7 +116,7 @@ class NotificationServiceTest {
 	void createNotificationList_throwException_whenReceiverIdsIsNull() {
 		// when
 		assertThrows(NotificationException.class,
-			() -> notificationService.createNotificationList(
+			() -> notificationService.saveNotificationList(
 				null,
 				"알림 제목",
 				"알림 내용",
@@ -134,7 +134,7 @@ class NotificationServiceTest {
 	@DisplayName("수신자 목록이 비어있으면 알림 리스트를 저장하지 않고 빈 목록을 반환한다.")
 	void createNotificationList_throwException_whenNotificationIdsIsBlank() {
 		// when
-		List<NotificationDto> result = notificationService.createNotificationList(
+		List<NotificationDto> result = notificationService.saveNotificationList(
 			Set.of(),
 			"알림 제목",
 			"알림 내용",
@@ -158,7 +158,7 @@ class NotificationServiceTest {
 
 		// when
 		assertThrows(NotificationException.class,
-			() -> notificationService.createNotificationList(
+			() -> notificationService.saveNotificationList(
 				Set.of(receiverId),
 				" ",
 				"알림 내용",
@@ -180,7 +180,7 @@ class NotificationServiceTest {
 
 		// when
 		assertThrows(NotificationException.class,
-			() -> notificationService.createNotificationList(
+			() -> notificationService.saveNotificationList(
 				Set.of(receiverId),
 				"테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목",
 				"알림 내용",
@@ -208,7 +208,7 @@ class NotificationServiceTest {
 
 		// when
 		assertThrows(NotificationException.class,
-			() -> notificationService.createNotificationList(
+			() -> notificationService.saveNotificationList(
 				Set.of(receiverId1, receiverId2),
 				"알림 제목",
 				"알림 내용",

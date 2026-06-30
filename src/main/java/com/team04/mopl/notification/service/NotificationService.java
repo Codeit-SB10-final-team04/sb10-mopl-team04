@@ -37,7 +37,7 @@ public class NotificationService {
 	// TODO: private 메서드로 변경될 경우 로그 삭제
 	// @Transactional(propagation = Propagation.REQUIRES_NEW)
 	@Transactional
-	public List<NotificationDto> createNotificationList(
+	public List<NotificationDto> saveNotificationList(
 		Set<UUID> receiverIds,
 		String title,
 		String content,
@@ -57,7 +57,7 @@ public class NotificationService {
 		// 수신인 Map 조회 및 누락 검증
 		Map<UUID, User> receiverMap = getReceiverMapOrThrow(receiverIds);
 
-		List<Notification> notificationList = createNotificationList(
+		List<Notification> notificationList = saveNotificationList(
 			receiverIds,
 			receiverMap,
 			title,
@@ -97,7 +97,7 @@ public class NotificationService {
 		return receiverMap;
 	}
 
-	private List<Notification> createNotificationList(
+	private List<Notification> saveNotificationList(
 		Set<UUID> receiverIds,
 		Map<UUID, User> receiverMap,
 		String title,
