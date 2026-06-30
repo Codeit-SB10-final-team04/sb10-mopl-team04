@@ -60,9 +60,9 @@ public class TmdbInitialCollectTasklet implements Tasklet {
 		int tvTotalPages = Math.min(tmdbClient.extractTotalPages(tvFirstPage), MAX_PAGES);
 		log.info("[TMDB] 총 페이지: {} (tv_series)", tvTotalPages);
 
-		collectPage(tvFirstPage, ContentType.tv_series, contribution);
+		collectPage(tvFirstPage, ContentType.tvSeries, contribution);
 		for (int page = 2; page <= tvTotalPages; page++) {
-			collectPage(tmdbClient.getOnAirTv(page), ContentType.tv_series, contribution);
+			collectPage(tmdbClient.getOnAirTv(page), ContentType.tvSeries, contribution);
 		}
 
 		log.info("[TMDB] ===== 초기 수집 완료: 저장 {}건 =====", contribution.getWriteCount());
