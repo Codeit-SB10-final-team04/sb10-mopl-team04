@@ -28,4 +28,6 @@ public interface ContentTagRepository extends JpaRepository<ContentTag, UUID> {
 	List<String> findTagNamesByContentId(@Param("contentId") UUID contentId);
 
 	boolean existsByContentAndTag(Content content, Tag tag);
+
+	void deleteAllByContent(Content content);
 }
