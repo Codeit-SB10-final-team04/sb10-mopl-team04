@@ -33,7 +33,7 @@ public class NotificationService {
 	private final NotificationMapper notificationMapper;
 
 	// TODO: 도메인 이벤트 Listener를 AFTER_COMMIT으로 확정한 뒤 @Transactional 삭제 및 private 메서드로 변경 검토
-	// TODO: 아마 private 메서드가 되지 않을까?
+	// TODO: private 메서드로 변경될 경우 로그 삭제
 	@Transactional
 	public NotificationDto createNotification(
 		UUID receiverId,
@@ -42,8 +42,8 @@ public class NotificationService {
 		NotificationType type,
 		NotificationLevel level
 	) {
-		log.debug("[NOTIFICATION_CREATE] 알림 생성 시작: title={}, content={}, type={}, level={}",
-			title, content, type, level);
+		log.info("[NOTIFICATION_CREATE] 알림 생성 시작: receiverId={}, type={}, level={}",
+			receiverId, type, level);
 
 		// input null 및 blank 검증
 		validateInputNullOrBlank(receiverId, title, content, type, level);
@@ -64,8 +64,8 @@ public class NotificationService {
 		// 알림 저장
 		notificationRepository.save(notification);
 
-		log.debug("[NOTIFICATION_CREATE] 알림 생성 완료: title={}, content={}, type={}, level={}",
-			title, content, type, level);
+		log.info("[NOTIFICATION_CREATE] 알림 생성 완료: receiverId={}, type={}, level={}",
+			receiverId, type, level);
 
 		// 알림 저장 후 dto로 변환
 		return notificationMapper.toDto(notification);
@@ -90,15 +90,15 @@ public class NotificationService {
 			return List.of();
 		}
 
-		log.debug("[NOTIFICATION_LIST_CREATE] 알림 생성 시작: receiverCount={}, title={}, content={}, type={}, level={}",
-			receiverIds.size(), title, content, type, level);
+		log.info("[NOTIFICATION_LIST_CREATE] 알림 생성 시작: receiverCount={}, type={}, level={}",
+			receiverIds.size(), type, level);
 
 		List<NotificationDto> notificationDtoList = receiverIds
 			.stream()
 			.map(receiverId -> createNotification(receiverId, title, content, type, level))
 			.toList();
 
-		log.debug("[NOTIFICATION_LIST_CREATE] 알림 생성 완료: receiverCount={}, notificationCount={}",
+		log.info("[NOTIFICATION_LIST_CREATE] 알림 생성 완료: receiverCount={}, notificationCount={}",
 			receiverIds.size(), notificationDtoList.size());
 
 		return notificationDtoList;
