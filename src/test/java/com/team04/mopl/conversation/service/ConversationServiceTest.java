@@ -376,6 +376,8 @@ class ConversationServiceTest {
 
 		// then
 		assertThat(result).isNotNull();
+		assertThat(result).isSameAs(mockDto);
+		verify(conversationParticipantRepository).findExistingConversationId(requestUserId, withUserId);
 		verify(conversationRepository).findById(conversationId);
 	}
 
