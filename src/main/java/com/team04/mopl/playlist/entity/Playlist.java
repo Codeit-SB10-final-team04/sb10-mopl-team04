@@ -54,6 +54,12 @@ public class Playlist extends BaseUpdatableEntity {
 		}
 	}
 
+	public void touchUpdatedAt(Instant updatedAt) {
+		if (updatedAt != null) {
+			this.updatedAt = updatedAt;
+		}
+	}
+
 	// 삭제 상태로 mark
 	public void markDeleted(Instant deletedAt) {
 		if (this.deletedAt == null) {

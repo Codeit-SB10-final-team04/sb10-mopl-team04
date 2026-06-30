@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -22,12 +23,16 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
+import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.service.ConversationService;
+import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 
 @WebMvcTest(
 	controllers = ConversationController.class,
@@ -127,6 +132,90 @@ class ConversationControllerTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(request)))
 			.andDo(print())
-			.andExpect(status().isConflict());
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS.getMessage()));
+	}
+
+	/*
+	=========================
+		대화 단건 조회
+	=========================
+	 */
+	@Test
+	@DisplayName("성공: 유효한 대화방 ID를 전달하면 대화방 단건 정보를 200 OK와 함께 반환한다.")
+	void findConversationById_Success() throws Exception {
+		// given
+		UUID conversationId = UUID.randomUUID();
+
+		UserSummary withUser = new UserSummary(
+			UUID.randomUUID(),
+			"상대방",
+			"https://profile.img"
+		);
+
+		DirectMessageDto latestMessage = new DirectMessageDto(
+			UUID.randomUUID(),
+			conversationId,
+			Instant.now(),
+			withUser,
+			new UserSummary(UUID.randomUUID(),
+				"나",
+				"https://my.img"),
+			"안녕"
+		);
+
+		ConversationDto response = ConversationDto.builder()
+			.id(conversationId)
+			.with(withUser)
+			.latestMessage(latestMessage)
+			.hasUnread(false)
+			.build();
+
+		given(conversationService.findConversationById(eq(conversationId), any()))
+			.willReturn(response);
+
+		// when & then
+		mockMvc.perform(get("/api/conversations/{conversationId}", conversationId)
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(conversationId.toString()))
+			.andExpect(jsonPath("$.with.name").value("상대방"))
+			.andExpect(jsonPath("$.latestMessage.content").value("안녕"))
+			.andExpect(jsonPath("$.hasUnread").value(false));
+	}
+
+	@Test
+	@DisplayName("실패: 존재하지 않는 대화방 ID로 조회하면 404 Not Found를 반환한다.")
+	void findConversationById_ConversationNotFound_Fail() throws Exception {
+		// given
+		UUID invalidConversationId = UUID.randomUUID();
+
+		given(conversationService.findConversationById(eq(invalidConversationId), any()))
+			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
+
+		// when & then
+		mockMvc.perform(get("/api/conversations/{conversationId}", invalidConversationId)
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage()));
+	}
+
+	@Test
+	@DisplayName("실패: 대화방 참여자 중 상대방 유저 정보를 찾을 수 없으면 404 Not Found를 반환한다.")
+	void findConversationById_UserNotFound_Fail() throws Exception {
+		// given
+		UUID conversationId = UUID.randomUUID();
+
+		given(conversationService.findConversationById(eq(conversationId), any()))
+			.willThrow(new UserException(UserErrorCode.USER_NOT_FOUND));
+
+		// when & then
+		mockMvc.perform(get("/api/conversations/{conversationId}", conversationId)
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.message").value(UserErrorCode.USER_NOT_FOUND.getMessage()));
 	}
 }

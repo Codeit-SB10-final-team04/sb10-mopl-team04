@@ -1,6 +1,7 @@
 package com.team04.mopl.conversation.service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -20,7 +21,13 @@ import com.team04.mopl.conversation.mapper.ConversationMapper;
 import com.team04.mopl.conversation.mapper.ConversationParticipantMapper;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
+import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
+import com.team04.mopl.directmessage.entity.DirectMessage;
+import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
+import com.team04.mopl.directmessage.repository.DirectMessageRepository;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -34,11 +41,14 @@ public class ConversationService {
 
 	private final ConversationRepository conversationRepository;
 	private final ConversationParticipantRepository conversationParticipantRepository;
+	private final DirectMessageRepository directMessageRepository;
 	private final UserRepository userRepository;
 
 	private final ConversationMapper conversationMapper;
 	private final ConversationParticipantMapper conversationParticipantMapper;
+	private final DirectMessageMapper directMessageMapper;
 
+	// 대화 생성
 	@Transactional
 	@PreAuthorize("#conversationCreateRequest.withUserId() != #moplUserDetails.userId")
 	public ConversationDto createConversation(
@@ -72,10 +82,10 @@ public class ConversationService {
 			log.info("[CONVERSATION CREATE] 대화 생성 완료: conversationId={}",
 				newConversation.getId());
 
-			// 응답 DTO 변환 (대화방, 대화 상대 정보, 마지막 메시지 내용)
-			// 대화방 생성 로직이므로 마지막 메시지 내용은 null 처리
+			// 응답 DTO 변환 (대화방, 대화 상대 정보, 마지막 메시지 내용, 안 읽음 여부)
+			// 대화방 생성 로직이므로 마지막 메시지 내용은 null, 안 읽음 여부는 false 처리
 			UserSummary with = getUserSummary(withUser);
-			return conversationMapper.toDto(newConversation, with, null);
+			return conversationMapper.toDto(newConversation, with, null, false);
 
 		} catch (DataIntegrityViolationException e) {
 			// DB 제약조건 위반 시, 이미 중복인 상황으로 간주
@@ -99,6 +109,33 @@ public class ConversationService {
 		conversationParticipantRepository.saveAll(participants);
 	}
 
+	// 대화 단건 조회
+	public ConversationDto findConversationById(UUID conversationId, MoplUserDetails moplUserDetails) {
+		log.debug("[FIND_CONVERSATION] 대화 단건 조회 시작: conversationId={}", conversationId);
+
+		// 1. 로그인 정보로부터 요청자 ID 추출
+		UUID requestUserId = moplUserDetails.getUserId();
+
+		// 2. 유효성 검증: 대화 존재 여부
+		Conversation conversation = getConversationEntityOrThrow(conversationId);
+
+		// 3. 대화 상대방 정보 조회
+		User withUser = getWithUserEntityOrThrow(conversation.getId(), requestUserId);
+		UserSummary with = getUserSummary(withUser);
+
+		// 4. 마지막 메시지 내용 조회
+		DirectMessageDto latestMessage = getLatestMessageEntity(conversationId)
+			.map(directMessageMapper::toDto)
+			.orElse(null);
+
+		// 5. 안 읽음 여부 판단
+		boolean hasUnread = hasUnreadMessage(conversation.getId(), requestUserId);
+
+		log.debug("[FIND_CONVERSATION] 대화 단건 조회 완료: conversationId={}", conversationId);
+
+		return conversationMapper.toDto(conversation, with, latestMessage, hasUnread);
+	}
+
 	// 유효성 검증: 대화 중복 검사
 	private void validateDuplicateConversation(UUID requestUserId, UUID withUserId) {
 		conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
@@ -108,13 +145,52 @@ public class ConversationService {
 			});
 	}
 
+	// 안 읽은 메시지 여부 확인
+	private boolean hasUnreadMessage(UUID conversationId, UUID receiverId) {
+		return directMessageRepository.existsByConversationIdAndReceiverIdAndReadFalse(conversationId, receiverId);
+	}
+
+	// 대화 엔티티 반환
+	private Conversation getConversationEntityOrThrow(UUID conversationId) {
+		return conversationRepository.findById(conversationId)
+			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND)
+				.addDetail("conversationId", conversationId));
+	}
+
 	// 사용자 엔티티 반환
 	private User getUserEntityOrThrow(UUID userId) {
 		return userRepository.findById(userId)
-			// TODO: User 도메인의 최상위 예외 클래스 구현 시 주석 제거 예정
-			.orElseThrow(/*() -> new Userxception(
-				UserErrorCode
-			)*/);
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
+				.addDetail("userId", userId));
+	}
+
+	// 대화 상대 정보 조회
+	private User getWithUserEntityOrThrow(UUID conversationId, UUID requestUserId) {
+		List<ConversationParticipant> participants =
+			conversationParticipantRepository.findByConversationId(conversationId);
+
+		validateParticipants(participants, requestUserId);
+
+		return participants.stream()
+			.map(ConversationParticipant::getUser)
+			.filter(user -> !user.getId().equals(requestUserId))
+			.findFirst()
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+	}
+
+	// 유효성 검증: 특정 대화방 참가자 여부
+	private void validateParticipants(List<ConversationParticipant> participants, UUID requestUserId) {
+		boolean isParticipant = participants.stream()
+			.anyMatch(participant -> participant.getUser().getId().equals(requestUserId));
+
+		if (!isParticipant) {
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_ACCESS_DENIED);
+		}
+	}
+
+	// 마지막 메시지 조회
+	private Optional<DirectMessage> getLatestMessageEntity(UUID conversationId) {
+		return directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId);
 	}
 
 	// 사용자 요약 정보 반환

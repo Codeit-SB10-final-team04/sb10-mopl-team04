@@ -14,5 +14,6 @@ public interface ConversationMapper {
 
 	// Conversation Entity -> ConversationDto
 	@Mapping(target = "id", source = "conversation.id")
-	ConversationDto toDto(Conversation conversation, UserSummary with, DirectMessageDto latestMessage);
+	ConversationDto toDto(Conversation conversation, UserSummary with, DirectMessageDto latestMessage,
+		boolean hasUnread);
 }
