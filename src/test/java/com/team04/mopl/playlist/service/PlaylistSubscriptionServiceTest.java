@@ -22,6 +22,7 @@ import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -82,7 +83,7 @@ class PlaylistSubscriptionServiceTest {
 			.thenReturn(Optional.empty());
 
 		// when
-		assertThrows(IllegalArgumentException.class,
+		assertThrows(UserException.class,
 			() -> playlistSubscriptionService.subscribePlaylist(playlistId, currentUserId));
 
 		// then

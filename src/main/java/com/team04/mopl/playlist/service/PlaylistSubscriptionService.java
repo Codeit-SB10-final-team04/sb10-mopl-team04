@@ -13,6 +13,8 @@ import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -94,10 +96,10 @@ public class PlaylistSubscriptionService {
 	}
 
 	// 사용자 조회
-	// TODO: `USER_NOT_FOUND` 같은 사용자 커스텀 예외 추가 시 `.orElseThrow(...)` 교체
 	private User getUserOrThrow(UUID userId) {
 		return userRepository.findByIdAndLockedFalse(userId)
-			.orElseThrow(() -> new IllegalArgumentException("User not found!"));
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
+				.addDetail("userId", userId));
 	}
 
 	// 삭제되지 않은 플레이리스트를 소유자 정보와 함께 조회

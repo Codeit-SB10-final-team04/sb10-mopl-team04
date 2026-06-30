@@ -44,6 +44,7 @@ import com.team04.mopl.playlist.repository.PlaylistContentRepository;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -144,8 +145,7 @@ class PlaylistServiceTest {
 			.thenReturn(Optional.empty());
 
 		// when, then
-		// TODO: USER_NOT_FOUND 같은 사용자 커스텀 예외 추가 시 `IllegalArgumentException.class` 수정
-		assertThrows(IllegalArgumentException.class,
+		assertThrows(UserException.class,
 			() -> playlistService.createPlaylist(request, currentUserId));
 
 		verify(userRepository).findById(currentUserId);
