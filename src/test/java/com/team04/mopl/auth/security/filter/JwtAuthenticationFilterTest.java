@@ -158,6 +158,30 @@ class JwtAuthenticationFilterTest {
 	}
 
 	@Test
+	@DisplayName("GET /api/auth/csrf-token 요청은 JWT 인증 필터를 적용하지 않는다")
+	void doFilter_passesRequest_whenRequestIsGetCsrfTokenPath() throws Exception {
+		// given
+		MockHttpServletRequest request = new MockHttpServletRequest(
+			HttpMethod.GET.name(),
+			"/api/auth/csrf-token"
+		);
+		request.setServletPath("/api/auth/csrf-token");
+		request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer invalid-token");
+
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		MockFilterChain filterChain = new MockFilterChain();
+
+		// when
+		jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+		// then
+		assertThat(filterChain.getRequest()).isSameAs(request);
+		verifyNoInteractions(jwtTokenProvider);
+		verifyNoInteractions(authSessionStore);
+		verifyNoInteractions(authResponseWriter);
+	}
+
+	@Test
 	@DisplayName("Bearer 형식이 아니면 인증 에러 응답을 반환한다")
 	void doFilterInternal_writesError_whenAuthorizationHeaderIsNotBearerType() throws Exception {
 		// given
