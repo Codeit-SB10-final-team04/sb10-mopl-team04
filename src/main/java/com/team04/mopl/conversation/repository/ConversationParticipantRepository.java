@@ -12,7 +12,7 @@ import com.team04.mopl.conversation.entity.ConversationParticipant;
 
 public interface ConversationParticipantRepository extends JpaRepository<ConversationParticipant, UUID> {
 
-	// 대화 참여자 목록 조회: 특정 대화에 참여하는 두 명의 사용자 목록 반회
+	// 대화 참여자 목록 조회: 특정 대화에 참여하는 두 명의 사용자 목록 반환
 	List<ConversationParticipant> findByConversationId(UUID conversationId);
 
 	// 유효성 검증: 대화 중복 검사
