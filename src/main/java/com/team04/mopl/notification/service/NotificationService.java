@@ -10,9 +10,14 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team04.mopl.common.enums.SortDirection;
+import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
+import com.team04.mopl.notification.dto.response.CursorResponseNotificationDto;
+import com.team04.mopl.notification.dto.response.NotificationCursorPage;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.entity.Notification;
 import com.team04.mopl.notification.enums.NotificationLevel;
+import com.team04.mopl.notification.enums.NotificationSortBy;
 import com.team04.mopl.notification.enums.NotificationType;
 import com.team04.mopl.notification.exception.NotificationErrorCode;
 import com.team04.mopl.notification.exception.NotificationException;
@@ -76,6 +81,60 @@ public class NotificationService {
 			receiverIds.size(), notificationDtoList.size());
 
 		return notificationDtoList;
+	}
+
+	public CursorResponseNotificationDto findAllNotifications(
+		NotificationSearchRequest request,
+		UUID currentUserId
+	) {
+		int limit = request.limit();
+		SortDirection sortDirection = request.sortDirection();
+		NotificationSortBy sortBy = request.sortBy();
+
+		log.debug("[NOTIFICATION_FIND_ALL] 알림 목록 조회 시작: cursor={}, idAfter={}, limit={}, sortDirection={}, sortBy={}",
+			request.cursor(), request.idAfter(), limit, sortDirection, sortBy);
+
+		// 조건에 따라 알림 목록 조회
+		NotificationCursorPage notificationCursorPage =
+			notificationRepository.findAllNotifications(request, currentUserId);
+
+		// notificationDto 조립
+		List<NotificationDto> notificationDtoList = notificationCursorPage.notificationList().stream()
+			.map(notification -> notificationMapper.toDto(notification))
+			.toList();
+
+		int notificationListSize = notificationDtoList.size();
+		boolean hasNext = notificationCursorPage.hasNext();
+
+		// 마지막 요소
+		NotificationDto lastNotificationDto = notificationDtoList.isEmpty()
+			? null
+			: notificationDtoList.get(notificationListSize - 1);
+		// 다음 cursor
+		String nextCursor = hasNext && lastNotificationDto != null
+			? lastNotificationDto.createdAt().toString()
+			: null;
+		// 다음 보조 cursor (idAfter)
+		UUID nextIdAfter = hasNext && lastNotificationDto != null
+			? lastNotificationDto.id()
+			: null;
+
+		// Cursor 페이지네이션 만들기
+		CursorResponseNotificationDto cursorResponseNotificationDto
+			= new CursorResponseNotificationDto(
+			notificationDtoList,
+			nextCursor,
+			nextIdAfter,
+			hasNext,
+			notificationCursorPage.totalCount(),
+			sortBy.toString(),
+			sortDirection
+		);
+
+		log.debug("[NOTIFICATION_FIND_ALL] 알림 목록 조회 완료: size={}, nextCursor={}, nextIdAfter={}",
+			notificationListSize, nextCursor, nextIdAfter);
+
+		return cursorResponseNotificationDto;
 	}
 
 	// 수신인 Map 조회 및 누락 검증
