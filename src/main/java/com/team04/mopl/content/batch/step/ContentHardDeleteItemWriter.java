@@ -1,5 +1,6 @@
 package com.team04.mopl.content.batch.step;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,12 +23,12 @@ public class ContentHardDeleteItemWriter implements ItemWriter<UUID> {
 
 	@Override
 	public void write(Chunk<? extends UUID> chunk) {
-		List<? extends UUID> ids = chunk.getItems();
+		List<UUID> ids = new ArrayList<>(chunk.getItems());
 		if (ids.isEmpty()) {
 			return;
 		}
 
-		contentRepository.deleteAllById(ids);
+		contentRepository.deleteAllByIdInBatch(ids);
 
 		log.info("[CONTENT_HARD_DELETE_BATCH] 콘텐츠 chunk 물리 삭제: count={}", ids.size());
 	}

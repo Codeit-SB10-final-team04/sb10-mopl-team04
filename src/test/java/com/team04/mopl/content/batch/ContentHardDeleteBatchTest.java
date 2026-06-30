@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -45,15 +46,20 @@ public class ContentHardDeleteBatchTest {
 	private JdbcTemplate jdbcTemplate;
 
 	@Test
-	@DisplayName("콘텐츠 물리 삭제 배치는 논리 삭제된 콘텐츠만 삭제한다.")
+	@DisplayName("콘텐츠 물리 삭제 배치는 retention-days 이상 경과한 논리 삭제 콘텐츠만 삭제한다.")
 	void contentHardDeleteJob_deleteOnlySoftDeletedContents() throws Exception {
 		// given
 		UUID deletedContentId1 = UUID.randomUUID();
 		UUID deletedContentId2 = UUID.randomUUID();
+		UUID recentlyDeletedContentId = UUID.randomUUID();
 		UUID activeContentId = UUID.randomUUID();
 
-		insertContent(deletedContentId1, "삭제된 콘텐츠1", Instant.parse("2026-05-01T00:00:00Z"));
-		insertContent(deletedContentId2, "삭제된 콘텐츠2", Instant.parse("2026-06-01T00:00:00Z"));
+		Instant twoDaysAgo = Instant.now().minus(2, ChronoUnit.DAYS);
+		Instant thirtyMinutesAgo = Instant.now().minus(30, ChronoUnit.MINUTES);
+
+		insertContent(deletedContentId1, "삭제된 콘텐츠1", twoDaysAgo);
+		insertContent(deletedContentId2, "삭제된 콘텐츠2", twoDaysAgo);
+		insertContent(recentlyDeletedContentId, "최근 삭제된 콘텐츠", thirtyMinutesAgo);
 		insertContent(activeContentId, "활성 콘텐츠", null);
 
 		JobParameters jobParameters = new JobParametersBuilder()
@@ -67,6 +73,7 @@ public class ContentHardDeleteBatchTest {
 		assertEquals(BatchStatus.COMPLETED, jobExecution.getStatus());
 		assertFalse(contentRepository.findById(deletedContentId1).isPresent());
 		assertFalse(contentRepository.findById(deletedContentId2).isPresent());
+		assertTrue(contentRepository.findById(recentlyDeletedContentId).isPresent());
 		assertTrue(contentRepository.findById(activeContentId).isPresent());
 	}
 

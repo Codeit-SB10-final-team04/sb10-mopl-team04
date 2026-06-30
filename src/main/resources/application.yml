@@ -19,6 +19,7 @@ playlist:
 content:
   hard-delete:
     cron: "0 0 2 * * MON"
+    retention-days: 1
 
 mopl:
   jwt:
