@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,10 +17,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.common.enums.SortDirection;
@@ -30,6 +35,7 @@ import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
 import com.team04.mopl.playlist.service.PlaylistService;
+import com.team04.mopl.user.entity.UserRole;
 
 @WebMvcTest(
 	controllers = PlaylistController.class,
@@ -50,6 +56,11 @@ class PlaylistControllerTest {
 	@MockitoBean
 	private PlaylistService playlistService;
 
+	@AfterEach
+	void tearDown() {
+		SecurityContextHolder.clearContext();
+	}
+
 	@Test
 	@DisplayName("플레이리스트 생성 요청에 성공하면 201 Created와 생성된 플레이리스트 DTO를 반환한다.")
 	void createPlaylist_returnCreated_whenValidRequest() throws Exception {
@@ -61,8 +72,6 @@ class PlaylistControllerTest {
 
 		PlaylistDto response = new PlaylistDto(
 			playlistId,
-			// TODO: UserSummary 구현 후 변경
-			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new UserSummary(currentUserId, "테스트 사용자", null),
 			request.title(),
 			request.description(),
@@ -77,7 +86,7 @@ class PlaylistControllerTest {
 
 		// when, then
 		mockMvc.perform(post("/api/playlists")
-				.header("X-MOPL-USER-ID", currentUserId)
+				.with(moplUser(currentUserId))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(request)))
 			.andExpect(status().isCreated())
@@ -96,11 +105,12 @@ class PlaylistControllerTest {
 	@DisplayName("제목이나 설명이 비어있으면 플레이리스트 생성 요청이 400 Bad Request로 실패한다.")
 	void createPlaylist_returnBadRequest_whenTitleOrDescriptionBlank() throws Exception {
 		// given
+		UUID currentUserId = UUID.randomUUID();
 		PlaylistCreateRequest request = new PlaylistCreateRequest("", "테스트 설명");
 
 		// when, then
 		mockMvc.perform(post("/api/playlists")
-				.header("X-MOPL-USER-ID", UUID.randomUUID())
+				.with(moplUser(currentUserId))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(request)))
 			.andExpect(status().isBadRequest());
@@ -115,8 +125,6 @@ class PlaylistControllerTest {
 
 		PlaylistDto response = new PlaylistDto(
 			playlistId,
-			// TODO: UserSummary 구현 후 변경
-			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new UserSummary(currentUserId, "테스트 사용자", null),
 			"테스트 제목",
 			"테스트 설명",
@@ -131,7 +139,7 @@ class PlaylistControllerTest {
 
 		// when, then
 		mockMvc.perform(get("/api/playlists/{playlistId}", playlistId)
-				.header("X-MOPL-USER-ID", currentUserId)
+				.with(moplUser(currentUserId))
 				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(playlistId.toString()))
@@ -149,7 +157,7 @@ class PlaylistControllerTest {
 
 		// when, then
 		mockMvc.perform(get("/api/playlists")
-				.header("X-MOPL-USER-ID", currentUserId)
+				.with(moplUser(currentUserId))
 				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isBadRequest());
 		// .andExpect(status().isInternalServerError());
@@ -163,7 +171,7 @@ class PlaylistControllerTest {
 
 		// when, then
 		mockMvc.perform(get("/api/playlists/{playlistId}", "UUID")
-				.header("X-MOPL-USER-ID", currentUserId)
+				.with(moplUser(currentUserId))
 				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isBadRequest());
 	}
@@ -178,8 +186,6 @@ class PlaylistControllerTest {
 		PlaylistUpdateRequest request = new PlaylistUpdateRequest("수정 title", "수정 description");
 		PlaylistDto response = new PlaylistDto(
 			playlistId,
-			// TODO: UserSummary 구현 후 변경
-			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new UserSummary(currentUserId, "테스트 사용자", null),
 			"수정 title",
 			"수정 description",
@@ -194,7 +200,7 @@ class PlaylistControllerTest {
 
 		// when, then
 		mockMvc.perform(patch("/api/playlists/{playlistId}", playlistId)
-				.header("X-MOPL-USER-ID", currentUserId)
+				.with(moplUser(currentUserId))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(request)))
 			.andExpect(status().isOk())
@@ -215,7 +221,7 @@ class PlaylistControllerTest {
 
 		// when, then
 		mockMvc.perform(patch("/api/playlists/{playlistId}", playlistId)
-				.header("X-MOPL-USER-ID", currentUserId)
+				.with(moplUser(currentUserId))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(request)))
 			.andExpect(status().isBadRequest());
@@ -232,7 +238,8 @@ class PlaylistControllerTest {
 
 		// when, then
 		mockMvc.perform(delete("/api/playlists/{playlistId}", playlistId)
-				.header("X-MOPL-USER-ID", currentUserId))
+				.with(moplUser(currentUserId))
+				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isOk());
 	}
 
@@ -244,7 +251,8 @@ class PlaylistControllerTest {
 
 		// when, then
 		mockMvc.perform(delete("/api/playlists/{playlistId}", "UUID")
-				.header("X-MOPL-USER-ID", currentUserId))
+				.with(moplUser(currentUserId))
+				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isBadRequest());
 	}
 
@@ -267,8 +275,6 @@ class PlaylistControllerTest {
 
 		PlaylistDto playlistDto1 = new PlaylistDto(
 			playlistId1,
-			// TODO: UserSummary 구현 후 변경
-			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new UserSummary(currentUserId, "currentUserId 사용자", null),
 			"테스트 제목1",
 			"테스트 설명1",
@@ -280,8 +286,6 @@ class PlaylistControllerTest {
 
 		PlaylistDto playlistDto2 = new PlaylistDto(
 			playlistId2,
-			// TODO: UserSummary 구현 후 변경
-			// new UserSummary(currentUserId, "테스트 사용자", null),
 			new UserSummary(ownerId1, "ownerId1 사용자", null),
 			"테스트 제목2",
 			"테스트 설명2",
@@ -310,7 +314,8 @@ class PlaylistControllerTest {
 				.param("limit", "2")
 				.param("sortDirection", SortDirection.DESCENDING.toString())
 				.param("sortBy", PlaylistSortBy.updatedAt.toString())
-				.header("X-MOPL-USER-ID", currentUserId))
+				.with(moplUser(currentUserId))
+				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.size()").value(2))
 			.andExpect(jsonPath("$.data[0].id").value(playlistId1.toString()))
@@ -334,7 +339,8 @@ class PlaylistControllerTest {
 				.param("keywordLike", "제목")
 				.param("sortDirection", SortDirection.DESCENDING.toString())
 				.param("sortBy", PlaylistSortBy.updatedAt.toString())
-				.header("X-MOPL-USER-ID", currentUserId))
+				.with(moplUser(currentUserId))
+				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isBadRequest());
 	}
 
@@ -349,7 +355,8 @@ class PlaylistControllerTest {
 				.param("keywordLike", "제목")
 				.param("limit", "2")
 				.param("sortBy", PlaylistSortBy.updatedAt.toString())
-				.header("X-MOPL-USER-ID", currentUserId))
+				.with(moplUser(currentUserId))
+				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isBadRequest());
 	}
 
@@ -366,7 +373,8 @@ class PlaylistControllerTest {
 				.param("limit", "2")
 				.param("sortDirection", SortDirection.DESCENDING.toString())
 				.param("sortBy", PlaylistSortBy.updatedAt.toString())
-				.header("X-MOPL-USER-ID", currentUserId))
+				.with(moplUser(currentUserId))
+				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isBadRequest());
 	}
 
@@ -383,7 +391,28 @@ class PlaylistControllerTest {
 				.param("limit", "2")
 				.param("sortDirection", SortDirection.DESCENDING.toString())
 				.param("sortBy", PlaylistSortBy.updatedAt.toString())
-				.header("X-MOPL-USER-ID", currentUserId))
+				.with(moplUser(currentUserId))
+				.contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isBadRequest());
+	}
+
+	private RequestPostProcessor moplUser(UUID userId) {
+		return request -> {
+			MoplUserDetails moplUserDetails = MoplUserDetails.authenticated(
+				userId,
+				"test@example.com",
+				UserRole.USER
+			);
+
+			UsernamePasswordAuthenticationToken authentication =
+				new UsernamePasswordAuthenticationToken(
+					moplUserDetails,
+					null,
+					moplUserDetails.getAuthorities()
+				);
+
+			SecurityContextHolder.getContext().setAuthentication(authentication);
+			return request;
+		};
 	}
 }
