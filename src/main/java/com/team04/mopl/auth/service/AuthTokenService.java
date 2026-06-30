@@ -24,8 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-// 세션 삭제 후 AuthException가 발생했을 때 세션 삭제가 롤백되는 것을 막기 위함
-@Transactional(noRollbackFor = AuthException.class)
+@Transactional(readOnly = true)
 public class AuthTokenService {
 
 	private final JwtTokenProvider jwtTokenProvider;
@@ -35,7 +34,8 @@ public class AuthTokenService {
 	private final UserMapper userMapper;
 
 	// refresh token으로 access token과 refresh token을 재발급
-	@Transactional
+	// 세션 삭제 후 AuthException이 발생해도 삭제가 롤백되지 않도록 설정
+	@Transactional(noRollbackFor = AuthException.class)
 	public TokenRefreshResult refresh(String refreshToken) {
 		if (refreshToken == null || refreshToken.isBlank()) {
 			log.warn("[AUTH_REFRESH_TOKEN] 토큰 재발급 실패: refresh token 쿠키 없음");
