@@ -64,6 +64,7 @@ public class ContentController implements ContentControllerDocs {
 	}
 
 	@Override
+	@PreAuthorize("hasRole('ADMIN')")
 	@PatchMapping("/{contentId}")
 	public ResponseEntity<ContentDto> updateContent(@PathVariable UUID contentId,
 		@Valid @RequestPart ContentUpdateRequest contentUpdateRequest,
