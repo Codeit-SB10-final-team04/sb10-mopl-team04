@@ -1,14 +1,15 @@
 package com.team04.mopl.auth.controller;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.team04.mopl.auth.dto.response.JwtDto;
-import com.team04.mopl.auth.service.dto.TokenRefreshResult;
 import com.team04.mopl.auth.security.cookie.RefreshTokenCookieWriter;
 import com.team04.mopl.auth.security.jwt.JwtProperties;
 import com.team04.mopl.auth.service.AuthTokenService;
+import com.team04.mopl.auth.service.dto.TokenRefreshResult;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,7 +37,7 @@ public class AuthController implements AuthControllerDocs {
 
 		refreshTokenCookieWriter.write(response, result.refreshToken());
 
-		return ResponseEntity.ok(result.jwtDto());
+		return ResponseEntity.status(HttpStatus.OK).body(result.jwtDto());
 	}
 
 	// 요청 쿠키에서 refresh token 값을 추출

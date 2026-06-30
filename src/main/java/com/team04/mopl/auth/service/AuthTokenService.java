@@ -6,7 +6,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.auth.dto.response.JwtDto;
-import com.team04.mopl.auth.service.dto.TokenRefreshResult;
 import com.team04.mopl.auth.entity.AuthSession;
 import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.exception.AuthException;
@@ -14,6 +13,7 @@ import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.jwt.JwtTokenProvider;
 import com.team04.mopl.auth.security.jwt.RefreshTokenGenerator;
 import com.team04.mopl.auth.security.jwt.TokenHasher;
+import com.team04.mopl.auth.service.dto.TokenRefreshResult;
 import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.mapper.UserMapper;
@@ -77,11 +77,17 @@ public class AuthTokenService {
 			refreshExpiresAt,
 			refreshedAt
 		).orElseThrow(() -> {
-			log.warn("[AUTH_REFRESH_TOKEN] 토큰 재발급 실패: 인증 세션 갱신 실패, userId={}, sessionId={}", user.getId(), authSession.getSessionId());
+			log.warn("[AUTH_REFRESH_TOKEN] 토큰 재발급 실패: 인증 세션 갱신 실패, userId={}, sessionId={}",
+				user.getId(),
+				authSession.getSessionId()
+			);
 			return new AuthException(AuthErrorCode.AUTH_INVALID_REFRESH_TOKEN);
 		});
 
-		log.info("[AUTH_REFRESH_TOKEN] 토큰 재발급 성공: userId={}, sessionId={}", user.getId(), authSession.getSessionId());
+		log.info("[AUTH_REFRESH_TOKEN] 토큰 재발급 성공: userId={}, sessionId={}",
+			user.getId(),
+			authSession.getSessionId()
+		);
 
 		JwtDto jwtDto = new JwtDto(
 			userMapper.toDto(user),
@@ -107,7 +113,10 @@ public class AuthTokenService {
 			authSession.getSessionId()
 		);
 
-		log.warn("[AUTH_REFRESH_TOKEN] 토큰 재발급 실패: 만료된 refresh token, userId={}, sessionId={}", user.getId(), authSession.getSessionId());
+		log.warn("[AUTH_REFRESH_TOKEN] 토큰 재발급 실패: 만료된 refresh token, userId={}, sessionId={}",
+			user.getId(),
+			authSession.getSessionId()
+		);
 
 		throw new AuthException(AuthErrorCode.AUTH_EXPIRED_REFRESH_TOKEN);
 	}
@@ -122,7 +131,10 @@ public class AuthTokenService {
 
 		authSessionStore.deleteByUserId(user.getId());
 
-		log.warn("[AUTH_REFRESH_TOKEN] 토큰 재발급 실패: 잠긴 계정, userId={}, sessionId={}", user.getId(), authSession.getSessionId());
+		log.warn("[AUTH_REFRESH_TOKEN] 토큰 재발급 실패: 잠긴 계정, userId={}, sessionId={}",
+			user.getId(),
+			authSession.getSessionId()
+		);
 
 		throw new AuthException(AuthErrorCode.AUTH_LOCKED_ACCOUNT);
 	}
