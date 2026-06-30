@@ -47,7 +47,7 @@ class PlaylistSubscriptionControllerTest {
 	}
 
 	@Test
-	@DisplayName("플레이리스트 구독 요청에 성하면 204 No Content를 반환한다.")
+	@DisplayName("플레이리스트 구독 요청에 성공하면 204 No Content를 반환한다.")
 	void subscribePlaylist_returnNoContent_whenValidRequest() throws Exception {
 		// given
 		UUID playlistId = UUID.randomUUID();
