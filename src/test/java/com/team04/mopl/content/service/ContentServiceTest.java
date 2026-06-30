@@ -1,6 +1,7 @@
 package com.team04.mopl.content.service;
 
 import static org.assertj.core.api.AssertionsForClassTypes.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
@@ -18,9 +19,11 @@ import org.springframework.mock.web.MockMultipartFile;
 import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
+import com.team04.mopl.content.dto.request.ContentUpdateRequest;
 import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.entity.Content;
+import com.team04.mopl.content.entity.ContentTag;
 import com.team04.mopl.content.entity.Tag;
 import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.mapper.ContentMapper;
@@ -331,5 +334,136 @@ class ContentServiceTest {
 			.isInstanceOf(RuntimeException.class);
 
 		verify(thumbnailStorage).delete(storedUrl);
+	}
+
+	// ========== updateContent ==========
+
+	@Test
+	@DisplayName("콘텐츠가 존재하지 않으면 예외가 발생한다")
+	void updateContent_throwException_whenContentNotFound() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		ContentUpdateRequest request = new ContentUpdateRequest("새 제목", null, null);
+
+		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> contentService.updateContent(contentId, request, null))
+			.isInstanceOf(ContentException.class);
+
+		verify(thumbnailStorage, never()).store(any());
+	}
+
+	@Test
+	@DisplayName("썸네일 없이 제목과 설명만 수정하면 기존 썸네일이 유지된다")
+	void updateContent_updatesTitleAndDescription_whenNoThumbnail() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		Content content = mock(Content.class);
+		ContentUpdateRequest request = new ContentUpdateRequest("새 제목", "새 설명", null);
+		List<String> existingTags = List.of("액션");
+		ContentDto expectedDto = mock(ContentDto.class);
+
+		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(existingTags);
+		when(contentMapper.toDto(content, existingTags)).thenReturn(expectedDto);
+
+		// when
+		ContentDto result = contentService.updateContent(contentId, request, null);
+
+		// then
+		assertThat(result).isEqualTo(expectedDto);
+		verify(content).updateTitle("새 제목");
+		verify(content).updateDescription("새 설명");
+		verify(content, never()).updateThumbnailUrl(any());
+		verify(thumbnailStorage, never()).store(any());
+		verify(thumbnailStorage, never()).delete(any());
+	}
+
+	@Test
+	@DisplayName("썸네일을 교체하면 새 썸네일을 저장하고 기존 썸네일을 삭제한다")
+	void updateContent_replaceThumbnail_whenNewThumbnailProvided() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		Content content = mock(Content.class);
+		ContentUpdateRequest request = new ContentUpdateRequest(null, null, null);
+		MockMultipartFile newThumbnail = new MockMultipartFile(
+			"thumbnail", "new.png", "image/png", "new-image".getBytes()
+		);
+		String oldUrl = "http://localhost:8080/thumbnails/old.png";
+		String newUrl = "http://localhost:8080/thumbnails/new.png";
+		ContentDto expectedDto = mock(ContentDto.class);
+
+		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(content.getThumbnailUrl()).thenReturn(oldUrl);
+		when(thumbnailStorage.store(newThumbnail)).thenReturn(newUrl);
+		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(List.of());
+		when(contentMapper.toDto(content, List.of())).thenReturn(expectedDto);
+
+		// when
+		ContentDto result = contentService.updateContent(contentId, request, newThumbnail);
+
+		// then
+		assertThat(result).isEqualTo(expectedDto);
+		verify(thumbnailStorage).store(newThumbnail);
+		verify(content).updateThumbnailUrl(newUrl);
+		verify(thumbnailStorage).delete(oldUrl);
+	}
+
+	@Test
+	@DisplayName("태그 목록이 전달되면 기존 태그를 조회하거나 생성해 중간 테이블에 추가한다")
+	void updateContent_upsertTags_whenTagsProvided() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		Content content = mock(Content.class);
+		ContentUpdateRequest request = new ContentUpdateRequest(null, null, List.of("액션", "SF"));
+		Tag existingTag = Tag.builder().name("액션").build();
+		Tag newTag = Tag.builder().name("SF").build();
+		ContentDto expectedDto = mock(ContentDto.class);
+
+		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(tagRepository.findByName("액션")).thenReturn(Optional.of(existingTag));
+		when(tagRepository.findByName("SF")).thenReturn(Optional.empty());
+		when(tagRepository.save(any(Tag.class))).thenReturn(newTag);
+		when(contentTagRepository.existsByContentAndTag(content, existingTag)).thenReturn(true);
+		when(contentTagRepository.existsByContentAndTag(content, newTag)).thenReturn(false);
+		when(contentMapper.toDto(eq(content), eq(List.of("액션", "SF")))).thenReturn(expectedDto);
+
+		// when
+		ContentDto result = contentService.updateContent(contentId, request, null);
+
+		// then
+		assertThat(result).isEqualTo(expectedDto);
+		verify(tagRepository).findByName("액션");
+		verify(tagRepository).findByName("SF");
+		verify(tagRepository).save(any(Tag.class)); // SF는 새로 생성
+		verify(contentTagRepository, never()).save(argThat(ct -> ct.getTag().equals(existingTag))); // 액션은 이미 존재
+		verify(contentTagRepository).save(argThat(ct -> ct.getTag().equals(newTag))); // SF는 새로 저장
+	}
+
+	@Test
+	@DisplayName("DB 저장 실패 시 새로 저장한 썸네일을 삭제한다")
+	void updateContent_deleteNewThumbnail_whenRepositoryFails() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		Content content = mock(Content.class);
+		ContentUpdateRequest request = new ContentUpdateRequest("새 제목", null, null);
+		MockMultipartFile newThumbnail = new MockMultipartFile(
+			"thumbnail", "new.png", "image/png", "new-image".getBytes()
+		);
+		String oldUrl = "http://localhost:8080/thumbnails/old.png";
+		String newUrl = "http://localhost:8080/thumbnails/new.png";
+
+		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(content.getThumbnailUrl()).thenReturn(oldUrl);
+		when(thumbnailStorage.store(newThumbnail)).thenReturn(newUrl);
+		doThrow(new RuntimeException("DB 저장 실패")).when(content).updateTitle("새 제목"); // DB 저장 예외 실패 떤지기
+
+		// when & then
+		assertThatThrownBy(() -> contentService.updateContent(contentId, request, newThumbnail))
+			.isInstanceOf(RuntimeException.class);
+
+		verify(thumbnailStorage).delete(newUrl);
+		verify(thumbnailStorage, never()).delete(oldUrl);
 	}
 }
