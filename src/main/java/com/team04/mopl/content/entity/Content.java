@@ -91,14 +91,20 @@ public class Content extends BaseUpdatableEntity {
 	}
 
 	public void updateTitle(String title) {
-		if (title != null) this.title = title;
+		if (title != null) {
+			this.title = title;
+		}
 	}
 
 	public void updateDescription(String description) {
-		if (description != null) this.description = description;
+		if (description != null) {
+			this.description = description;
+		}
 	}
 
 	public void updateThumbnailUrl(String thumbnailUrl) {
-		if (thumbnailUrl != null) this.thumbnailUrl = thumbnailUrl;
+		if (thumbnailUrl != null) {
+			this.thumbnailUrl = thumbnailUrl;
+		}
 	}
 }
