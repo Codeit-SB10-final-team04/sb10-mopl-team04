@@ -44,7 +44,8 @@ public class Review extends BaseUpdatableEntity {
 	private Instant deletedAt;
 
 	@Builder
-	protected Review(Content content, String text, short rating) {
+	protected Review(User user, Content content, String text, short rating) {
+		this.user = user;
 		this.content = content;
 		this.text = text;
 		this.rating = rating;
