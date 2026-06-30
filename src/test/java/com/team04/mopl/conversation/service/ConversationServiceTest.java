@@ -393,4 +393,27 @@ class ConversationServiceTest {
 		assertThatThrownBy(() -> conversationService.findConversationByUserId(userId, moplUserDetails))
 			.isInstanceOf(UserException.class);
 	}
+
+	@Test
+	@DisplayName("실패: 상대 유저는 존재하지만, 공통 대화방이 없으면 ConversationException이 발생한다")
+	void findConversationByUserId_Fail_ConversationNotFound() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
+		given(moplUserDetails.getUserId()).willReturn(requestUserId);
+
+		UUID withUserId = UUID.randomUUID();
+		User withUser = mock(User.class);
+		given(withUser.getId()).willReturn(withUserId);
+
+		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
+
+		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
+			.willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> conversationService.findConversationByUserId(withUserId, moplUserDetails))
+			.isInstanceOf(ConversationException.class)
+			.hasFieldOrPropertyWithValue("errorCode", ConversationErrorCode.CONVERSATION_NOT_FOUND);
+	}
 }
