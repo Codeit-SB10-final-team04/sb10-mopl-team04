@@ -1,5 +1,7 @@
 package com.team04.mopl.content.scheduler;
 
+import javax.annotation.processing.Generated;
+
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
@@ -16,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 // 정해진 시간에 논리 삭제된 콘텐츠를 물리 삭제하는 스케줄러
+@Generated("jacoco-exclude") // jacoco 테스트 커버리지 제외
 @Component
 @Slf4j
 @RequiredArgsConstructor

@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.annotation.processing.Generated;
+
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
@@ -36,6 +38,8 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>{@link #isSeasonSkippable}: COMPLETED + RUNNING 상태 모두 확인해 시즌 단위 중복 실행 방지</li>
  * </ul>
  */
+
+@Generated("jacoco-exclude") // jacoco 테스트 커버리지 제외
 @Slf4j
 @Component
 @RequiredArgsConstructor
