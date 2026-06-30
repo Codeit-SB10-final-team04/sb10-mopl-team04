@@ -45,7 +45,7 @@ public class AuthController implements AuthControllerDocs {
 	@Override
 	@GetMapping("/api/auth/csrf-token")
 	public ResponseEntity<Void> getCsrfToken() {
-		return ResponseEntity.noContent().build();
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 	}
 
 	// 요청 쿠키에서 refresh token 값을 추출
