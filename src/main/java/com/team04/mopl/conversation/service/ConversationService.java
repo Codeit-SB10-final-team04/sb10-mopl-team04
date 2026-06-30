@@ -136,6 +136,22 @@ public class ConversationService {
 		return conversationMapper.toDto(conversation, with, latestMessage, hasUnread);
 	}
 
+	// 특정 사용자와의 대화 조회
+	public ConversationDto findConversationByUserId(UUID usserId, MoplUserDetails moplUserDetails) {
+
+		// 1. 로그인 정보로부터 요청자 ID 추출
+
+		// 2. 유효성 검증: 요청자 및 대화 상대 존재
+
+		// 3. 유효성 검증: 대화 존재 유무
+
+		// 4. 대화 상대 정보 조회
+
+		// 5. 마지막 메시지 내용 조회
+
+		// 6. 안 읽음 여부 조회
+	}
+
 	// 유효성 검증: 대화 중복 검사
 	private void validateDuplicateConversation(UUID requestUserId, UUID withUserId) {
 		conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
