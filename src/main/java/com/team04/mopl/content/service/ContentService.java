@@ -134,6 +134,8 @@ public class ContentService {
 	@Transactional
 	public ContentDto updateContent(UUID contentId, ContentUpdateRequest contentUpdateRequest,
 		MultipartFile thumbnail) {
+		log.info("[콘텐츠 수정 시작] contentId={}", contentId);
+
 		// 콘텐츠 조회
 		Content content = getNotDeletedContentEntityOrThrow(contentId);
 
@@ -143,6 +145,7 @@ public class ContentService {
 
 		if (thumbnail != null) {
 			newThumbnailUrl = thumbnailStorage.store(thumbnail);
+			log.info("[콘텐츠 수정] 썸네일 교체 예정: contentId={}, oldUrl={}, newUrl={}", contentId, oldThumbnailUrl, newThumbnailUrl);
 		}
 
 		try {
@@ -157,6 +160,8 @@ public class ContentService {
 			List<String> tagNames;
 
 			if (contentUpdateRequest.tags() != null) {
+				log.debug("[콘텐츠 수정] 태그 갱신: contentId={}, tags={}", contentId, contentUpdateRequest.tags());
+
 				// 태그 조회 or 생성
 				List<Tag> tags = contentUpdateRequest.tags().stream()
 					.map(name -> tagRepository.findByName(name)
@@ -184,6 +189,8 @@ public class ContentService {
 					log.error("기존 썸네일 삭제 실패, 배치 정리 필요. url={}", oldThumbnailUrl, e);
 				}
 			}
+
+			log.info("[콘텐츠 수정 완료] contentId={}", contentId);
 
 			return contentMapper.toDto(content, tagNames);
 
