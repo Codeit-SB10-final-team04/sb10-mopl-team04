@@ -1,6 +1,8 @@
 package com.team04.mopl.user.repository;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,4 +18,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
 	// lock 되지 않은 사용자 조회
 	Optional<User> findByIdAndLockedFalse(UUID id);
+
+	List<User> findAllByIdInAndLockedFalse(Set<UUID> ids);
 }
