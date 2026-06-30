@@ -254,7 +254,7 @@ class ContentControllerTest {
 	void updateContent_returnOK_whenThumbnailProvided() throws Exception {
 		// given
 		UUID contentId = UUID.randomUUID();
-		ContentUpdateRequest request = new ContentUpdateRequest(null, null, null);
+		ContentUpdateRequest request = new ContentUpdateRequest("인터스텔라", "우주 이야기", null);
 		ContentDto response = new ContentDto(
 			contentId, ContentType.movie, "인터스텔라", "우주 이야기",
 			"http://localhost:8080/thumbnails/new.png",
@@ -285,7 +285,7 @@ class ContentControllerTest {
 	void updateContent_returnNotFound_whenContentNotExists() throws Exception {
 		// given
 		UUID contentId = UUID.randomUUID();
-		ContentUpdateRequest request = new ContentUpdateRequest("새 제목", null, null);
+		ContentUpdateRequest request = new ContentUpdateRequest("새 제목", "새 설명", null);
 		MockMultipartFile requestPart = new MockMultipartFile(
 			"contentUpdateRequest", "", MediaType.APPLICATION_JSON_VALUE,
 			objectMapper.writeValueAsBytes(request)
