@@ -104,7 +104,6 @@ public class PlaylistSubscriptionService {
 
 	// 삭제되지 않은 플레이리스트를 소유자 정보와 함께 조회
 	private Playlist getPlaylistOrThrow(UUID playlistId) {
-		// UserSummary를 만들기 위해서 owner 정보가 필요
 		return playlistRepository.findByIdWithOwnerAndDeletedAtIsNull(playlistId)
 			.orElseThrow(() -> new PlaylistException(PlaylistErrorCode.PLAYLIST_NOT_FOUND));
 	}

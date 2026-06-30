@@ -22,24 +22,24 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
-import com.team04.mopl.playlist.service.PlaylistSubscriptionService;
+import com.team04.mopl.playlist.service.PlaylistContentService;
 import com.team04.mopl.user.entity.UserRole;
 
 @WebMvcTest(
-	controllers = PlaylistSubscriptionController.class,
+	controllers = PlaylistContentController.class,
 	excludeFilters = @ComponentScan.Filter(
 		type = FilterType.ASSIGNABLE_TYPE,
 		classes = JwtAuthenticationFilter.class
 	)
 )
 @AutoConfigureMockMvc(addFilters = false)
-class PlaylistSubscriptionControllerTest {
+class PlaylistContentControllerTest {
 
 	@Autowired
 	private MockMvc mockMvc;
 
 	@MockitoBean
-	private PlaylistSubscriptionService playlistSubscriptionService;
+	private PlaylistContentService playlistContentService;
 
 	@AfterEach
 	void tearDown() {
@@ -47,49 +47,69 @@ class PlaylistSubscriptionControllerTest {
 	}
 
 	@Test
-	@DisplayName("플레이리스트 구독 요청에 성공하면 204 No Content를 반환한다.")
-	void subscribePlaylist_returnNoContent_whenValidRequest() throws Exception {
+	@DisplayName("플레이리스트 내 콘텐츠 추가 요청에 성공하면 204 No Content를 반환한다.")
+	void addContentToPlaylist_returnNoContent_whenValidRequest() throws Exception {
 		// given
-		UUID playlistId = UUID.randomUUID();
 		UUID currentUserId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+		UUID contentId = UUID.randomUUID();
 
 		doNothing()
-			.when(playlistSubscriptionService)
-			.subscribePlaylist(playlistId, currentUserId);
+			.when(playlistContentService)
+			.addContentToPlaylist(playlistId, contentId, currentUserId);
 
 		// when, then
-		mockMvc.perform(post("/api/playlists/{playlistId}/subscription", playlistId)
+		mockMvc.perform(post("/api/playlists/{playlistId}/contents/{contentId}", playlistId, contentId)
 				.with(moplUser(currentUserId)))
 			.andExpect(status().isNoContent());
+
+		verify(playlistContentService).addContentToPlaylist(playlistId, contentId, currentUserId);
 	}
 
 	@Test
-	@DisplayName("플레이리스트 id가 UUID 형식이 아니면 400 Bad Request를 반환한다.")
-	void subscribePlaylist_returnBadRequest_whenPlaylistIdIsInvalidFormat() throws Exception {
+	@DisplayName("플레이리스트/콘텐츠 id가 UUID 형식이 아니라면 400 Bad Request를 반환한다.")
+	void addContentToPlaylist_returnBadRequest_whenPlaylistIdIsInvalidFormat() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
+		UUID contentId = UUID.randomUUID();
 
 		// when, then
-		mockMvc.perform(post("/api/playlists/{playlistId}/subscription", "UUID")
+		mockMvc.perform(post("/api/playlists/{playlistId}/contents/{contentId}", "UUID", contentId)
 				.with(moplUser(currentUserId)))
 			.andExpect(status().isBadRequest());
 	}
 
 	@Test
-	@DisplayName("플레이리스트 구독 취소 요청에 성공하면 204 No Content를 반환한다.")
-	void unSubscribePlaylist_returnNoContent_whenValidRequest() throws Exception {
+	@DisplayName("플레이리스트 내 콘텐츠 삭제 요청에 성공하면 204 No Content를 반환한다.")
+	void deleteContentFromPlaylist_returnNoContent_whenValidRequest() throws Exception {
 		// given
-		UUID playlistId = UUID.randomUUID();
 		UUID currentUserId = UUID.randomUUID();
+		UUID playlistId = UUID.randomUUID();
+		UUID contentId = UUID.randomUUID();
 
 		doNothing()
-			.when(playlistSubscriptionService)
-			.unSubscribePlaylist(playlistId, currentUserId);
+			.when(playlistContentService)
+			.deleteContentFromPlaylist(playlistId, contentId, currentUserId);
 
 		// when, then
-		mockMvc.perform(delete("/api/playlists/{playlistId}/subscription", playlistId)
+		mockMvc.perform(delete("/api/playlists/{playlistId}/contents/{contentId}", playlistId, contentId)
 				.with(moplUser(currentUserId)))
 			.andExpect(status().isNoContent());
+
+		verify(playlistContentService).deleteContentFromPlaylist(playlistId, contentId, currentUserId);
+	}
+
+	@Test
+	@DisplayName("플레이리스트/콘텐츠 id가 UUID 형식이 아니라면 400 Bad Request를 반환한다.")
+	void deleteContentToPlaylist_returnBadRequest_whenPlaylistIdIsInvalidFormat() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID contentId = UUID.randomUUID();
+
+		// when, then
+		mockMvc.perform(delete("/api/playlists/{playlistId}/contents/{contentId}", "UUID", contentId)
+				.with(moplUser(currentUserId)))
+			.andExpect(status().isBadRequest());
 	}
 
 	private RequestPostProcessor moplUser(UUID userId) {
