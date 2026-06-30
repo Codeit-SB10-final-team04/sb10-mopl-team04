@@ -1,6 +1,7 @@
 package com.team04.mopl.conversation.service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -123,11 +124,13 @@ public class ConversationService {
 		UserSummary with = getUserSummary(withUser);
 
 		// 4. 마지막 메시지 내용 조회
-		DirectMessage latestDirectMessage = getLatestMessageEntityOrNull(conversationId);
-		DirectMessageDto latestMessage = latestDirectMessage != null    // 대화방 내 메시지가 존재하는 경우
-			? directMessageMapper.toDto(latestDirectMessage)            // DTO 전환
-			: null;
+		DirectMessage latestDirectMessage = getLatestMessageEntity(conversationId)
+			.orElse(null);
 
+		DirectMessageDto latestMessage = getLatestMessageEntity(conversationId)
+			.map(directMessageMapper::toDto)
+			.orElse(null);
+		
 		// 5. 안 읽음 여부 판단
 		boolean hasUnread = hasUnreadMessage(latestDirectMessage, requestUserId);
 
@@ -179,9 +182,8 @@ public class ConversationService {
 	}
 
 	// 마지막 메시지 조회
-	private DirectMessage getLatestMessageEntityOrNull(UUID conversationId) {
-		return directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId)
-			.orElse(null);
+	private Optional<DirectMessage> getLatestMessageEntity(UUID conversationId) {
+		return directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId);
 	}
 
 	// 사용자 요약 정보 반환
