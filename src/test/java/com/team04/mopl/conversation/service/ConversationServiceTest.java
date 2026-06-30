@@ -236,10 +236,9 @@ class ConversationServiceTest {
 		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId)).willReturn(
 			Optional.of(latestMessage));
 		given(directMessageMapper.toDto(latestMessage)).willReturn(latestMessageDto);
-		
+
 		ConversationDto expectedDto = mock(ConversationDto.class);
-		given(conversationMapper.toDto(any(Conversation.class), any(UserSummary.class), any(DirectMessageDto.class),
-			anyBoolean()))
+		given(conversationMapper.toDto(eq(conversation), any(UserSummary.class), eq(latestMessageDto), eq(false)))
 			.willReturn(expectedDto);
 
 		// when
@@ -247,6 +246,7 @@ class ConversationServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
+		verify(conversationMapper).toDto(eq(conversation), any(UserSummary.class), eq(latestMessageDto), eq(false));
 	}
 
 	@Test
