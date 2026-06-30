@@ -31,4 +31,13 @@ public interface ConversationControllerDocs {
 		UUID conversationId,
 		MoplUserDetails moplUserDetails
 	);
+
+	@Operation(
+		summary = "특정 사용자와의 대화 조회",
+		description = "대화 상대 ID를 통해 특정 대화방을 조회합니다."
+	)
+	ResponseEntity<ConversationDto> findConversationByUserId(
+		UUID userId,
+		MoplUserDetails moplUserDetails
+	);
 }

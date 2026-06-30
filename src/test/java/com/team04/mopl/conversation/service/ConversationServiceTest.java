@@ -202,6 +202,11 @@ class ConversationServiceTest {
 			.hasMessage(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS.getMessage());
 	}
 
+	/*
+	=========================
+		대화 단건 조회
+	=========================
+	 */
 	@Test
 	@DisplayName("성공: 메시지가 존재하는 대화방을 조회하면 상대방 정보와 마지막 메시지를 조립하여 반환한다.")
 	void findConversationById_WithLatestMessage_Success() {
@@ -335,5 +340,81 @@ class ConversationServiceTest {
 		// when & then
 		assertThatThrownBy(() -> conversationService.findConversationById(conversationId, moplUserDetails))
 			.isInstanceOf(UserException.class);
+	}
+
+	/*
+	=========================
+		특정 사용자와의 대화 조회
+	=========================
+	 */
+	@Test
+	@DisplayName("성공: 특정 사용자 조회 시 기존 대화방이 존재하면 DTO를 반환한다")
+	void findConversationByUserId_Success_Existing() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
+		given(moplUserDetails.getUserId()).willReturn(requestUserId);
+
+		UUID withUserId = UUID.randomUUID();
+		User withUser = mock(User.class);
+		given(withUser.getId()).willReturn(withUserId);
+		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
+
+		UUID conversationId = UUID.randomUUID();
+		Conversation conversation = mock(Conversation.class);
+		given(conversation.getId()).willReturn(conversationId);
+
+		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
+			.willReturn(Optional.of(conversationId));
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+		ConversationDto mockDto = mock(ConversationDto.class);
+		given(conversationMapper.toDto(any(), any(), any(), anyBoolean())).willReturn(mockDto);
+
+		// when
+		ConversationDto result = conversationService.findConversationByUserId(withUserId, moplUserDetails);
+
+		// then
+		assertThat(result).isNotNull();
+		assertThat(result).isSameAs(mockDto);
+		verify(conversationParticipantRepository).findExistingConversationId(requestUserId, withUserId);
+		verify(conversationRepository).findById(conversationId);
+	}
+
+	@Test
+	@DisplayName("실패: 존재하지 않는 userId로 조회 시 UserException 발생")
+	void findConversationByUserId_Fail_UserNotFound() {
+		// given
+		UUID userId = UUID.randomUUID();
+		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
+
+		given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> conversationService.findConversationByUserId(userId, moplUserDetails))
+			.isInstanceOf(UserException.class);
+	}
+
+	@Test
+	@DisplayName("실패: 상대 유저는 존재하지만, 공통 대화방이 없으면 ConversationException이 발생한다")
+	void findConversationByUserId_Fail_ConversationNotFound() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
+		given(moplUserDetails.getUserId()).willReturn(requestUserId);
+
+		UUID withUserId = UUID.randomUUID();
+		User withUser = mock(User.class);
+		given(withUser.getId()).willReturn(withUserId);
+
+		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
+
+		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
+			.willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> conversationService.findConversationByUserId(withUserId, moplUserDetails))
+			.isInstanceOf(ConversationException.class)
+			.hasFieldOrPropertyWithValue("errorCode", ConversationErrorCode.CONVERSATION_NOT_FOUND);
 	}
 }

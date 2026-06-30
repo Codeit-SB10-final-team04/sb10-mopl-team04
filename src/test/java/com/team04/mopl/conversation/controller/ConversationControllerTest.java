@@ -218,4 +218,80 @@ class ConversationControllerTest {
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.message").value(UserErrorCode.USER_NOT_FOUND.getMessage()));
 	}
+
+	/*
+	=========================
+		특정 사용자와의 대화 조회
+	=========================
+	 */
+	@Test
+	@DisplayName("성공: 특정 사용자 조회 요청 시 200 OK 반환")
+	void findByUserId_Success() throws Exception {
+		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+
+		UUID userId = UUID.randomUUID();
+		ConversationDto responseDto = mock(ConversationDto.class);
+
+		given(conversationService.findConversationByUserId(
+			eq(userId),
+			argThat(userDetails -> userDetails != null && requesterUserId.equals(userDetails.getUserId()))))
+			.willReturn(responseDto);
+
+		mockMvc.perform(get("/api/conversations/with", UUID.randomUUID())
+				.param("userId", userId.toString())
+				.with(user(mockUserDetails)))
+			.andExpect(status().isOk());
+	}
+
+	@Test
+	@DisplayName("실패: 유효하지 않은 userId로 요청 시 404 반환")
+	void findByUserId_Fail_UserNotFound() throws Exception {
+		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+
+		UUID userId = UUID.randomUUID();
+
+		// when & then
+		given(conversationService.findConversationByUserId(any(), any()))
+			.willThrow(new UserException(UserErrorCode.USER_NOT_FOUND));
+
+		mockMvc.perform(get("/api/conversations/with")
+				.param("userId", userId.toString())
+				.with(user(mockUserDetails)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.message").value(UserErrorCode.USER_NOT_FOUND.getMessage()));
+	}
+
+	@Test
+	@DisplayName("실패: 상대 유저는 존재하지만 대화방이 없으면 404 Not Found를 반환한다")
+	void findByUserId_Fail_ConversationNotFound() throws Exception {
+		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+
+		given(conversationService.findConversationByUserId(any(), any()))
+			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
+
+		// when & then
+		mockMvc.perform(get("/api/conversations/with")
+				.param("userId", UUID.randomUUID().toString())
+				.with(user(mockUserDetails)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage()));
+	}
 }
