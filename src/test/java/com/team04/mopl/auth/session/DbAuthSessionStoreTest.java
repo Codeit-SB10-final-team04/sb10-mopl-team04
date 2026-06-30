@@ -511,6 +511,32 @@ class DbAuthSessionStoreTest {
 	}
 
 	@Test
+	@DisplayName("현재 refresh token hash가 null이면 refresh에 실패한다")
+	void refresh_throwIllegalArgumentException_whenCurrentRefreshTokenHashIsNull() {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
+
+		// when
+		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.refresh(
+			userId,
+			null,
+			"new-refresh-token-hash",
+			refreshedAt.plusSeconds(1800),
+			refreshedAt.plusSeconds(1209600),
+			refreshedAt
+		);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("현재 Refresh Token 해시는 필수입니다.");
+
+		verifyNoInteractions(entityManager);
+		verifyNoInteractions(authSessionRepository);
+	}
+
+	@Test
 	@DisplayName("새 refresh token hash가 공백이면 refresh에 실패한다")
 	void refresh_throwIllegalArgumentException_whenNewRefreshTokenHashIsBlank() {
 		// given
@@ -522,6 +548,32 @@ class DbAuthSessionStoreTest {
 			userId,
 			"current-refresh-token-hash",
 			"   ",
+			refreshedAt.plusSeconds(1800),
+			refreshedAt.plusSeconds(1209600),
+			refreshedAt
+		);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("새 Refresh Token 해시는 필수입니다.");
+
+		verifyNoInteractions(entityManager);
+		verifyNoInteractions(authSessionRepository);
+	}
+
+	@Test
+	@DisplayName("새 refresh token hash가 null이면 refresh에 실패한다")
+	void refresh_throwIllegalArgumentException_whenNewRefreshTokenHashIsNull() {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant refreshedAt = Instant.parse("2026-06-24T01:00:00Z");
+
+		// when
+		ThrowableAssert.ThrowingCallable action = () -> authSessionStore.refresh(
+			userId,
+			"current-refresh-token-hash",
+			null,
 			refreshedAt.plusSeconds(1800),
 			refreshedAt.plusSeconds(1209600),
 			refreshedAt
