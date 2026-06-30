@@ -185,7 +185,7 @@ class AuthSessionLogoutHandlerTest {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 
 		when(jwtTokenProvider.parseAccessToken(accessToken))
-			.thenThrow(new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN));
+			.thenThrow(new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN));
 
 		// when & then
 		assertThatCode(() -> authSessionLogoutHandler.logout(request, response, null))

@@ -37,7 +37,6 @@ public class DbAuthSessionStore implements AuthSessionStore {
 		Objects.requireNonNull(userId, "userId는 필수입니다.");
 
 		// 같은 사용자에 대한 동시 replace()를 직렬화하기 위해 사용자 row에 비관적 락
-		// 동시에 로그인 요청이 들어오면 delete -> insert 과정에서 user_id unique 충돌이 날 수 있음
 		User user = findUserForUpdate(userId);
 
 		// 사용자당 활성 세션은 하나만 있어야 하므로 기존 세션이 있으면 삭제
@@ -63,6 +62,7 @@ public class DbAuthSessionStore implements AuthSessionStore {
 	@Override
 	public Optional<AuthSession> findByUserId(UUID userId) {
 		Objects.requireNonNull(userId, "userId는 필수입니다.");
+
 		return authSessionRepository.findByUser_Id(userId);
 	}
 
@@ -73,9 +73,17 @@ public class DbAuthSessionStore implements AuthSessionStore {
 			return false;
 		}
 
-		// DB에 userId + sessionId 조합이 존재 -> 현재 살아있는 세션
-		// 로그아웃, 권한 변경, 계정 잠금으로 세션이 삭제되면 false가 됨
 		return authSessionRepository.existsByUser_IdAndSessionId(userId, sessionId);
+	}
+
+	// refresh token 기준 인증 세션 조회
+	@Override
+	public Optional<AuthSession> findByRefreshTokenHash(String refreshTokenHash) {
+		if (refreshTokenHash == null || refreshTokenHash.isBlank()) {
+			return Optional.empty();
+		}
+
+		return authSessionRepository.findByRefreshTokenHash(refreshTokenHash);
 	}
 
 	// refresh token 재발급 시 인증 세션의 refresh token과 만료시간을 갱신
@@ -83,17 +91,21 @@ public class DbAuthSessionStore implements AuthSessionStore {
 	@Transactional
 	public Optional<AuthSession> refresh(
 		UUID userId,
-		String refreshTokenHash,
+		String currentRefreshTokenHash,
+		String newRefreshTokenHash,
 		Instant accessExpiresAt,
 		Instant refreshExpiresAt,
 		Instant refreshedAt
 	) {
 		Objects.requireNonNull(userId, "userId는 필수입니다.");
+		String currentHash = requireText(currentRefreshTokenHash, "현재 Refresh Token 해시는 필수입니다.");
+		String newHash = requireText(newRefreshTokenHash, "새 Refresh Token 해시는 필수입니다.");
 
-		return authSessionRepository.findByUser_Id(userId)
+		return authSessionRepository.findByRefreshTokenHash(currentHash)
+			.filter(authSession -> authSession.getUser().getId().equals(userId))
 			.map(authSession -> {
 				authSession.refresh(
-					refreshTokenHash,
+					newHash,
 					accessExpiresAt,
 					refreshExpiresAt,
 					refreshedAt
@@ -110,7 +122,6 @@ public class DbAuthSessionStore implements AuthSessionStore {
 		Objects.requireNonNull(userId, "userId는 필수입니다.");
 
 		// 세션이 없어도 예외를 던지지 않음
-		// 로그아웃/강제 로그아웃 흐름에서 멱등하게 호출 가능해야 함
 		authSessionRepository.deleteByUser_Id(userId);
 	}
 
@@ -122,15 +133,13 @@ public class DbAuthSessionStore implements AuthSessionStore {
 		Objects.requireNonNull(sessionId, "sessionId는 필수입니다.");
 
 		// 세션이 없어도 예외를 던지지 않음
-		// 로그아웃은 멱등하게 호출 가능해야 함
 		authSessionRepository.deleteByUser_IdAndSessionId(userId, sessionId);
 	}
 
+	// replace() 동시 호출 방지를 위해 사용자 row를 비관적 락으로 조회
 	private User findUserForUpdate(UUID userId) {
 		Objects.requireNonNull(userId, "userId는 필수입니다.");
 
-		// replace() 동시 호출 방지를 위해 PESSIMISTIC_WRITE 락 적용
-		// 같은 사용자에 대한 로그인 요청이 동시에 들어오면 user row 기준으로 직렬화됨
 		User user = entityManager.find(
 			User.class,
 			userId,
@@ -142,5 +151,14 @@ public class DbAuthSessionStore implements AuthSessionStore {
 		}
 
 		return user;
+	}
+
+	// 문자열 필수값을 검증
+	private static String requireText(String value, String message) {
+		if (value == null || value.isBlank()) {
+			throw new IllegalArgumentException(message);
+		}
+
+		return value;
 	}
 }

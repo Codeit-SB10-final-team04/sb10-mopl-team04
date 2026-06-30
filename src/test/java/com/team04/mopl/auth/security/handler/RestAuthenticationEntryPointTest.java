@@ -42,6 +42,6 @@ class RestAuthenticationEntryPointTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.UNAUTHORIZED);
+			.isEqualTo(AuthErrorCode.AUTH_UNAUTHORIZED);
 	}
 }

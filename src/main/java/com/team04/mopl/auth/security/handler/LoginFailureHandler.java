@@ -46,17 +46,17 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 	// 예외 타입에 맞는 인증 에러 코드를 결정
 	private AuthErrorCode resolveErrorCode(AuthenticationException exception) {
 		if (exception instanceof LockedException) {
-			return AuthErrorCode.LOCKED_ACCOUNT;
+			return AuthErrorCode.AUTH_LOCKED_ACCOUNT;
 		}
 
 		if (exception instanceof BadCredentialsException || exception instanceof UsernameNotFoundException) {
-			return AuthErrorCode.INVALID_CREDENTIALS;
+			return AuthErrorCode.AUTH_INVALID_CREDENTIALS;
 		}
 
 		if (exception instanceof AuthenticationServiceException) {
-			return AuthErrorCode.AUTHENTICATION_SERVICE_ERROR;
+			return AuthErrorCode.AUTH_SERVICE_ERROR;
 		}
 
-		return AuthErrorCode.AUTHENTICATION_SERVICE_ERROR;
+		return AuthErrorCode.AUTH_SERVICE_ERROR;
 	}
 }

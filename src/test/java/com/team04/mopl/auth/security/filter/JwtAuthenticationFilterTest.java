@@ -2,11 +2,7 @@ package com.team04.mopl.auth.security.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.same;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.util.UUID;
 
@@ -14,6 +10,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -27,6 +25,8 @@ import com.team04.mopl.auth.security.jwt.JwtTokenProvider;
 import com.team04.mopl.auth.security.support.AuthResponseWriter;
 import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.user.entity.UserRole;
+
+import jakarta.servlet.FilterChain;
 
 class JwtAuthenticationFilterTest {
 
@@ -134,6 +134,30 @@ class JwtAuthenticationFilterTest {
 	}
 
 	@Test
+	@DisplayName("POST /api/auth/refresh 요청은 JWT 인증 필터를 적용하지 않는다")
+	void doFilter_skipJwtAuthentication_whenRefreshRequest() throws Exception {
+		// given
+		MockHttpServletRequest request = new MockHttpServletRequest(
+			HttpMethod.POST.name(),
+			"/api/auth/refresh"
+		);
+		request.setServletPath("/api/auth/refresh");
+		request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer access-token");
+
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		FilterChain filterChain = mock(FilterChain.class);
+
+		// when
+		jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+		// then
+		verify(filterChain).doFilter(request, response);
+		verifyNoInteractions(jwtTokenProvider);
+		verifyNoInteractions(authSessionStore);
+		verifyNoInteractions(authResponseWriter);
+	}
+
+	@Test
 	@DisplayName("Bearer 형식이 아니면 인증 에러 응답을 반환한다")
 	void doFilterInternal_writesError_whenAuthorizationHeaderIsNotBearerType() throws Exception {
 		// given
@@ -154,7 +178,7 @@ class JwtAuthenticationFilterTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 	}
 
@@ -179,7 +203,7 @@ class JwtAuthenticationFilterTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 	}
 
@@ -275,7 +299,7 @@ class JwtAuthenticationFilterTest {
 		MockFilterChain filterChain = new MockFilterChain();
 
 		when(jwtTokenProvider.parseAccessToken(accessToken))
-			.thenThrow(new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN));
+			.thenThrow(new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN));
 
 		ArgumentCaptor<AuthException> exceptionCaptor = ArgumentCaptor.forClass(AuthException.class);
 
@@ -287,7 +311,7 @@ class JwtAuthenticationFilterTest {
 
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
-			.isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
 	}
 }

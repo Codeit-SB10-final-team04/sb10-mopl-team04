@@ -68,11 +68,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		}
 	}
 
-	// 로그인/로그아웃 요청은 JWT 인증 필터를 적용하지 않도록 제외
+	// 로그인/로그아웃/토큰 재발급 요청은 JWT 인증 필터를 적용하지 않도록 제외
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
 		return isPost(request, "/api/auth/sign-in")
-			|| isPost(request, "/api/auth/sign-out");
+			|| isPost(request, "/api/auth/sign-out")
+			|| isPost(request, "/api/auth/refresh");
 	}
 
 	// Authorization 헤더에서 Bearer Access Token 추출
@@ -84,13 +85,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		}
 
 		if (!authorizationHeader.startsWith(BEARER_PREFIX)) {
-			throw new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			throw new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		}
 
 		String accessToken = authorizationHeader.substring(BEARER_PREFIX.length());
 
 		if (accessToken.isBlank()) {
-			throw new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			throw new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		}
 
 		return accessToken;
