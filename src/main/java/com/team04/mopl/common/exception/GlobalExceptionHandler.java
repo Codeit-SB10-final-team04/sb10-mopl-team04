@@ -189,7 +189,7 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleAccessDeniedException(
 		AccessDeniedException exception
 	) {
-		AuthException authException = new AuthException(AuthErrorCode.ACCESS_DENIED, exception);
+		AuthException authException = new AuthException(AuthErrorCode.AUTH_ACCESS_DENIED, exception);
 
 		log.warn(
 			"[AccessDenied] 접근 권한 없음: exceptionName={}, message={}",
@@ -198,7 +198,7 @@ public class GlobalExceptionHandler {
 		);
 
 		return ResponseEntity
-			.status(AuthErrorCode.ACCESS_DENIED.getHttpStatus())
+			.status(AuthErrorCode.AUTH_ACCESS_DENIED.getHttpStatus())
 			.body(ErrorResponse.from(authException));
 	}
 
