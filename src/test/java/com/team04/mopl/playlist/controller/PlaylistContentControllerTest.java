@@ -99,6 +99,19 @@ class PlaylistContentControllerTest {
 		verify(playlistContentService).deleteContentFromPlaylist(playlistId, contentId, currentUserId);
 	}
 
+	@Test
+	@DisplayName("플레이리스트/콘텐츠 id가 UUID 형식이 아니라면 400 Bad Request를 반환한다.")
+	void deleteContentToPlaylist_returnBadRequest_whenPlaylistIdIsInvalidFormat() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID contentId = UUID.randomUUID();
+
+		// when, then
+		mockMvc.perform(delete("/api/playlists/{playlistId}/contents/{contentId}", "UUID", contentId)
+				.with(moplUser(currentUserId)))
+			.andExpect(status().isBadRequest());
+	}
+
 	private RequestPostProcessor moplUser(UUID userId) {
 		return request -> {
 			MoplUserDetails moplUserDetails = MoplUserDetails.authenticated(
