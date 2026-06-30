@@ -1,6 +1,7 @@
 package com.team04.mopl.playlist.repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -31,4 +32,8 @@ public interface PlaylistSubscriptionRepository extends JpaRepository<PlaylistSu
 		@Param("playlistIds") List<UUID> playlistIds,
 		@Param("currentUserId") UUID currentUserId
 	);
+
+	boolean existsByPlaylistIdAndSubscriberId(UUID playlistId, UUID subscriberId);
+
+	Optional<PlaylistSubscription> findByPlaylistIdAndSubscriberId(UUID playlistId, UUID subscriberId);
 }

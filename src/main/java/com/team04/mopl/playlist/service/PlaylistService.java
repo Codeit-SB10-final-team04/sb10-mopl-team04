@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,8 @@ import com.team04.mopl.playlist.repository.PlaylistContentRepository;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -98,9 +101,6 @@ public class PlaylistService {
 		log.debug("[PLAYLIST_FIND] 플레이리스트 단건 조회 시작: currentUserId={}, playlistId={}",
 			currentUserId, playlistId);
 
-		// 현재 로그인한 인증된 사용자 조회
-		getUserOrThrow(currentUserId);
-
 		// 삭제되지 않은 플레이리스트를 소유자 정보와 함께 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
 
@@ -126,9 +126,6 @@ public class PlaylistService {
 			"[PLAYLIST_FIND_ALL] 플레이리스트 목록 조회 시작: keyword={}, ownerIdEqual={}, subscriberIdEqual={}, cursor={}, idAfter={}, limit={}, sortDirection={}, sortBy={}",
 			request.normalizedKeyword(), request.ownerIdEqual(), request.subscriberIdEqual(), request.cursor(),
 			request.idAfter(), limit, sortDirection, sortBy);
-
-		// 현재 로그인한 인증된 사용자 조회
-		getUserOrThrow(currentUserId);
 
 		// 조건에 따라 플레이리스트 목록 조회
 		// 정렬 조건에 구독자 수 포함 -> 플레이리스트 조회 시 구독자 수도 같이 조회
@@ -195,8 +192,7 @@ public class PlaylistService {
 		return cursorResponsePlaylistDto;
 	}
 
-	// TODO: `@PreAuthorize`는 Security 구현 후 추가
-	// @PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
+	@PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
 	@Transactional
 	public PlaylistDto updatePlaylist(
 		UUID playlistId,
@@ -216,12 +212,6 @@ public class PlaylistService {
 
 		// 플레이리스트 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
-
-		// TODO: Security 추가로 `@PreAuthorize`가 사용 가능해지면 삭제
-		if (!playlist.getOwner().getId().equals(currentUserId)) {
-			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_FORBIDDEN)
-				.addDetail("requestUserId", currentUserId);
-		}
 
 		// 요청과 현재의 title과 description을 비교하고,
 		// 같으면 `null` / 다르면 요청값
@@ -249,8 +239,7 @@ public class PlaylistService {
 		return playlistDto;
 	}
 
-	// TODO: `@PreAuthorize`는 Security 구현 후 추가
-	// @PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
+	@PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
 	@Transactional
 	public void softDeletePlaylist(UUID playlistId, UUID currentUserId) {
 		log.info("[PLAYLIST_SOFT_DELETE] 플레이리스트 논리 삭제 시작: currentUserId={}, playlistId={}",
@@ -258,12 +247,6 @@ public class PlaylistService {
 
 		// 플레이리스트 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
-
-		// TODO: Security 추가로 `@PreAuthorize`가 사용 가능해지면 삭제
-		if (!playlist.getOwner().getId().equals(currentUserId)) {
-			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_FORBIDDEN)
-				.addDetail("requestUserId", currentUserId);
-		}
 
 		// 논리 삭제
 		playlist.markDeleted(Instant.now());
@@ -273,10 +256,10 @@ public class PlaylistService {
 	}
 
 	// 사용자 조회
-	// TODO: `USER_NOT_FOUND` 같은 사용자 커스텀 예외 추가 시 `.orElseThrow(...)` 교체
 	private User getUserOrThrow(UUID userId) {
 		return userRepository.findById(userId)
-			.orElseThrow(() -> new IllegalArgumentException("User not found!"));
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
+				.addDetail("userId", userId));
 	}
 
 	// 플레이리스트 응답에 포함할 소유자 요약 정보를 만듦
@@ -447,14 +430,14 @@ public class PlaylistService {
 	// blank가 아님을 검증
 	private void validateNotBlank(String fieldName, String value) {
 		if (value != null && value.isBlank()) {
-			throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT)
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
 				.addDetail(fieldName, value);
 		}
 	}
 
 	private void validateAllRequestExistingOrNull(String normalizedTitle, String normalizedDescription) {
 		if (normalizedTitle == null && normalizedDescription == null) {
-			throw new PlaylistException(PlaylistErrorCode.NO_CHANGE_VALUE);
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_NO_CHANGE_VALUE);
 		}
 	}
 }

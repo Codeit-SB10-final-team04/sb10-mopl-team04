@@ -6,11 +6,15 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import com.team04.mopl.auth.exception.AuthErrorCode;
+import com.team04.mopl.auth.exception.AuthException;
 
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -178,6 +182,24 @@ public class GlobalExceptionHandler {
 				"요청 본문 형식이 올바르지 않습니다.",
 				Map.of()
 			));
+	}
+
+	// AccessDeniedException
+	@ExceptionHandler(AccessDeniedException.class)
+	public ResponseEntity<ErrorResponse> handleAccessDeniedException(
+		AccessDeniedException exception
+	) {
+		AuthException authException = new AuthException(AuthErrorCode.ACCESS_DENIED, exception);
+
+		log.warn(
+			"[AccessDenied] 접근 권한 없음: exceptionName={}, message={}",
+			exception.getClass().getSimpleName(),
+			exception.getMessage()
+		);
+
+		return ResponseEntity
+			.status(AuthErrorCode.ACCESS_DENIED.getHttpStatus())
+			.body(ErrorResponse.from(authException));
 	}
 
 	// 위에서 처리하지 못한 모든 예외의 마지막 방어선
