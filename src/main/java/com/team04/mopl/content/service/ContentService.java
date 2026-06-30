@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
+import com.team04.mopl.content.dto.request.ContentUpdateRequest;
 import com.team04.mopl.content.dto.response.ContentDto;
 import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.entity.Content;
@@ -128,6 +129,75 @@ public class ContentService {
 		long totalCount = contentRepository.countContents(req);
 
 		return new CursorResponse<>(data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, sortDirection);
+	}
+
+	@Transactional
+	public ContentDto updateContent(UUID contentId, ContentUpdateRequest contentUpdateRequest,
+		MultipartFile thumbnail) {
+		// 콘텐츠 조회
+		Content content = getNotDeletedContentEntityOrThrow(contentId);
+
+		// 썸네일 저장
+		String newThumbnailUrl = null;
+		String oldThumbnailUrl = content.getThumbnailUrl();
+
+		if (thumbnail != null) {
+			newThumbnailUrl = thumbnailStorage.store(thumbnail);
+		}
+
+		try {
+			// 콘텐츠 업데이트 - title, description, thumbnailUrl
+			content.updateTitle(contentUpdateRequest.title());
+			content.updateDescription(contentUpdateRequest.description());
+			if (newThumbnailUrl != null) {
+				content.updateThumbnailUrl(newThumbnailUrl);
+			}
+
+			// 태그 return, 중간 태그 콘텐츠 테이블 생성
+			List<String> tagNames;
+
+			if (contentUpdateRequest.tags() != null) {
+				// 태그 조회 or 생성
+				List<Tag> tags = contentUpdateRequest.tags().stream()
+					.map(name -> tagRepository.findByName(name)
+						.orElseGet(() -> tagRepository.save(Tag.builder().name(name).build())))
+					.toList();
+
+				// 태그 중간 테이블 조회 후 존재 유무에 따라 생성
+				tags.forEach(tag -> {
+					boolean exists = contentTagRepository.existsByContentAndTag(content, tag);
+					if (!exists) {
+						contentTagRepository.save(ContentTag.builder().content(content).tag(tag).build());
+					}
+				});
+				tagNames = tags.stream().map(Tag::getName).toList();
+			} else {
+				// 태그 수정 없으면 기존 태그 조회
+				tagNames = contentTagRepository.findTagNamesByContentId(contentId);
+			}
+
+			// 썸네일 교체 성공 후 기존 파일 삭제
+			if (newThumbnailUrl != null) {
+				try {
+					thumbnailStorage.delete(oldThumbnailUrl);
+				} catch (Exception e) {
+					log.error("기존 썸네일 삭제 실패, 배치 정리 필요. url={}", oldThumbnailUrl, e);
+				}
+			}
+
+			return contentMapper.toDto(content, tagNames);
+
+		} catch (Exception e) {
+			// DB 저장 실패 시 새로 저장한 썸네일 롤백
+			if (newThumbnailUrl != null) {
+				try {
+					thumbnailStorage.delete(newThumbnailUrl);
+				} catch (Exception deleteEx) {
+					log.error("파일 삭제 실패, 배치 정리 필요. url={}", newThumbnailUrl, deleteEx);
+				}
+			}
+			throw e;
+		}
 	}
 
 	// contentIds로 태그명 조회 메서드
