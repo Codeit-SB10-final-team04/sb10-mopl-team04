@@ -202,6 +202,11 @@ class ConversationServiceTest {
 			.hasMessage(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS.getMessage());
 	}
 
+	/*
+	=========================
+		대화 단건 조회
+	=========================
+	 */
 	@Test
 	@DisplayName("성공: 메시지가 존재하는 대화방을 조회하면 상대방 정보와 마지막 메시지를 조립하여 반환한다.")
 	void findConversationById_WithLatestMessage_Success() {
@@ -334,6 +339,56 @@ class ConversationServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> conversationService.findConversationById(conversationId, moplUserDetails))
+			.isInstanceOf(UserException.class);
+	}
+
+	/*
+	=========================
+		특정 사용자와의 대화 조회
+	=========================
+	 */
+	@Test
+	@DisplayName("성공: 기존 대화방 존재 시, 단건 조회 메서드로 위임한다")
+	void findConversationByUserId_Success_Existing() {
+		// given
+		ConversationService conversationServiceSpy = spy(conversationService);
+
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
+		given(moplUserDetails.getUserId()).willReturn(requestUserId);
+
+		UUID withUserId = UUID.randomUUID();
+		User withUser = mock(User.class);
+		given(withUser.getId()).willReturn(withUserId);
+
+		UUID conversationId = UUID.randomUUID();
+
+		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
+		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
+			.willReturn(Optional.of(conversationId));
+
+		// 위임
+		doReturn(mock(ConversationDto.class)).when(conversationServiceSpy)
+			.findConversationById(eq(conversationId), any());
+
+		// when
+		conversationServiceSpy.findConversationByUserId(withUserId, moplUserDetails);
+
+		// then
+		verify(conversationServiceSpy).findConversationById(eq(conversationId), any());
+	}
+
+	@Test
+	@DisplayName("실패: 존재하지 않는 userId로 조회 시 UserException 발생")
+	void findConversationByUserId_Fail_UserNotFound() {
+		// given
+		UUID userId = UUID.randomUUID();
+		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
+
+		given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> conversationService.findConversationByUserId(userId, moplUserDetails))
 			.isInstanceOf(UserException.class);
 	}
 }
