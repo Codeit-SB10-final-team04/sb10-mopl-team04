@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
@@ -48,6 +49,17 @@ public class ConversationController implements ConversationControllerDocs {
 	) {
 
 		ConversationDto conversationDto = conversationService.findConversationById(conversationId, moplUserDetails);
+
+		return ResponseEntity.status(HttpStatus.OK).body(conversationDto);
+	}
+
+	@Override
+	@GetMapping("/with")
+	public ResponseEntity<ConversationDto> findConversationByUserId(
+		@RequestParam UUID userId,
+		@AuthenticationPrincipal MoplUserDetails moplUserDetails) {
+
+		ConversationDto conversationDto = conversationService.findConversationByUserId(userId, moplUserDetails);
 
 		return ResponseEntity.status(HttpStatus.OK).body(conversationDto);
 	}
