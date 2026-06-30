@@ -237,13 +237,21 @@ class ConversationControllerTest {
 
 		UUID userId = UUID.randomUUID();
 
-		given(conversationService.findConversationByUserId(any(), any()))
-			.willReturn(mock(ConversationDto.class));
+		ConversationDto responseDto = mock(ConversationDto.class);
+		given(conversationService.findConversationByUserId(
+			eq(userId),
+			argThat(userDetails -> userDetails != null && requesterUserId.equals(userDetails.getUserId()))))
+			.willReturn(responseDto);
 
 		mockMvc.perform(get("/api/conversations/with", UUID.randomUUID())
 				.param("userId", userId.toString())
 				.with(user(mockUserDetails)))
 			.andExpect(status().isOk());
+
+		verify(conversationService).findConversationByUserId(
+			eq(userId),
+			argThat(userDetails -> userDetails != null && requesterUserId.equals(userDetails.getUserId()))
+		);
 	}
 
 	@Test
@@ -266,6 +274,29 @@ class ConversationControllerTest {
 		mockMvc.perform(get("/api/conversations/with")
 				.param("userId", userId.toString())
 				.with(user(mockUserDetails)))
-			.andExpect(status().isNotFound());
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.message").value(UserErrorCode.USER_NOT_FOUND.getMessage()));
+	}
+
+	@Test
+	@DisplayName("실패: 상대 유저는 존재하지만 대화방이 없으면 404 Not Found를 반환한다")
+	void findByUserId_Fail_ConversationNotFound() throws Exception {
+		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+
+		given(conversationService.findConversationByUserId(any(), any()))
+			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
+
+		// when & then
+		mockMvc.perform(get("/api/conversations/with")
+				.param("userId", UUID.randomUUID().toString())
+				.with(user(mockUserDetails)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage()));
 	}
 }
