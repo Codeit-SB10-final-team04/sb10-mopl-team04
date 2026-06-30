@@ -161,26 +161,24 @@ public class ContentService {
 
 			if (contentUpdateRequest.tags() != null) {
 				log.debug("[콘텐츠 수정] 태그 갱신: contentId={}, tags={}", contentId, contentUpdateRequest.tags());
-				// 기존 태그 연결 전부 삭제
+
+				// 기존 태그 연결 전부 삭제 후 교체
 				contentTagRepository.deleteAllByContent(content);
 
-				// 태그 조회 or 생성
 				List<Tag> tags = contentUpdateRequest.tags().stream()
 					.map(name -> tagRepository.findByName(name)
 						.orElseGet(() -> tagRepository.save(Tag.builder().name(name).build())))
 					.toList();
 
-				// 태그 중간 테이블 조회 후 존재 유무에 따라 생성
-				tags.forEach(tag -> {
-					boolean exists = contentTagRepository.existsByContentAndTag(content, tag);
-					if (!exists) {
-						contentTagRepository.save(ContentTag.builder().content(content).tag(tag).build());
-					}
-				});
+				List<ContentTag> contentTags = tags.stream()
+					.map(tag -> ContentTag.builder().content(content).tag(tag).build())
+					.toList();
+				contentTagRepository.saveAll(contentTags);
+
 				tagNames = tags.stream().map(Tag::getName).toList();
-			} else { // 태그가 빈 리스트로 오면 전부 삭제
-				contentTagRepository.deleteAllByContent(content);
-				tagNames = List.of();
+			} else {
+				// tags가 null이면 기존 태그 유지
+				tagNames = contentTagRepository.findTagNamesByContentId(contentId);
 			}
 
 			// 썸네일 교체 성공 후 기존 파일 삭제

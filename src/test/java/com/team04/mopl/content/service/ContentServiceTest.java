@@ -20,10 +20,9 @@ import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
 import com.team04.mopl.content.dto.request.ContentUpdateRequest;
-import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.dto.response.ContentDto;
+import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.entity.Content;
-import com.team04.mopl.content.entity.ContentTag;
 import com.team04.mopl.content.entity.Tag;
 import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.mapper.ContentMapper;
@@ -411,8 +410,8 @@ class ContentServiceTest {
 	}
 
 	@Test
-	@DisplayName("태그 목록이 전달되면 기존 태그를 조회하거나 생성해 중간 테이블에 추가한다")
-	void updateContent_upsertTags_whenTagsProvided() {
+	@DisplayName("태그 목록이 전달되면 기존 태그를 전부 삭제하고 새 태그로 교체한다")
+	void updateContent_replacesTags_whenTagsProvided() {
 		// given
 		UUID contentId = UUID.randomUUID();
 		Content content = mock(Content.class);
@@ -425,8 +424,6 @@ class ContentServiceTest {
 		when(tagRepository.findByName("액션")).thenReturn(Optional.of(existingTag));
 		when(tagRepository.findByName("SF")).thenReturn(Optional.empty());
 		when(tagRepository.save(any(Tag.class))).thenReturn(newTag);
-		when(contentTagRepository.existsByContentAndTag(content, existingTag)).thenReturn(true);
-		when(contentTagRepository.existsByContentAndTag(content, newTag)).thenReturn(false);
 		when(contentMapper.toDto(eq(content), eq(List.of("액션", "SF")))).thenReturn(expectedDto);
 
 		// when
@@ -434,11 +431,56 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
+		verify(contentTagRepository).deleteAllByContent(content);
 		verify(tagRepository).findByName("액션");
 		verify(tagRepository).findByName("SF");
-		verify(tagRepository).save(any(Tag.class)); // SF는 새로 생성
-		verify(contentTagRepository, never()).save(argThat(ct -> ct.getTag().equals(existingTag))); // 액션은 이미 존재
-		verify(contentTagRepository).save(argThat(ct -> ct.getTag().equals(newTag))); // SF는 새로 저장
+		verify(tagRepository).save(any(Tag.class));
+		verify(contentTagRepository).saveAll(any());
+	}
+
+	@Test
+	@DisplayName("빈 태그 목록이 전달되면 기존 태그를 전부 삭제한다")
+	void updateContent_deletesAllTags_whenEmptyTagsProvided() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		Content content = mock(Content.class);
+		ContentUpdateRequest request = new ContentUpdateRequest(null, null, List.of());
+		ContentDto expectedDto = mock(ContentDto.class);
+
+		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(contentMapper.toDto(content, List.of())).thenReturn(expectedDto);
+
+		// when
+		ContentDto result = contentService.updateContent(contentId, request, null);
+
+		// then
+		assertThat(result).isEqualTo(expectedDto);
+		verify(contentTagRepository).deleteAllByContent(content);
+		verify(tagRepository, never()).findByName(any());
+		verify(contentTagRepository).saveAll(List.of());
+	}
+
+	@Test
+	@DisplayName("태그가 null이면 기존 태그를 유지한다")
+	void updateContent_keepsExistingTags_whenTagsIsNull() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		Content content = mock(Content.class);
+		ContentUpdateRequest request = new ContentUpdateRequest(null, null, null);
+		List<String> existingTags = List.of("액션", "드라마");
+		ContentDto expectedDto = mock(ContentDto.class);
+
+		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(existingTags);
+		when(contentMapper.toDto(content, existingTags)).thenReturn(expectedDto);
+
+		// when
+		ContentDto result = contentService.updateContent(contentId, request, null);
+
+		// then
+		assertThat(result).isEqualTo(expectedDto);
+		verify(contentTagRepository, never()).deleteAllByContent(any());
+		verify(contentTagRepository, never()).saveAll(any());
 	}
 
 	@Test
