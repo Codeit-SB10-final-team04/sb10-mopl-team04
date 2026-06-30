@@ -9,6 +9,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -37,6 +38,7 @@ import com.team04.mopl.auth.security.handler.RestLogoutSuccessHandler;
 import com.team04.mopl.auth.security.jwt.JwtExpiredTokenValidator;
 import com.team04.mopl.auth.security.jwt.JwtProperties;
 
+@EnableMethodSecurity
 @Configuration
 @EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {

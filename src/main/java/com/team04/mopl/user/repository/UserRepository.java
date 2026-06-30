@@ -13,4 +13,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
 	// 로그인 시 이메일로 사용자 조회
 	Optional<User> findByEmail(String email);
+
+	// lock 되지 않은 사용자 조회
+	Optional<User> findByIdAndLockedFalse(UUID id);
 }

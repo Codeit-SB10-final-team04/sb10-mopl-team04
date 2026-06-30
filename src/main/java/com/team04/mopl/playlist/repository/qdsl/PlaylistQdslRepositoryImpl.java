@@ -186,7 +186,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 			);
 		}
 
-		throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT);
+		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT);
 	}
 
 	// String 타입의 cursor -> Instant 타입으로 parse
@@ -194,7 +194,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 		try {
 			return Instant.parse(cursor);
 		} catch (DateTimeParseException e) {
-			throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT, e)
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT, e)
 				.addDetail("cursor", cursor);
 		}
 	}
@@ -220,7 +220,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 				);
 		}
 
-		throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT);
+		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT);
 	}
 
 	// sortBy가 subscriberCount일 때
@@ -246,7 +246,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 			);
 		}
 
-		throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT);
+		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT);
 	}
 
 	// String 타입 cursor -> Long 타입으로 parse
@@ -254,7 +254,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 		try {
 			return Long.parseLong(cursor);
 		} catch (NumberFormatException e) {
-			throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT, e)
+			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT, e)
 				.addDetail("cursor", cursor);
 		}
 	}
@@ -282,7 +282,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 				);
 		}
 
-		throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT);
+		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT);
 	}
 
 	private OrderSpecifier<?>[] orderCondition(
@@ -299,7 +299,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 		}
 
 		// 정렬 조건에 updatedAt이나 subscriberCount 이외의 것이 입력되었을 경우 예외 발생
-		throw new PlaylistException(PlaylistErrorCode.INVALID_INPUT);
+		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT);
 	}
 
 	private OrderSpecifier<?>[] updateOrder(SortDirection sortDirection) {
