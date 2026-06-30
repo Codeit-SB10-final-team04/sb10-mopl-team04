@@ -348,11 +348,9 @@ class ConversationServiceTest {
 	=========================
 	 */
 	@Test
-	@DisplayName("성공: 기존 대화방 존재 시, 단건 조회 메서드로 위임한다")
+	@DisplayName("성공: 특정 사용자 조회 시 기존 대화방이 존재하면 DTO를 반환한다")
 	void findConversationByUserId_Success_Existing() {
 		// given
-		ConversationService conversationServiceSpy = spy(conversationService);
-
 		UUID requestUserId = UUID.randomUUID();
 		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
 		given(moplUserDetails.getUserId()).willReturn(requestUserId);
@@ -360,24 +358,25 @@ class ConversationServiceTest {
 		UUID withUserId = UUID.randomUUID();
 		User withUser = mock(User.class);
 		given(withUser.getId()).willReturn(withUserId);
+		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
 
 		UUID conversationId = UUID.randomUUID();
+		Conversation conversation = mock(Conversation.class);
+		given(conversation.getId()).willReturn(conversationId);
 
-		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
 		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
 			.willReturn(Optional.of(conversationId));
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 
-		// 위임
-		ConversationDto expectedDto = mock(ConversationDto.class);
-		doReturn(expectedDto).when(conversationServiceSpy)
-			.findConversationById(eq(conversationId), same(moplUserDetails));
+		ConversationDto mockDto = mock(ConversationDto.class);
+		given(conversationMapper.toDto(any(), any(), any(), anyBoolean())).willReturn(mockDto);
 
 		// when
-		ConversationDto result = conversationServiceSpy.findConversationByUserId(withUserId, moplUserDetails);
+		ConversationDto result = conversationService.findConversationByUserId(withUserId, moplUserDetails);
 
 		// then
-		assertThat(result).isSameAs(expectedDto);
-		verify(conversationServiceSpy).findConversationById(eq(conversationId), any());
+		assertThat(result).isNotNull();
+		verify(conversationRepository).findById(conversationId);
 	}
 
 	@Test
