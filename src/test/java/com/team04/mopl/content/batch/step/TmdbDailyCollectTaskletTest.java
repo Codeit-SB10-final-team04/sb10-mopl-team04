@@ -169,7 +169,7 @@ class TmdbDailyCollectTaskletTest {
 
 		// then: movie item은 movie 타입, tv item은 tv_series 타입으로 서비스 호출 (각 1회)
 		verify(tmdbContentCollectService).saveIfNotExists(movieItem, ContentType.movie);
-		verify(tmdbContentCollectService).saveIfNotExists(tvItem, ContentType.tv_series);
+		verify(tmdbContentCollectService).saveIfNotExists(tvItem, ContentType.tvSeries);
 	}
 
 	@Test

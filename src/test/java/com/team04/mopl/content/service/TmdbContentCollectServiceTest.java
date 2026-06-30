@@ -158,14 +158,14 @@ class TmdbContentCollectServiceTest {
         when(tmdbClient.buildThumbnailUrl("/squid.jpg")).thenReturn("https://image.tmdb.org/t/p/w500/squid.jpg");
 
         // when
-        boolean result = tmdbContentCollectService.saveIfNotExists(item, ContentType.tv_series);
+        boolean result = tmdbContentCollectService.saveIfNotExists(item, ContentType.tvSeries);
 
         // then
         assertThat(result).isTrue();
         ArgumentCaptor<Content> captor = ArgumentCaptor.forClass(Content.class);
         verify(contentRepository).save(captor.capture());
         assertThat(captor.getValue().getTitle()).isEqualTo("오징어 게임");
-        assertThat(captor.getValue().getType()).isEqualTo(ContentType.tv_series);
+        assertThat(captor.getValue().getType()).isEqualTo(ContentType.tvSeries);
     }
 
     @Test

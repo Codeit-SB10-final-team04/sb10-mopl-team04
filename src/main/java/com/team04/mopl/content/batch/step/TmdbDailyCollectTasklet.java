@@ -38,7 +38,7 @@ public class TmdbDailyCollectTasklet implements Tasklet {
 		// tv/on_the_air 수집
 		log.info("[TMDB] 방영 중 TV 수집 시작");
 		for (int page = 1; page <= MAX_PAGES; page++) {
-			collectPage(tmdbClient.getOnAirTv(page), ContentType.tv_series, contribution);
+			collectPage(tmdbClient.getOnAirTv(page), ContentType.tvSeries, contribution);
 		}
 
 		log.info("[TMDB] ===== 주기 수집 완료: 저장 {}건 =====", contribution.getWriteCount());
