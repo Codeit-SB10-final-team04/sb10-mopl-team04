@@ -32,7 +32,7 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
 	) throws IOException {
 		authResponseWriter.writeError(
 			response,
-			new AuthException(AuthErrorCode.ACCESS_DENIED, accessDeniedException)
+			new AuthException(AuthErrorCode.AUTH_ACCESS_DENIED, accessDeniedException)
 		);
 	}
 }

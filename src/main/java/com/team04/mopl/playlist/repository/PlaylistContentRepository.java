@@ -1,6 +1,7 @@
 package com.team04.mopl.playlist.repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,5 +21,10 @@ public interface PlaylistContentRepository extends JpaRepository<PlaylistContent
 			AND c.deletedAt IS NULL 
 		""")
 	List<PlaylistContentRow> findAllContentsByPlaylistIdsWithDeletedAtNull(
-		@Param("playlistIds") List<UUID> playlistIds);
+		@Param("playlistIds") List<UUID> playlistIds
+	);
+
+	Optional<PlaylistContent> findByPlaylistIdAndContentId(UUID playlistId, UUID contentId);
+
+	boolean existsByPlaylistIdAndContentId(UUID playlistId, UUID contentId);
 }

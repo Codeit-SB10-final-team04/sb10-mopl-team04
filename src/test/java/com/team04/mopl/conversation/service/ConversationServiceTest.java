@@ -233,16 +233,12 @@ class ConversationServiceTest {
 		given(participant1.getUser()).willReturn(requestUser);
 		given(participant2.getUser()).willReturn(withUser);
 
-		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId)).willReturn(
+		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId)).willReturn(
 			Optional.of(latestMessage));
 		given(directMessageMapper.toDto(latestMessage)).willReturn(latestMessageDto);
 
-		// 마지막 메시지 상태: 안 읽음
-		given(latestMessage.getReceiver()).willReturn(requestUser);
-		given(latestMessage.isRead()).willReturn(false);
-
 		ConversationDto expectedDto = mock(ConversationDto.class);
-		given(conversationMapper.toDto(eq(conversation), any(UserSummary.class), eq(latestMessageDto), eq(true)))
+		given(conversationMapper.toDto(eq(conversation), any(UserSummary.class), eq(latestMessageDto), eq(false)))
 			.willReturn(expectedDto);
 
 		// when
@@ -250,6 +246,7 @@ class ConversationServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
+		verify(conversationMapper).toDto(eq(conversation), any(UserSummary.class), eq(latestMessageDto), eq(false));
 	}
 
 	@Test
@@ -281,7 +278,7 @@ class ConversationServiceTest {
 		given(participant2.getUser()).willReturn(withUser);
 
 		// 마지막 메시지 없음
-		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId)).willReturn(
+		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId)).willReturn(
 			Optional.empty());
 
 		ConversationDto expectedDto = mock(ConversationDto.class);
@@ -293,6 +290,7 @@ class ConversationServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
+		verifyNoInteractions(directMessageMapper);
 	}
 
 	@Test

@@ -35,7 +35,7 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 	) throws IOException {
 		authResponseWriter.writeError(
 			response,
-			new AuthException(AuthErrorCode.UNAUTHORIZED, authException)
+			new AuthException(AuthErrorCode.AUTH_UNAUTHORIZED, authException)
 		);
 	}
 }

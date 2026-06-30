@@ -9,7 +9,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum DirectMessageErrorCode implements ErrorCode {
 	DM_BLANK(HttpStatus.BAD_REQUEST, "DM01", "메시지 내용은 공백일 수 없습니다."),
-	DM_NOT_FOUND(HttpStatus.NOT_FOUND, "DN02", "해당 메시지의 정보를 찾을 수 없습니다.");
+	DM_NOT_FOUND(HttpStatus.NOT_FOUND, "DM02", "해당 메시지의 정보를 찾을 수 없습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String code;

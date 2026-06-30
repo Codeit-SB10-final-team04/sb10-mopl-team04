@@ -87,12 +87,12 @@ public class JwtTokenProvider {
 			throw exception;
 		} catch (JwtValidationException exception) {
 			if (isExpired(exception)) {
-				throw new AuthException(AuthErrorCode.EXPIRED_ACCESS_TOKEN, exception);
+				throw new AuthException(AuthErrorCode.AUTH_EXPIRED_ACCESS_TOKEN, exception);
 			}
 
-			throw new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN, exception);
+			throw new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN, exception);
 		} catch (JwtException | IllegalArgumentException | NullPointerException exception) {
-			throw new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN, exception);
+			throw new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN, exception);
 		}
 	}
 
@@ -116,7 +116,7 @@ public class JwtTokenProvider {
 		Object value = jwt.getClaims().get(claimName);
 
 		if (!(value instanceof String stringValue) || stringValue.isBlank()) {
-			throw new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN);
+			throw new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		}
 
 		return stringValue;

@@ -43,17 +43,17 @@ class AuthResponseWriterTest {
 	void writeError_writesErrorResponse_whenAuthExceptionProvided() throws Exception {
 		// given
 		MockHttpServletResponse response = new MockHttpServletResponse();
-		AuthException exception = new AuthException(AuthErrorCode.INVALID_ACCESS_TOKEN);
+		AuthException exception = new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 
 		// when
 		authResponseWriter.writeError(response, exception);
 
 		// then
-		assertThat(response.getStatus()).isEqualTo(AuthErrorCode.INVALID_ACCESS_TOKEN.getHttpStatus().value());
+		assertThat(response.getStatus()).isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN.getHttpStatus().value());
 		assertThat(response.getContentType()).startsWith(MediaType.APPLICATION_JSON_VALUE);
 		assertThat(response.getCharacterEncoding()).isEqualTo(StandardCharsets.UTF_8.name());
 		assertThat(response.getContentAsString()).contains("AuthException");
-		assertThat(response.getContentAsString()).contains(AuthErrorCode.INVALID_ACCESS_TOKEN.getMessage());
+		assertThat(response.getContentAsString()).contains(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN.getMessage());
 		assertThat(response.getContentAsString()).contains("details");
 	}
 }
