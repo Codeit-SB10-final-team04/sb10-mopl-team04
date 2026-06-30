@@ -9,7 +9,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum NotificationErrorCode implements ErrorCode {
 
-	NOTIFICATION_INVALID_INPUT(HttpStatus.BAD_REQUEST, "NO01", "잘못된 입력값입니다.");
+	NOTIFICATION_INVALID_INPUT(HttpStatus.BAD_REQUEST, "NO01", "잘못된 입력값입니다."),
+	NOTIFICATION_RECEIVER_NOT_FOUND(HttpStatus.NOT_FOUND, "NO02", "알림 수신자를 찾을 수 없습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String code;
