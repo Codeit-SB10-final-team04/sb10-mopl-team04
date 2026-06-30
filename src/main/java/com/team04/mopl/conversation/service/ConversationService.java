@@ -119,21 +119,11 @@ public class ConversationService {
 		// 2. 유효성 검증: 대화 존재 여부
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
-		// 3. 대화 상대방 정보 조회
+		// 3, 유효성 검증: 대화 상대 존재 여부
 		User withUser = getWithUserEntityOrThrow(conversation.getId(), requestUserId);
-		UserSummary with = getUserSummary(withUser);
 
-		// 4. 마지막 메시지 내용 조회
-		DirectMessageDto latestMessage = getLatestMessageEntity(conversationId)
-			.map(directMessageMapper::toDto)
-			.orElse(null);
-
-		// 5. 안 읽음 여부 판단
-		boolean hasUnread = hasUnreadMessage(conversation.getId(), requestUserId);
-
-		log.debug("[CONVERSATION_FIND] 대화 단건 조회 완료: conversationId={}", conversationId);
-
-		return conversationMapper.toDto(conversation, with, latestMessage, hasUnread);
+		// 3. DTO 변환
+		return mapToConversationDto(conversation, withUser, requestUserId);
 	}
 
 	// 대화 상대 정보 조회
@@ -150,16 +140,6 @@ public class ConversationService {
 			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 	}
 
-	// 마지막 메시지 조회
-	private Optional<DirectMessage> getLatestMessageEntity(UUID conversationId) {
-		return directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId);
-	}
-
-	// 안 읽은 메시지 여부 확인
-	private boolean hasUnreadMessage(UUID conversationId, UUID receiverId) {
-		return directMessageRepository.existsByConversationIdAndReceiverIdAndReadFalse(conversationId, receiverId);
-	}
-
 	// 특정 사용자와의 대화 조회
 	public ConversationDto findConversationByUserId(UUID userId, MoplUserDetails moplUserDetails) {
 		log.debug("[CONVERSATION_FIND_BY_USER_ID] 특정 사용자와의 대화 조회 시작: userId={}", userId);
@@ -172,10 +152,10 @@ public class ConversationService {
 
 		// 3. 유효성 검증: 대화 존재 유무
 		UUID conversationId = findExistingConversationId(requestUserId, withUser.getId());
+		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
-		// 특정 사용자와의 대화방이 존재할 경우, 대화 조회 메서드로 위임
-		log.debug("[CONVERSATION_FIND_BY_USER_ID] 기존 대화방 존재, 조회로 위임: conversationId={}", conversationId);
-		return findConversationById(conversationId, moplUserDetails);
+		log.debug("[CONVERSATION_FIND_BY_USER_ID] 특정 사용자와의 대화 조회 완료: conversationId={}", conversationId);
+		return mapToConversationDto(conversation, withUser, requestUserId);
 	}
 
 	// 대화 ID 반환
@@ -224,5 +204,31 @@ public class ConversationService {
 			user.getName(),
 			user.getProfileImageUrl()
 		);
+	}
+
+	// DTO 변환 로직
+	private ConversationDto mapToConversationDto(Conversation conversation, User withUser, UUID requestUserId) {
+		// 1. 대화 상대방 정보 조회
+		UserSummary with = getUserSummary(withUser);
+
+		// 2. 마지막 메시지 내용 조회
+		DirectMessageDto latestMessage = getLatestMessageEntity(conversation.getId())
+			.map(directMessageMapper::toDto)
+			.orElse(null);
+
+		// 3. 안 읽음 여부 판단
+		boolean hasUnread = hasUnreadMessage(conversation.getId(), requestUserId);
+
+		return conversationMapper.toDto(conversation, with, latestMessage, hasUnread);
+	}
+
+	// 마지막 메시지 조회
+	private Optional<DirectMessage> getLatestMessageEntity(UUID conversationId) {
+		return directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId);
+	}
+
+	// 안 읽은 메시지 여부 확인
+	private boolean hasUnreadMessage(UUID conversationId, UUID receiverId) {
+		return directMessageRepository.existsByConversationIdAndReceiverIdAndReadFalse(conversationId, receiverId);
 	}
 }
