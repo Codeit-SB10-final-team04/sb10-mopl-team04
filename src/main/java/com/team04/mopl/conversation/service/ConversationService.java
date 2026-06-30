@@ -124,15 +124,12 @@ public class ConversationService {
 		UserSummary with = getUserSummary(withUser);
 
 		// 4. 마지막 메시지 내용 조회
-		DirectMessage latestDirectMessage = getLatestMessageEntity(conversationId)
-			.orElse(null);
-
 		DirectMessageDto latestMessage = getLatestMessageEntity(conversationId)
 			.map(directMessageMapper::toDto)
 			.orElse(null);
-		
+
 		// 5. 안 읽음 여부 판단
-		boolean hasUnread = hasUnreadMessage(latestDirectMessage, requestUserId);
+		boolean hasUnread = hasUnreadMessage(conversation.getId(), requestUserId);
 
 		log.debug("[FIND_CONVERSATION] 대화 단건 조회 완료: conversationId={}", conversationId);
 
@@ -149,13 +146,8 @@ public class ConversationService {
 	}
 
 	// 안 읽은 메시지 여부 확인
-	private boolean hasUnreadMessage(DirectMessage directMessage, UUID requestUserId) {
-		// 메시지가 없는 경우, false 처리
-		if (directMessage == null) {
-			return false;
-		}
-
-		return directMessage.getReceiver().getId().equals(requestUserId) && !directMessage.isRead();
+	private boolean hasUnreadMessage(UUID conversationId, UUID receiverId) {
+		return directMessageRepository.existsByConversationIdAndReceiverIdAndReadFalse(conversationId, receiverId);
 	}
 
 	// 대화 엔티티 반환
@@ -174,11 +166,26 @@ public class ConversationService {
 
 	// 대화 상대 정보 조회
 	private User getWithUserEntityOrThrow(UUID conversationId, UUID requestUserId) {
-		return conversationParticipantRepository.findByConversationId(conversationId).stream()
+		List<ConversationParticipant> participants =
+			conversationParticipantRepository.findByConversationId(conversationId);
+
+		validateParticipants(participants, requestUserId);
+
+		return participants.stream()
 			.map(ConversationParticipant::getUser)
 			.filter(user -> !user.getId().equals(requestUserId))
 			.findFirst()
 			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+	}
+
+	// 유효성 검증: 특정 대화방 참가자 여부
+	private void validateParticipants(List<ConversationParticipant> participants, UUID requestUserId) {
+		boolean isParticipant = participants.stream()
+			.anyMatch(participant -> participant.getUser().getId().equals(requestUserId));
+
+		if (!isParticipant) {
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_ACCESS_DENIED);
+		}
 	}
 
 	// 마지막 메시지 조회
