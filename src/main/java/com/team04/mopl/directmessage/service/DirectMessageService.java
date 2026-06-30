@@ -40,19 +40,23 @@ public class DirectMessageService {
 		// 2. 유효성 검증: 대화 존재 유무
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
-		// 3. 유효성 검증: DM 존재 유무
+		// 3. 유효성 검증: 특정 대화방 참가자 여부
+		validateParticipant(conversation.getId(), requestUserId);
+
+		// 4. 유효성 검증: DM 존재 유무
 		DirectMessage directMessage = getDirectMessageEntityOrThrow(directMessageId);
 
-		// 4. 유효성 검증: 해당 대화 내 DM 존재 유무
-
-		// 5. 유효성 검증: 특정 대화방 참가자 여부
-		validateParticipant(conversation.getId(), requestUserId);
+		// 5. 유효성 검증: 해당 대화 내 DM 존재 유무
+		validateMessageInConversation(directMessage, conversation.getId());
 
 		// 6. 유효성 검증: DM 수신인 여부
 		validateReceiver(directMessage, requestUserId);
 
 		// 7. DM 읽음 처리 및 저장
 		directMessage.markAsRead();
+
+		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}",
+			conversationId, directMessageId);
 	}
 
 	// 유효성 검증: 해당 대화 내 DM 존재 유무
