@@ -118,7 +118,7 @@ class ContentServiceTest {
 		assertThat(result).isEqualTo(expectedDto);
 		verify(thumbnailStorage).store(thumbnail);
 		verify(contentRepository).save(any(Content.class));
-		verify(tagRepository, never()).findByName(any());
+		verify(tagRepository, never()).findAllByNameIn(any());
 		verify(contentTagRepository, never()).saveAll(any());
 	}
 
@@ -138,8 +138,7 @@ class ContentServiceTest {
 
 		when(thumbnailStorage.store(thumbnail)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
-		when(tagRepository.findByName("액션")).thenReturn(Optional.of(tag1));
-		when(tagRepository.findByName("SF")).thenReturn(Optional.empty());
+		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(tag1)); // 액션만 기존 존재
 		when(tagRepository.save(any(Tag.class))).thenReturn(tag2);
 		when(contentMapper.toDto(any(Content.class), eq(List.of("액션", "SF")))).thenReturn(expectedDto);
 
@@ -148,8 +147,7 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(tagRepository).findByName("액션");
-		verify(tagRepository).findByName("SF");
+		verify(tagRepository).findAllByNameIn(List.of("액션", "SF"));
 		verify(tagRepository).save(any(Tag.class)); // SF는 새로 생성
 		verify(contentTagRepository).saveAll(any());
 	}
@@ -326,7 +324,7 @@ class ContentServiceTest {
 
 		when(thumbnailStorage.store(thumbnail)).thenReturn(storedUrl);
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
-		when(tagRepository.findByName(any())).thenThrow(new RuntimeException("태그 저장 실패"));
+		when(tagRepository.findAllByNameIn(any())).thenThrow(new RuntimeException("태그 저장 실패"));
 
 		// when & then
 		assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
@@ -421,8 +419,7 @@ class ContentServiceTest {
 		ContentDto expectedDto = mock(ContentDto.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
-		when(tagRepository.findByName("액션")).thenReturn(Optional.of(existingTag));
-		when(tagRepository.findByName("SF")).thenReturn(Optional.empty());
+		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(existingTag)); // 액션만 기존 존재
 		when(tagRepository.save(any(Tag.class))).thenReturn(newTag);
 		when(contentMapper.toDto(eq(content), eq(List.of("액션", "SF")))).thenReturn(expectedDto);
 
@@ -432,8 +429,7 @@ class ContentServiceTest {
 		// then
 		assertThat(result).isEqualTo(expectedDto);
 		verify(contentTagRepository).deleteAllByContent(content);
-		verify(tagRepository).findByName("액션");
-		verify(tagRepository).findByName("SF");
+		verify(tagRepository).findAllByNameIn(List.of("액션", "SF"));
 		verify(tagRepository).save(any(Tag.class));
 		verify(contentTagRepository).saveAll(any());
 	}
@@ -448,6 +444,7 @@ class ContentServiceTest {
 		ContentDto expectedDto = mock(ContentDto.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(tagRepository.findAllByNameIn(List.of())).thenReturn(List.of());
 		when(contentMapper.toDto(content, List.of())).thenReturn(expectedDto);
 
 		// when
@@ -456,7 +453,7 @@ class ContentServiceTest {
 		// then
 		assertThat(result).isEqualTo(expectedDto);
 		verify(contentTagRepository).deleteAllByContent(content);
-		verify(tagRepository, never()).findByName(any());
+		verify(tagRepository, never()).save(any());
 		verify(contentTagRepository).saveAll(List.of());
 	}
 

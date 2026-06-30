@@ -129,7 +129,7 @@ class ContentControllerTest {
 			"thumbnail", "thumb.png", MediaType.IMAGE_PNG_VALUE, "image-data".getBytes()
 		);
 		MockMultipartFile requestPart = new MockMultipartFile(
-			"contentCreateRequest", "", MediaType.APPLICATION_JSON_VALUE,
+			"request", "", MediaType.APPLICATION_JSON_VALUE,
 			objectMapper.writeValueAsBytes(request)
 		);
 
@@ -206,7 +206,7 @@ class ContentControllerTest {
 			"thumbnail", "thumb.png", MediaType.IMAGE_PNG_VALUE, "image-data".getBytes()
 		);
 		MockMultipartFile requestPart = new MockMultipartFile(
-			"contentCreateRequest", "", MediaType.APPLICATION_JSON_VALUE,
+			"request", "", MediaType.APPLICATION_JSON_VALUE,
 			objectMapper.writeValueAsBytes(request)
 		);
 
@@ -232,7 +232,7 @@ class ContentControllerTest {
 		);
 
 		MockMultipartFile requestPart = new MockMultipartFile(
-			"contentUpdateRequest", "", MediaType.APPLICATION_JSON_VALUE,
+			"request", "", MediaType.APPLICATION_JSON_VALUE,
 			objectMapper.writeValueAsBytes(request)
 		);
 
@@ -265,7 +265,7 @@ class ContentControllerTest {
 			"thumbnail", "new.png", MediaType.IMAGE_PNG_VALUE, "image-data".getBytes()
 		);
 		MockMultipartFile requestPart = new MockMultipartFile(
-			"contentUpdateRequest", "", MediaType.APPLICATION_JSON_VALUE,
+			"request", "", MediaType.APPLICATION_JSON_VALUE,
 			objectMapper.writeValueAsBytes(request)
 		);
 
@@ -287,7 +287,7 @@ class ContentControllerTest {
 		UUID contentId = UUID.randomUUID();
 		ContentUpdateRequest request = new ContentUpdateRequest("새 제목", "새 설명", null);
 		MockMultipartFile requestPart = new MockMultipartFile(
-			"contentUpdateRequest", "", MediaType.APPLICATION_JSON_VALUE,
+			"request", "", MediaType.APPLICATION_JSON_VALUE,
 			objectMapper.writeValueAsBytes(request)
 		);
 

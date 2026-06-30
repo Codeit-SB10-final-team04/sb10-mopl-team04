@@ -1,7 +1,9 @@
 package com.team04.mopl.content.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -72,10 +74,7 @@ public class ContentService {
 			List<String> tagNames = List.of();
 
 			if (contentCreateRequest.tags() != null && !contentCreateRequest.tags().isEmpty()) {
-				List<Tag> tags = contentCreateRequest.tags().stream()
-					.map(name -> tagRepository.findByName(name)
-						.orElseGet(() -> tagRepository.save(Tag.builder().name(name).build())))
-					.toList();
+				List<Tag> tags = findOrCreateTags(contentCreateRequest.tags());
 
 				List<ContentTag> contentTags = tags.stream()
 					.map(tag -> ContentTag.builder().content(content).tag(tag).build())
@@ -165,10 +164,7 @@ public class ContentService {
 				// 기존 태그 연결 전부 삭제 후 교체
 				contentTagRepository.deleteAllByContent(content);
 
-				List<Tag> tags = contentUpdateRequest.tags().stream()
-					.map(name -> tagRepository.findByName(name)
-						.orElseGet(() -> tagRepository.save(Tag.builder().name(name).build())))
-					.toList();
+				List<Tag> tags = findOrCreateTags(contentUpdateRequest.tags());
 
 				List<ContentTag> contentTags = tags.stream()
 					.map(tag -> ContentTag.builder().content(content).tag(tag).build())
@@ -205,6 +201,23 @@ public class ContentService {
 			}
 			throw e;
 		}
+	}
+
+	// 태그명 목록으로 태그 조회 or 생성 (N+1 방지)
+	private List<Tag> findOrCreateTags(List<String> tagNames) {
+		List<Tag> existingTags = tagRepository.findAllByNameIn(tagNames);
+		Set<String> existingNames = existingTags.stream()
+			.map(Tag::getName)
+			.collect(Collectors.toSet());
+
+		List<Tag> newTags = tagNames.stream()
+			.filter(name -> !existingNames.contains(name))
+			.map(name -> tagRepository.save(Tag.builder().name(name).build()))
+			.toList();
+
+		List<Tag> allTags = new ArrayList<>(existingTags);
+		allTags.addAll(newTags);
+		return allTags;
 	}
 
 	// contentIds로 태그명 조회 메서드

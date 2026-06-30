@@ -45,7 +45,7 @@ public class ContentController implements ContentControllerDocs {
 	@PreAuthorize("hasRole('ADMIN')")
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<ContentDto> createContent(
-		@Valid @RequestPart ContentCreateRequest contentCreateRequest,
+		@Valid @RequestPart("request") ContentCreateRequest contentCreateRequest,
 		@RequestPart MultipartFile thumbnail // thumbnail은 필수
 	) {
 
@@ -65,9 +65,9 @@ public class ContentController implements ContentControllerDocs {
 
 	@Override
 	@PreAuthorize("hasRole('ADMIN')")
-	@PatchMapping("/{contentId}")
+	@PatchMapping(value = "/{contentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<ContentDto> updateContent(@PathVariable UUID contentId,
-		@Valid @RequestPart ContentUpdateRequest contentUpdateRequest,
+		@Valid @RequestPart("request") ContentUpdateRequest contentUpdateRequest,
 		@RequestPart(required = false) MultipartFile thumbnail
 	) {
 
