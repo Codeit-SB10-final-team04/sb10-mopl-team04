@@ -28,6 +28,8 @@ import com.team04.mopl.conversation.repository.ConversationParticipantRepository
 import com.team04.mopl.conversation.repository.ConversationRepository;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -85,7 +87,7 @@ class ConversationServiceTest {
 			.willReturn(mock(ConversationParticipant.class));
 
 		ConversationDto expectedDto = mock(ConversationDto.class);
-		given(conversationMapper.toDto(any(Conversation.class), any(UserSummary.class), isNull()))
+		given(conversationMapper.toDto(any(Conversation.class), any(UserSummary.class), isNull(), eq(false)))
 			.willReturn(expectedDto);
 
 		// when
@@ -97,30 +99,30 @@ class ConversationServiceTest {
 		verify(conversationParticipantRepository).saveAll(anyList());
 	}
 
-	// @Test
-	// @DisplayName("실패: 대상 사용자가 존재하지 않으면 예외가 발생한다.")
-	// void createConversation_UserNotFound_Fail() {
-	// 	// given
-	// 	UUID requestUserId = UUID.randomUUID();
-	// 	MoplUserDetails userDetails = MoplUserDetails.authenticated(
-	// 		requestUserId,
-	// 		"test@test.com",
-	// 		UserRole.USER
-	// 	);
-	// 	User requestUser = mock(User.class);
-	//
-	// 	UUID withUserId = UUID.randomUUID();
-	// 	ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
-	//
-	// 	given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestUser));
-	// 	// 대화 참여자 미존재
-	// 	given(userRepository.findById(withUserId)).willReturn(Optional.empty());
-	//
-	// 	// when & then
-	// 	// TODO: UserException 구현 완료 시 아래 예외 클래스를 UserException으로 변경
-	// 	assertThatThrownBy(() -> conversationService.createConversation(request, userDetails))
-	// 		.isInstanceOf(RuntimeException.class);
-	// }
+	@Test
+	@DisplayName("실패: 대상 사용자가 존재하지 않으면 예외가 발생한다.")
+	void createConversation_UserNotFound_Fail() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		User requestUser = mock(User.class);
+
+		UUID withUserId = UUID.randomUUID();
+		ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
+
+		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestUser));
+		// 대화 참여자 미존재
+		given(userRepository.findById(withUserId)).willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> conversationService.createConversation(request, userDetails))
+			.isInstanceOf(UserException.class)
+			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
+	}
 
 	@Test
 	@DisplayName("실패: 이미 존재하는 대화방일 경우 중복 예외가 발생한다.")
