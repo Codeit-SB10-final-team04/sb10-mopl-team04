@@ -24,7 +24,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+// 세션 삭제 후 AuthException가 발생했을 때 세션 삭제가 롤백되는 것을 막기 위함
+@Transactional(noRollbackFor = AuthException.class)
 public class AuthTokenService {
 
 	private final JwtTokenProvider jwtTokenProvider;
