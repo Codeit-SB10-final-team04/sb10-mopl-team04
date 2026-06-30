@@ -203,6 +203,7 @@ public class ContentService {
 		}
 	}
 
+	@Transactional
 	public void deleteContent(UUID contentId) {
 		log.info("[콘텐츠 삭제 시작] contentId={}", contentId);
 		// 삭제되지 않은 콘텐츠 조회
