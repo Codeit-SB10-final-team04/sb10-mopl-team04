@@ -103,4 +103,34 @@ class SpaCsrfTokenRequestHandlerTest {
 		// then
 		assertThat(result).isNull();
 	}
+
+	@Test
+	@DisplayName("X-XSRF-TOKEN 헤더가 없고 _csrf 파라미터가 있으면 XOR 토큰 값을 해석한다")
+	void resolveCsrfTokenValue_returnToken_whenXorParameterExists() {
+		// given
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		CsrfToken csrfToken = new DefaultCsrfToken(
+			"X-XSRF-TOKEN",
+			"_csrf",
+			"csrf-token"
+		);
+
+		handler.handle(
+			request,
+			response,
+			() -> csrfToken
+		);
+
+		CsrfToken maskedCsrfToken = (CsrfToken) request.getAttribute("_csrf");
+
+		request.setParameter("_csrf", maskedCsrfToken.getToken());
+
+		// when
+		String result = handler.resolveCsrfTokenValue(request, csrfToken);
+
+		// then
+		assertThat(result).isEqualTo("csrf-token");
+	}
 }
