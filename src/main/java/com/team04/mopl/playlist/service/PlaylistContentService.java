@@ -44,7 +44,7 @@ public class PlaylistContentService {
 		Content content = getContentOrThrow(contentId);
 
 		// 플레이리스트 내에 이미 존재하는 콘텐츠인지 확인
-		if (isExistContent(playlistId, contentId)) {
+		if (existsContentInPlaylist(playlistId, contentId)) {
 			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_CONTENT_ALREADY_ADD);
 		}
 
@@ -80,13 +80,8 @@ public class PlaylistContentService {
 		// 플레이리스트 조회
 		Playlist playlist = getPlaylistOrThrow(playlistId);
 
-		// 콘텐츠 조회
-		getContentOrThrow(contentId);
-
 		// 플레이리스트 내에 존재하는 콘텐츠인지 확인
-		PlaylistContent playlistContent = playlistContentRepository
-			.findByPlaylistIdAndContentId(playlistId, contentId)
-			.orElseThrow(() -> new PlaylistException(PlaylistErrorCode.PLAYLIST_CONTENT_NOT_FOUND));
+		PlaylistContent playlistContent = getPlaylistContentOrThrow(playlistId, contentId);
 
 		// 삭제
 		playlistContentRepository.delete(playlistContent);
@@ -111,7 +106,13 @@ public class PlaylistContentService {
 	}
 
 	// 이미 등록된 콘텐츠 여부 확인
-	private boolean isExistContent(UUID playlistId, UUID contentId) {
+	private boolean existsContentInPlaylist(UUID playlistId, UUID contentId) {
 		return playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId);
+	}
+
+	private PlaylistContent getPlaylistContentOrThrow(UUID playlistId, UUID contentId) {
+		return playlistContentRepository
+			.findByPlaylistIdAndContentId(playlistId, contentId)
+			.orElseThrow(() -> new PlaylistException(PlaylistErrorCode.PLAYLIST_CONTENT_NOT_FOUND));
 	}
 }
