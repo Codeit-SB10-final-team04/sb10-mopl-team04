@@ -1,6 +1,9 @@
 package com.team04.mopl.notification.service;
 
+import static java.util.stream.Collectors.*;
+
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -16,8 +19,6 @@ import com.team04.mopl.notification.exception.NotificationException;
 import com.team04.mopl.notification.mapper.NotificationMapper;
 import com.team04.mopl.notification.repository.NotificationRepository;
 import com.team04.mopl.user.entity.User;
-import com.team04.mopl.user.exception.UserErrorCode;
-import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -34,44 +35,6 @@ public class NotificationService {
 
 	// TODO: 도메인 이벤트 Listener를 AFTER_COMMIT으로 확정한 뒤 @Transactional 삭제 및 private 메서드로 변경 검토
 	// TODO: private 메서드로 변경될 경우 로그 삭제
-	@Transactional
-	public NotificationDto createNotification(
-		UUID receiverId,
-		String title,
-		String content,
-		NotificationType type,
-		NotificationLevel level
-	) {
-		log.info("[NOTIFICATION_CREATE] 알림 생성 시작: receiverId={}, type={}, level={}",
-			receiverId, type, level);
-
-		// input null 및 blank 검증
-		validateInputNullOrBlank(receiverId, title, content, type, level);
-
-		// 길이 검증
-		validateInputSize(title);
-
-		User receiver = getUserOrThrow(receiverId);
-
-		Notification notification = Notification.builder()
-			.receiver(receiver)
-			.title(title)
-			.content(content)
-			.type(type)
-			.level(level)
-			.build();
-
-		// 알림 저장
-		notificationRepository.save(notification);
-
-		log.info("[NOTIFICATION_CREATE] 알림 생성 완료: receiverId={}, type={}, level={}",
-			receiverId, type, level);
-
-		// 알림 저장 후 dto로 변환
-		return notificationMapper.toDto(notification);
-	}
-
-	// TODO: 도메인 이벤트 리스너를 AFTER_COMMIT으로 확정한 뒤 REQUIRES_NEW 재검토
 	// @Transactional(propagation = Propagation.REQUIRES_NEW)
 	@Transactional
 	public List<NotificationDto> createNotificationList(
@@ -81,11 +44,9 @@ public class NotificationService {
 		NotificationType type,
 		NotificationLevel level
 	) {
-		if (receiverIds == null) {
-			throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
-				.addDetail("isReceiverProvided", false);
-		}
+		validateCreateNotificationListRequest(receiverIds, title, content, type, level);
 
+		// receiverIds Set이 비었으면 빈 리스트 반환
 		if (receiverIds.isEmpty()) {
 			return List.of();
 		}
@@ -93,9 +54,22 @@ public class NotificationService {
 		log.info("[NOTIFICATION_LIST_CREATE] 알림 생성 시작: receiverCount={}, type={}, level={}",
 			receiverIds.size(), type, level);
 
-		List<NotificationDto> notificationDtoList = receiverIds
+		// 수신인 Map 조회 및 누락 검증
+		Map<UUID, User> receiverMap = getReceiverMapOrThrow(receiverIds);
+
+		List<Notification> notificationList = createNotificationList(
+			receiverIds,
+			receiverMap,
+			title,
+			content,
+			type,
+			level
+		);
+
+		// 알림 저장 및 dto로 변환
+		List<NotificationDto> notificationDtoList = notificationRepository.saveAll(notificationList)
 			.stream()
-			.map(receiverId -> createNotification(receiverId, title, content, type, level))
+			.map(notification -> notificationMapper.toDto(notification))
 			.toList();
 
 		log.info("[NOTIFICATION_LIST_CREATE] 알림 생성 완료: receiverCount={}, notificationCount={}",
@@ -104,16 +78,82 @@ public class NotificationService {
 		return notificationDtoList;
 	}
 
-	// 사용자 조회
-	private User getUserOrThrow(UUID userId) {
-		return userRepository.findByIdAndLockedFalse(userId)
-			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
-				.addDetail("userId", userId));
+	// 수신인 Map 조회 및 누락 검증
+	private Map<UUID, User> getReceiverMapOrThrow(Set<UUID> receiverIds) {
+		Map<UUID, User> receiverMap = userRepository.findAllByIdInAndLockedFalse(receiverIds).stream()
+			.collect(toMap(
+					user -> user.getId(),
+					user -> user
+				)
+			);
+
+		// 누락 검증
+		if (receiverMap.size() != receiverIds.size()) {
+			throw new NotificationException(NotificationErrorCode.NOTIFICATION_RECEIVER_NOT_FOUND)
+				.addDetail("receiverIdsSize", receiverIds.size())
+				.addDetail("receiverMapSize", receiverMap.size());
+		}
+
+		return receiverMap;
 	}
 
-	// input null or blank 검증
-	private void validateInputNullOrBlank(
-		UUID receiverId,
+	private List<Notification> createNotificationList(
+		Set<UUID> receiverIds,
+		Map<UUID, User> receiverMap,
+		String title,
+		String content,
+		NotificationType type,
+		NotificationLevel level
+
+	) {
+		return receiverIds.stream()
+			.map(receiverId -> createNotification(
+				receiverMap.get(receiverId),
+				title,
+				content,
+				type,
+				level
+			))
+			.toList();
+	}
+
+	private Notification createNotification(
+		User receiver,
+		String title,
+		String content,
+		NotificationType type,
+		NotificationLevel level
+	) {
+		return Notification.builder()
+			.receiver(receiver)
+			.title(title)
+			.content(content)
+			.type(type)
+			.level(level)
+			.build();
+	}
+
+	// ========== validate ==========
+	// 검증 통합
+	private void validateCreateNotificationListRequest(
+		Set<UUID> receiverIds,
+		String title,
+		String content,
+		NotificationType type,
+		NotificationLevel level
+	) {
+		// 입력된 알림 정보 null or blank 검증
+		validateNotificationInfoNullOrBlank(title, content, type, level);
+
+		// 길이 검증
+		validateTitleSize(title);
+
+		// 입력된 receiverId null or blank 검증
+		validateReceiverIdsNullOrBlank(receiverIds);
+	}
+
+	// 입력된 알림 정보 null or blank 검증
+	private void validateNotificationInfoNullOrBlank(
 		String title,
 		String content,
 		NotificationType type,
@@ -122,11 +162,10 @@ public class NotificationService {
 		boolean titleBlank = title != null && title.isBlank();
 		boolean contentBlank = content != null && content.isBlank();
 
-		if (receiverId == null || title == null || content == null || type == null || level == null
+		if (title == null || content == null || type == null || level == null
 			|| titleBlank || contentBlank
 		) {
 			throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
-				.addDetail("isReceiverIdProvided", receiverId != null)
 				.addDetail("isTitleProvided", title != null)
 				.addDetail("isTitleBlank", titleBlank)
 				.addDetail("isContentProvided", content != null)
@@ -136,11 +175,19 @@ public class NotificationService {
 		}
 	}
 
-	// input 길이 검증
-	private void validateInputSize(String title) {
+	// 입력된 title 길이 검증
+	private void validateTitleSize(String title) {
 		if (title.length() > 50) {
 			throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
 				.addDetail("titleLength", title.length());
+		}
+	}
+
+	// 입력된 receiverId null or blank 검증
+	private void validateReceiverIdsNullOrBlank(Set<UUID> receiverIds) {
+		if (receiverIds == null) {
+			throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
+				.addDetail("isReceiverProvided", false);
 		}
 	}
 }

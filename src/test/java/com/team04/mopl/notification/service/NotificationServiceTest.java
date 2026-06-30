@@ -5,13 +5,13 @@ import static org.mockito.Mockito.*;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,7 +25,6 @@ import com.team04.mopl.notification.exception.NotificationException;
 import com.team04.mopl.notification.mapper.NotificationMapper;
 import com.team04.mopl.notification.repository.NotificationRepository;
 import com.team04.mopl.user.entity.User;
-import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -71,11 +70,9 @@ class NotificationServiceTest {
 			NotificationLevel.INFO
 		);
 
-		when(userRepository.findByIdAndLockedFalse(receiverId1))
-			.thenReturn(Optional.of(receiver1));
-		when(userRepository.findByIdAndLockedFalse(receiverId2))
-			.thenReturn(Optional.of(receiver2));
-		when(notificationRepository.save(any(Notification.class)))
+		when(userRepository.findAllByIdInAndLockedFalse(Set.of(receiverId1, receiverId2)))
+			.thenReturn(List.of(receiver1, receiver2));
+		when(notificationRepository.saveAll(anyList()))
 			.thenAnswer(invocation -> invocation.getArgument(0));
 		when(notificationMapper.toDto(any(Notification.class)))
 			.thenReturn(notificationDto1, notificationDto2);
@@ -94,9 +91,23 @@ class NotificationServiceTest {
 		assertTrue(result.contains(notificationDto1));
 		assertTrue(result.contains(notificationDto2));
 
-		verify(userRepository).findByIdAndLockedFalse(receiverId1);
-		verify(userRepository).findByIdAndLockedFalse(receiverId2);
-		verify(notificationRepository, times(2)).save(any(Notification.class));
+		ArgumentCaptor<List<Notification>> notificationListCaptor =
+			ArgumentCaptor.forClass(List.class);
+		verify(notificationRepository).saveAll(notificationListCaptor.capture());
+
+		List<Notification> notificationList = notificationListCaptor.getValue();
+		assertEquals(2, notificationList.size());
+		assertTrue(notificationList.stream()
+			.allMatch(notification -> notification.getTitle().equals("알림 제목")));
+		assertTrue(notificationList.stream()
+			.allMatch(notification -> notification.getContent().equals("알림 내용")));
+		assertTrue(notificationList.stream()
+			.allMatch(notification -> notification.getType() == NotificationType.ROLE_CHANGE));
+		assertTrue(notificationList.stream()
+			.allMatch(notification -> notification.getLevel() == NotificationLevel.INFO));
+
+		verify(userRepository).findAllByIdInAndLockedFalse(Set.of(receiverId1, receiverId2));
+		verify(notificationRepository).saveAll(anyList());
 		verify(notificationMapper, times(2)).toDto(any(Notification.class));
 	}
 
@@ -114,8 +125,8 @@ class NotificationServiceTest {
 			));
 
 		// then
-		verify(userRepository, never()).findByIdAndLockedFalse(any(UUID.class));
-		verify(notificationRepository, never()).save(any(Notification.class));
+		verify(userRepository, never()).findAllByIdInAndLockedFalse(anySet());
+		verify(notificationRepository, never()).saveAll(anyList());
 		verify(notificationMapper, never()).toDto(any(Notification.class));
 	}
 
@@ -134,8 +145,8 @@ class NotificationServiceTest {
 		// then
 		assertTrue(result.isEmpty());
 
-		verify(userRepository, never()).findByIdAndLockedFalse(any(UUID.class));
-		verify(notificationRepository, never()).save(any(Notification.class));
+		verify(userRepository, never()).findAllByIdInAndLockedFalse(anySet());
+		verify(notificationRepository, never()).saveAll(anyList());
 		verify(notificationMapper, never()).toDto(any(Notification.class));
 	}
 
@@ -156,8 +167,8 @@ class NotificationServiceTest {
 			));
 
 		// then
-		verify(userRepository, never()).findByIdAndLockedFalse(any(UUID.class));
-		verify(notificationRepository, never()).save(any(Notification.class));
+		verify(userRepository, never()).findAllByIdInAndLockedFalse(anySet());
+		verify(notificationRepository, never()).saveAll(anyList());
 		verify(notificationMapper, never()).toDto(any(Notification.class));
 	}
 
@@ -178,8 +189,8 @@ class NotificationServiceTest {
 			));
 
 		// then
-		verify(userRepository, never()).findByIdAndLockedFalse(any(UUID.class));
-		verify(notificationRepository, never()).save(any(Notification.class));
+		verify(userRepository, never()).findAllByIdInAndLockedFalse(anySet());
+		verify(notificationRepository, never()).saveAll(anyList());
 		verify(notificationMapper, never()).toDto(any(Notification.class));
 	}
 
@@ -187,15 +198,18 @@ class NotificationServiceTest {
 	@DisplayName("존재하지 않는 수신인으로 알림 저장 시 예외가 발생한다.")
 	void createNotificationList_throwException_whenUserNotFound() {
 		// given
-		UUID receiverId = UUID.randomUUID();
+		UUID receiverId1 = UUID.randomUUID();
+		UUID receiverId2 = UUID.randomUUID();
 
-		when(userRepository.findByIdAndLockedFalse(receiverId))
-			.thenReturn(Optional.empty());
+		User receiver1 = createUser(receiverId1);
+
+		when(userRepository.findAllByIdInAndLockedFalse(Set.of(receiverId1, receiverId2)))
+			.thenReturn(List.of(receiver1));
 
 		// when
-		assertThrows(UserException.class,
+		assertThrows(NotificationException.class,
 			() -> notificationService.createNotificationList(
-				Set.of(receiverId),
+				Set.of(receiverId1, receiverId2),
 				"알림 제목",
 				"알림 내용",
 				NotificationType.ROLE_CHANGE,
@@ -203,8 +217,8 @@ class NotificationServiceTest {
 			));
 
 		// then
-		verify(userRepository).findByIdAndLockedFalse(receiverId);
-		verify(notificationRepository, never()).save(any(Notification.class));
+		verify(userRepository).findAllByIdInAndLockedFalse(Set.of(receiverId1, receiverId2));
+		verify(notificationRepository, never()).saveAll(anyList());
 		verify(notificationMapper, never()).toDto(any(Notification.class));
 	}
 
