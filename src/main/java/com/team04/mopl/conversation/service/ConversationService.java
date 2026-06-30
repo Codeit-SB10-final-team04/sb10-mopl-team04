@@ -22,8 +22,6 @@ import com.team04.mopl.conversation.repository.ConversationParticipantRepository
 import com.team04.mopl.conversation.repository.ConversationRepository;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
-import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
-import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
 import com.team04.mopl.directmessage.repository.DirectMessageRepository;
 import com.team04.mopl.user.entity.User;
@@ -49,6 +47,7 @@ public class ConversationService {
 	private final ConversationParticipantMapper conversationParticipantMapper;
 	private final DirectMessageMapper directMessageMapper;
 
+	// 대화 생성
 	@Transactional
 	@PreAuthorize("#conversationCreateRequest.withUserId() != #moplUserDetails.userId")
 	public ConversationDto createConversation(
@@ -109,6 +108,7 @@ public class ConversationService {
 		conversationParticipantRepository.saveAll(participants);
 	}
 
+	// 대화 단건 조회
 	public ConversationDto findConversationById(UUID conversationId, MoplUserDetails moplUserDetails) {
 		log.debug("[FIND_CONVERSATION] 대화 단건 조회 시작: conversationId={}", conversationId);
 
@@ -123,16 +123,17 @@ public class ConversationService {
 		UserSummary with = getUserSummary(withUser);
 
 		// 4. 마지막 메시지 내용 조회
-		DirectMessage latestDIrectMessage = getLatestMessageEntityOrThrow(conversationId);
-		DirectMessageDto latestMessage = directMessageMapper.toDto(latestDIrectMessage);
+		DirectMessage latestDirectMessage = getLatestMessageEntityOrNull(conversationId);
+		DirectMessageDto latestMessage = latestDirectMessage != null    // 대화방 내 메시지가 존재하는 경우
+			? directMessageMapper.toDto(latestDirectMessage)            // DTO 전환
+			: null;
 
 		// 5. 안 읽음 여부 판단
-		boolean hasUnread = latestDIrectMessage.getReceiver().getId().equals(requestUserId)
-			&& !latestDIrectMessage.isRead();
+		boolean hasUnread = hasUnreadMessage(latestDirectMessage, requestUserId);
 
 		log.debug("[FIND_CONVERSATION] 대화 단건 조회 완료: conversationId={}", conversationId);
 
-		return conversationMapper.toDto(conversation, with, latestMessage, false);
+		return conversationMapper.toDto(conversation, with, latestMessage, hasUnread);
 	}
 
 	// 유효성 검증: 대화 중복 검사
@@ -142,6 +143,16 @@ public class ConversationService {
 				throw new ConversationException(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS)
 					.addDetail("existingConversationId", conversationId);
 			});
+	}
+
+	// 안 읽은 메시지 여부 확인
+	private boolean hasUnreadMessage(DirectMessage directMessage, UUID requestUserId) {
+		// 메시지가 없는 경우, false 처리
+		if (directMessage == null) {
+			return false;
+		}
+
+		return directMessage.getReceiver().getId().equals(requestUserId) && !directMessage.isRead();
 	}
 
 	// 대화 엔티티 반환
@@ -168,10 +179,9 @@ public class ConversationService {
 	}
 
 	// 마지막 메시지 조회
-	private DirectMessage getLatestMessageEntityOrThrow(UUID conversationId) {
+	private DirectMessage getLatestMessageEntityOrNull(UUID conversationId) {
 		return directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId)
-			.orElseThrow(() -> new DirectMessageException(DirectMessageErrorCode.DM_NOT_FOUND)
-				.addDetail("conversationId", conversationId));
+			.orElse(null);
 	}
 
 	// 사용자 요약 정보 반환
