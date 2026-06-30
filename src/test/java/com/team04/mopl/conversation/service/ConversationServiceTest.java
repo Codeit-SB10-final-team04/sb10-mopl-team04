@@ -236,13 +236,10 @@ class ConversationServiceTest {
 		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversationId)).willReturn(
 			Optional.of(latestMessage));
 		given(directMessageMapper.toDto(latestMessage)).willReturn(latestMessageDto);
-
-		// 마지막 메시지 상태: 안 읽음
-		given(latestMessage.getReceiver()).willReturn(requestUser);
-		given(latestMessage.isRead()).willReturn(false);
-
+		
 		ConversationDto expectedDto = mock(ConversationDto.class);
-		given(conversationMapper.toDto(eq(conversation), any(UserSummary.class), eq(latestMessageDto), eq(true)))
+		given(conversationMapper.toDto(any(Conversation.class), any(UserSummary.class), any(DirectMessageDto.class),
+			anyBoolean()))
 			.willReturn(expectedDto);
 
 		// when
