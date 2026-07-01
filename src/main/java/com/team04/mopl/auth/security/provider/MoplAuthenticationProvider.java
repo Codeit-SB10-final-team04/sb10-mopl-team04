@@ -37,7 +37,7 @@ public class MoplAuthenticationProvider implements AuthenticationProvider {
 
 	// 로그인 요청의 이메일과 비밀번호를 검증
 	@Override
-	@Transactional
+	@Transactional(noRollbackFor = AuthenticationException.class)
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
 		String email = authentication.getName();
 		String password = String.valueOf(authentication.getCredentials());
