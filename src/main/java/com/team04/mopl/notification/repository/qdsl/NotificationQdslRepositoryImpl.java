@@ -160,8 +160,8 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 				? notification.createdAt.desc()
 				: notification.createdAt.asc(),
 			descending
-				? notification.createdAt.desc()
-				: notification.createdAt.asc()
+				? notification.id.desc()
+				: notification.id.asc()
 		};
 	}
 
