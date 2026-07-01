@@ -17,7 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.config.QuerydslConfig;
-import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistPageRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
@@ -61,7 +61,7 @@ class PlaylistQdslRepositoryImplTest {
 	@DisplayName("논리 삭제되지 않은 플레이리스트를 수정일 내림차순으로 조회한다.")
 	void findPlaylists_returnCursorPageOrderByUpdatedAtDesc() {
 		// given
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
+		PlaylistPageRequest request = new PlaylistPageRequest(
 			null, null, null, null, null,
 			2,
 			SortDirection.DESCENDING,
@@ -87,7 +87,7 @@ class PlaylistQdslRepositoryImplTest {
 	@DisplayName("소유자 조건으로 플레이리스트를 조회한다.")
 	void findPlaylists_returnCursorPage_whenOwnerIdEqualExists() {
 		// given
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
+		PlaylistPageRequest request = new PlaylistPageRequest(
 			null, owner1, null, null, null,
 			5,
 			SortDirection.DESCENDING,
@@ -112,7 +112,7 @@ class PlaylistQdslRepositoryImplTest {
 	@DisplayName("구독자 조건으로 플레이리스트를 조회한다.")
 	void findPlaylists_returnCursorPage_whenSubscriberIdEqualExists() {
 		// given
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
+		PlaylistPageRequest request = new PlaylistPageRequest(
 			null, null, subscriber1, null, null,
 			5,
 			SortDirection.DESCENDING,
@@ -136,7 +136,7 @@ class PlaylistQdslRepositoryImplTest {
 	@DisplayName("updatedAt 커서가 있으면 이후 데이터를 조회한다.")
 	void findPlaylists_returnCursorPage_whenAfterUpdatedAtCursor() {
 		// given
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
+		PlaylistPageRequest request = new PlaylistPageRequest(
 			null, null, subscriber1, updatedAt2.toString(), playlist2,
 			5,
 			SortDirection.DESCENDING,
@@ -158,7 +158,7 @@ class PlaylistQdslRepositoryImplTest {
 	@DisplayName("subscriberCount 커서가 있으면 커서 이후 데이터를 조회한다.")
 	void findPlaylists_returnCursorPage_whenAfterSubscriberCountCursor() {
 		// given
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
+		PlaylistPageRequest request = new PlaylistPageRequest(
 			null, null, null, "2", playlist1,
 			5,
 			SortDirection.DESCENDING,
@@ -182,7 +182,7 @@ class PlaylistQdslRepositoryImplTest {
 	@DisplayName("keywordLike 쿼리 파리미터가 있으면 해당 keywordLike를 제목이나 설명에 포함한 데이터를 조회한다.")
 	void findPlaylists_returnCursorPage_whenInputKeywordLike() {
 		// given
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
+		PlaylistPageRequest request = new PlaylistPageRequest(
 			"설명",
 			null, null, null, null,
 			5,

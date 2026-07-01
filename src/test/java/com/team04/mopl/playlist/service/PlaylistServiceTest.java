@@ -27,7 +27,7 @@ import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
-import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistPageRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
@@ -472,7 +472,7 @@ class PlaylistServiceTest {
 
 		Content content = createContent(contentId);
 
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
+		PlaylistPageRequest request = new PlaylistPageRequest(
 			"제목",
 			null, null, null, null,
 			2,
@@ -636,7 +636,7 @@ class PlaylistServiceTest {
 
 		Content content = createContent(contentId);
 
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
+		PlaylistPageRequest request = new PlaylistPageRequest(
 			"제목",
 			null, null, null, null,
 			2,
@@ -794,7 +794,7 @@ class PlaylistServiceTest {
 
 		User currentUser = createUser(currentUserId);
 
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
+		PlaylistPageRequest request = new PlaylistPageRequest(
 			"제목",
 			null, null, null, null,
 			2,
