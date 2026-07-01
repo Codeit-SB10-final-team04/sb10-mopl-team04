@@ -17,6 +17,7 @@ import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.team04.mopl.common.enums.SortDirection;
+import com.team04.mopl.common.exception.MoplException;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
 import com.team04.mopl.playlist.dto.row.PlaylistRow;
@@ -186,9 +187,8 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 			);
 		}
 
-		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
-			.addDetail("sortBy", sortBy)
-			.addDetail("message", "적합하지 않은 sortBy입니다.");
+		// 정렬 조건에 updatedAt이나 subscriberCount 이외의 것이 입력되었을 경우 예외 발생
+		throw invalidSortByException(sortBy);
 	}
 
 	// String 타입의 cursor -> Instant 타입으로 parse
@@ -196,9 +196,8 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 		try {
 			return Instant.parse(cursor);
 		} catch (DateTimeParseException e) {
-			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT, e)
-				.addDetail("cursor", cursor)
-				.addDetail("message", "적합하지 않은 cursor 타입입니다.");
+			// cursor가 Instant 타입이 아닐 경우 예외 발생
+			throw invalidCursorTypeException(cursor, e);
 		}
 	}
 
@@ -223,9 +222,8 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 				);
 		}
 
-		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
-			.addDetail("sortDirection", sortDirection)
-			.addDetail("message", "적합하지 않은 sortDirection입니다.");
+		// 정렬 방향에 DESCENDING이나 ASCENDING 이외의 것이 입력되었을 경우 예외 발생
+		throw invalidSortDirectionException(sortDirection);
 	}
 
 	// sortBy가 subscriberCount일 때
@@ -251,9 +249,8 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 			);
 		}
 
-		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
-			.addDetail("sortBy", sortBy)
-			.addDetail("message", "적합하지 않은 sortBy입니다.");
+		// 정렬 조건에 updatedAt이나 subscriberCount 이외의 것이 입력되었을 경우 예외 발생
+		throw invalidSortByException(sortBy);
 	}
 
 	// String 타입 cursor -> Long 타입으로 parse
@@ -261,9 +258,8 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 		try {
 			return Long.parseLong(cursor);
 		} catch (NumberFormatException e) {
-			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT, e)
-				.addDetail("cursor", cursor)
-				.addDetail("message", "적합하지 않은 cursor 타입입니다.");
+			// cursor가 Instant 타입이 아닐 경우 예외 발생
+			throw invalidCursorTypeException(cursor, e);
 		}
 	}
 
@@ -290,9 +286,8 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 				);
 		}
 
-		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
-			.addDetail("sortDirection", sortDirection)
-			.addDetail("message", "적합하지 않은 sortDirection입니다.");
+		// 정렬 방향에 DESCENDING이나 ASCENDING 이외의 것이 입력되었을 경우 예외 발생
+		throw invalidSortDirectionException(sortDirection);
 	}
 
 	private OrderSpecifier<?>[] orderCondition(
@@ -309,9 +304,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 		}
 
 		// 정렬 조건에 updatedAt이나 subscriberCount 이외의 것이 입력되었을 경우 예외 발생
-		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
-			.addDetail("sortBy", sortBy)
-			.addDetail("message", "적합하지 않은 sortBy입니다.");
+		throw invalidSortByException(sortBy);
 	}
 
 	private OrderSpecifier<?>[] updatedAtOrder(SortDirection sortDirection) {
@@ -363,6 +356,28 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 				subscriberIdEq(request.subscriberIdEqual())
 			)
 			.fetchOne();
+	}
+
+	// validate
+	// cursor가 Instant 타입이 아닐 경우 예외 발생
+	private MoplException invalidCursorTypeException(Object cursor, Throwable e) {
+		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT, e)
+			.addDetail("cursor", cursor)
+			.addDetail("message", "적합하지 않은 cursor 타입입니다.");
+	}
+
+	// 정렬 방향에 DESCENDING이나 ASCENDING 이외의 것이 입력되었을 경우 예외 발생
+	private MoplException invalidSortDirectionException(SortDirection sortDirection) {
+		return new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
+			.addDetail("sortDirection", sortDirection)
+			.addDetail("message", "적합하지 않은 sortDirection입니다.");
+	}
+
+	// 정렬 조건에 updatedAt이나 subscriberCount 이외의 것이 입력되었을 경우 예외 발생
+	private MoplException invalidSortByException(PlaylistSortBy sortBy) {
+		return new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
+			.addDetail("sortBy", sortBy)
+			.addDetail("message", "적합하지 않은 sortBy입니다.");
 	}
 }
 

@@ -13,6 +13,7 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.team04.mopl.common.enums.SortDirection;
+import com.team04.mopl.common.exception.MoplException;
 import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
 import com.team04.mopl.notification.dto.response.NotificationCursorPage;
 import com.team04.mopl.notification.entity.Notification;
@@ -107,9 +108,8 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 		try {
 			return Instant.parse(cursor);
 		} catch (DateTimeParseException e) {
-			throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT, e)
-				.addDetail("cursor", cursor)
-				.addDetail("message", "적합하지 않은 cursor 타입입니다.");
+			// cursor가 Instant 타입이 아닐 경우 예외 발생
+			throw invalidCursorTypeException(cursor, e);
 		}
 	}
 
@@ -134,9 +134,8 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 				);
 		}
 
-		throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
-			.addDetail("sortDirection", sortDirection)
-			.addDetail("message", "적합하지 않은 sortDirection입니다.");
+		// 정렬 방향에 DESCENDING이나 ASCENDING 이외의 것이 입력되었을 경우 예외 발생
+		throw invalidSortDirectionException(sortDirection);
 	}
 
 	private OrderSpecifier<?>[] createdAtOrderCondition(
@@ -147,9 +146,8 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 			return createdAtOrder(sortDirection);
 		}
 
-		throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
-			.addDetail("sortBy", sortBy)
-			.addDetail("message", "적합하지 않은 sortBy입니다.");
+		// 정렬 조건에 updatedAt이나 subscriberCount 이외의 것이 입력되었을 경우 예외 발생
+		throw invalidSortByException(sortBy);
 	}
 
 	private OrderSpecifier<?>[] createdAtOrder(SortDirection sortDirection) {
@@ -181,5 +179,27 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 				notification.receiver.id.eq(currentUserId)
 			)
 			.fetchOne();
+	}
+
+	// validate
+	// cursor가 Instant 타입이 아닐 경우 예외 발생
+	private MoplException invalidCursorTypeException(Object cursor, Throwable e) {
+		return new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT, e)
+			.addDetail("cursor", cursor)
+			.addDetail("message", "적합하지 않은 cursor 타입입니다.");
+	}
+
+	// 정렬 방향에 DESCENDING이나 ASCENDING 이외의 것이 입력되었을 경우 예외 발생
+	private MoplException invalidSortDirectionException(SortDirection sortDirection) {
+		return new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
+			.addDetail("sortDirection", sortDirection)
+			.addDetail("message", "적합하지 않은 sortDirection입니다.");
+	}
+
+	// 정렬 조건에 updatedAt이나 subscriberCount 이외의 것이 입력되었을 경우 예외 발생
+	private MoplException invalidSortByException(NotificationSortBy sortBy) {
+		return new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
+			.addDetail("sortBy", sortBy)
+			.addDetail("message", "적합하지 않은 sortBy입니다.");
 	}
 }
