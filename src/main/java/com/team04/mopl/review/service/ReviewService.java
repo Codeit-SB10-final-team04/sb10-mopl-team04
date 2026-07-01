@@ -45,6 +45,8 @@ public class ReviewService {
 		// 요청자 Id 추출
 		UUID userId = moplUserDetails.getUserId();
 
+		log.info("[REVIEW_CREATE] 리뷰 생성 시작: userId={}, contentId={}", userId, reviewCreateRequest.contentId());
+
 		// 요청자 검증
 		User user = getUserOrThrow(userId);
 
@@ -68,6 +70,8 @@ public class ReviewService {
 
 		// 콘텐츠 쪽 리뷰 개수 및 평균 평점 이벤트 발행(비동기 처리 -> 리뷰 많아질수록 집계 시간 오래 걸림)
 		applicationEventPublisher.publishEvent(new ReviewCreatedEvent(content.getId()));
+
+		log.info("[REVIEW_CREATE] 리뷰 생성 완료: userId={}, contentId={}, reviewId={}", userId, content.getId(), review.getId());
 
 		return reviewMapper.toDto(review, userSummary);
 	}
