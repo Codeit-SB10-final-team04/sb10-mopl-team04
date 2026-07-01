@@ -46,7 +46,7 @@ public class ReviewController implements ReviewControllerDocs {
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		ReviewDto reviewDto;
+		ReviewDto reviewDto = reviewService.updateReview(reviewId, reviewUpdateRequest, moplUserDetails);
 
 		return ResponseEntity.status(HttpStatus.OK).body(reviewDto);
 	}
