@@ -17,7 +17,7 @@ public record NotificationSearchRequest(
 
 	@NotNull(message = "조회할 데이터 개수는 필수 입니다.")
 	@Min(value = 1, message = "조회할 데이터 개수는 1 개 이상이어야 합니다.")
-	int limit,
+	Integer limit,
 
 	@NotNull(message = "정렬 방향은 필수 입니다.")
 	SortDirection sortDirection,
