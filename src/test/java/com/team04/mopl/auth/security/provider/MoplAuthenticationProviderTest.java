@@ -121,6 +121,7 @@ class MoplAuthenticationProviderTest {
 			.isInstanceOf(LockedException.class);
 
 		verify(passwordEncoder, never()).matches(RAW_PASSWORD, PASSWORD_HASH);
+		verify(temporaryPasswordRepository, never()).findByUser_Id(user.getId());
 	}
 
 	@Test
@@ -137,6 +138,30 @@ class MoplAuthenticationProviderTest {
 		// when, then
 		assertThatThrownBy(() -> moplAuthenticationProvider.authenticate(request))
 			.isInstanceOf(BadCredentialsException.class);
+	}
+
+	@Test
+	@DisplayName("임시 비밀번호가 있어도 입력 비밀번호와 일치하지 않으면 BadCredentialsException을 던진다")
+	void authenticate_throwBadCredentialsException_whenTemporaryPasswordMismatch() {
+		// given
+		User user = createUser(UUID.randomUUID(), EMAIL, false);
+		TemporaryPassword temporaryPassword = createTemporaryPassword(
+			user,
+			Instant.now().minusSeconds(30),
+			Instant.now().plusSeconds(120)
+		);
+		Authentication request = new UsernamePasswordAuthenticationToken(EMAIL, RAW_PASSWORD);
+
+		when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+		when(passwordEncoder.matches(RAW_PASSWORD, PASSWORD_HASH)).thenReturn(false);
+		when(temporaryPasswordRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(temporaryPassword));
+		when(passwordEncoder.matches(RAW_PASSWORD, TEMPORARY_PASSWORD_HASH)).thenReturn(false);
+
+		// when, then
+		assertThatThrownBy(() -> moplAuthenticationProvider.authenticate(request))
+			.isInstanceOf(BadCredentialsException.class);
+
+		verify(temporaryPasswordRepository, never()).deleteByUser_Id(user.getId());
 	}
 
 	@Test
@@ -170,6 +195,16 @@ class MoplAuthenticationProviderTest {
 
 		// then
 		assertThat(result).isTrue();
+	}
+
+	@Test
+	@DisplayName("UsernamePasswordAuthenticationToken 타입이 아니면 지원하지 않는다")
+	void supports_returnFalse_whenAuthenticationTypeIsNotUsernamePasswordAuthenticationToken() {
+		// when
+		boolean result = moplAuthenticationProvider.supports(Authentication.class);
+
+		// then
+		assertThat(result).isFalse();
 	}
 
 	private User createUser(UUID userId, String email, boolean locked) {
