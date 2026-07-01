@@ -38,7 +38,7 @@ public class TemporaryPasswordMailSender {
 	@Value("${mopl.mail.from}")
 	private String from;
 
-	@Value("${mopl.mail.from.name}")
+	@Value("${mopl.mail.from-name}")
 	private String fromName;
 
 	// 임시 비밀번호와 만료 시각을 이메일로 전송
