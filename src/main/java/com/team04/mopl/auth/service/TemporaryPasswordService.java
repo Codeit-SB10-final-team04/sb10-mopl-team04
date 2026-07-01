@@ -2,14 +2,17 @@ package com.team04.mopl.auth.service;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.auth.entity.TemporaryPassword;
 import com.team04.mopl.auth.repository.TemporaryPasswordRepository;
+import com.team04.mopl.auth.service.event.TemporaryPasswordIssuedEvent;
 import com.team04.mopl.auth.service.mail.TemporaryPasswordMailSender;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.exception.UserErrorCode;
@@ -31,7 +34,7 @@ public class TemporaryPasswordService {
 	private final TemporaryPasswordRepository temporaryPasswordRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final TemporaryPasswordGenerator temporaryPasswordGenerator;
-	private final TemporaryPasswordMailSender temporaryPasswordMailSender;
+	private final ApplicationEventPublisher eventPublisher;
 
 	// 이메일 주소로 임시 비밀번호를 발급하고 이메일로 전송
 	@Transactional
@@ -39,43 +42,52 @@ public class TemporaryPasswordService {
 		String maskedEmail = maskEmail(email);
 		log.info("[AUTH_RESET_PASSWORD] 임시 비밀번호 발급 시작: email={}", maskedEmail);
 
-		// 요청 이메일에 해당하는 사용자 조회
-		User user = userRepository.findByEmail(email)
-			.orElseThrow(() -> new UserException(
-				UserErrorCode.USER_NOT_FOUND,
-				Map.of("email", email)
-			));
+		Optional<User> userOptional = userRepository.findByEmail(email);
 
-		// 사용자에게 전달할 임시 비밀번호 원문 생성
+		// 가입 여부를 외부에 노출하지 않기 위해 미가입 이메일이면 조용히 종료
+		if (userOptional.isEmpty()) {
+			log.info("[AUTH_RESET_PASSWORD] 가입되지 않은 이메일 요청: email={}", maskedEmail);
+
+			return;
+		}
+
+		User user = userOptional.get();
+
+		//임시 비밀번호 원문 생성
 		String temporaryPassword = temporaryPasswordGenerator.generate();
+
+		// DB에는 해시값 저장
 		String temporaryPasswordHash = passwordEncoder.encode(temporaryPassword);
 
-		// 임시 비밀번호는 3분 동안만 유효
 		Instant createdAt = Instant.now();
 		Instant expiresAt = createdAt.plusSeconds(TEMPORARY_PASSWORD_EXPIRATION_SECONDS);
 
-		TemporaryPassword temporaryPasswordEntity = TemporaryPassword.builder()
-			.user(user)
-			.passwordHash(temporaryPasswordHash)
-			.createdAt(createdAt)
-			.expiresAt(expiresAt)
-			.build();
-
-		// 이미 발급된 임시 비밀번호가 있으면 갱신, 없으면 새로 저장
-		temporaryPasswordRepository.findById(user.getId())
+		// 기존 임시 비밀번호가 있으면 갱신/ 없으면 새로 저장
+		temporaryPasswordRepository.findByUser_Id(user.getId())
 			.ifPresentOrElse(
 				savedTemporaryPassword -> savedTemporaryPassword.reissue(
 					temporaryPasswordHash,
 					createdAt,
 					expiresAt
 				),
-				() -> temporaryPasswordRepository.save(temporaryPasswordEntity)
+				() -> temporaryPasswordRepository.save(
+					TemporaryPassword.builder()
+						.user(user)
+						.passwordHash(temporaryPasswordHash)
+						.createdAt(createdAt)
+						.expiresAt(expiresAt)
+						.build()
+				)
 			);
 
-		// 사용자가 입력한 이메일로 임시 비밀번호 원문과 만료 시각 전송
-		temporaryPasswordMailSender.sendTemporaryPassword(email, temporaryPassword, expiresAt);
+		// 실제 메일 발송은 트랜잭션 커밋 이후 리스너에서 처리
+		eventPublisher.publishEvent(new TemporaryPasswordIssuedEvent(
+			user.getEmail(),
+			temporaryPassword,
+			expiresAt
+		));
 
-		log.info("[AUTH_RESET_PASSWORD] 임시 비밀번호 발급 성공: userId={}, email={}", user.getId(), maskedEmail);
+		log.info("[AUTH_RESET_PASSWORD] 임시 비밀번호 발급 이벤트 발행: userId={}, email={}", user.getId(), maskedEmail);
 	}
 
 	// 비밀번호 변경 완료 후 임시 비밀번호 삭제 시 사용
