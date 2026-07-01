@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
-import com.team04.mopl.conversation.dto.request.ConversationSearchRequest;
+import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
 import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 import com.team04.mopl.conversation.service.ConversationService;
@@ -71,12 +71,12 @@ public class ConversationController implements ConversationControllerDocs {
 	@Override
 	@GetMapping
 	public ResponseEntity<CursorResponseConversationDto> findAll(
-		@Valid @ModelAttribute ConversationSearchRequest conversationSearchRequest,
+		@Valid @ModelAttribute ConversationPageRequest conversationPageRequest,
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
 		CursorResponseConversationDto cursorResponseConversationDto = conversationService.findAll(
-			conversationSearchRequest, moplUserDetails.getUserId());
+			conversationPageRequest, moplUserDetails.getUserId());
 
 		return ResponseEntity.status(HttpStatus.OK).body(cursorResponseConversationDto);
 	}

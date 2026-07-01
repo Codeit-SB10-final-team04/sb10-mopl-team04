@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
-public record ConversationSearchRequest(
+public record ConversationPageRequest(
 	// 검색 키워드: 사용자 이름, 메시지 내용
 	String keywordLike,
 

@@ -6,7 +6,7 @@ import org.springframework.http.ResponseEntity;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
-import com.team04.mopl.conversation.dto.request.ConversationSearchRequest;
+import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
 import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 
@@ -48,7 +48,7 @@ public interface ConversationControllerDocs {
 		description = "특정 사용자가 참여하고 있는 대화방 목록을 조회합니다."
 	)
 	ResponseEntity<CursorResponseConversationDto> findAll(
-		ConversationSearchRequest conversationSearchRequest,
+		ConversationPageRequest conversationPageRequest,
 		MoplUserDetails moplUserDetails
 	);
 }
