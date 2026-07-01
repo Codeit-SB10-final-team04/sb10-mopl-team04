@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.team04.mopl.notification.entity.Notification;
+import com.team04.mopl.notification.repository.qdsl.NotificationQdslRepository;
 
-public interface NotificationRepository extends JpaRepository<Notification, UUID> {
+public interface NotificationRepository extends JpaRepository<Notification, UUID>, NotificationQdslRepository {
 }
