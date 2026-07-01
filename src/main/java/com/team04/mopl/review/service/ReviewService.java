@@ -3,6 +3,7 @@ package com.team04.mopl.review.service;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,7 +64,12 @@ public class ReviewService {
 			.rating(reviewCreateRequest.rating())
 			.text(reviewCreateRequest.text())
 			.build();
-		reviewRepository.save(review);
+		try {
+			reviewRepository.save(review);
+		} catch (DataIntegrityViolationException e) {
+			// 동시 요청으로 인한 유니크 제약 충돌 처리
+			throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
+		}
 
 		// User Summary 정보
 		UserSummary userSummary = getUserSummary(user);
@@ -71,7 +77,8 @@ public class ReviewService {
 		// 콘텐츠 쪽 리뷰 개수 및 평균 평점 이벤트 발행(비동기 처리 -> 리뷰 많아질수록 집계 시간 오래 걸림)
 		applicationEventPublisher.publishEvent(new ReviewCreatedEvent(content.getId()));
 
-		log.info("[REVIEW_CREATE] 리뷰 생성 완료: userId={}, contentId={}, reviewId={}", userId, content.getId(), review.getId());
+		log.info("[REVIEW_CREATE] 리뷰 생성 완료: userId={}, contentId={}, reviewId={}", userId, content.getId(),
+			review.getId());
 
 		return reviewMapper.toDto(review, userSummary);
 	}
