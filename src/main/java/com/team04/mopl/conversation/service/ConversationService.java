@@ -12,7 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
+import com.team04.mopl.conversation.dto.request.ConversationSearchRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
+import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 import com.team04.mopl.conversation.entity.Conversation;
 import com.team04.mopl.conversation.entity.ConversationParticipant;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
@@ -165,6 +167,30 @@ public class ConversationService {
 	private UUID findExistingConversationId(UUID requestUserId, UUID withUserId) {
 		return conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
 			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
+	}
+
+	// 대화 목록 조회 (정렬 + 필터링 + 커서 페이지네이션)
+	private CursorResponseConversationDto findAll(
+		ConversationSearchRequest request,
+		UUID requestUserId
+	) {
+		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 시작: keyword={}", request.keywordLike());
+
+		// 1. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
+
+		// 대화 전체 개수 조회
+
+		// 2. 다음 페이지 유무 확인
+
+		// 3. 다음 커서 값 계산 (메인 커서, 보조 커서)
+
+		// 4. Conversation -> ConversationDto (내부 메서드 활용)
+
+		// 5. CursorResponseConversationDto 전환 (Mapper 활용)
+
+		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 완료: keyword={}", request.keywordLike());
+
+		return null;
 	}
 
 	// 유효성 검증: 대화 중복 검사
