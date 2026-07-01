@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional(readOnly = true)
 public class TemporaryPasswordService {
 
-	private static final long TEMPORARY_PASSWORD_EXPIRATION_SECONDS = 180L;
+	private static final long TEMPORARY_PASSWORD_EXPIRATION_SECONDS = 180L; // 3분
 
 	private final UserRepository userRepository;
 	private final TemporaryPasswordRepository temporaryPasswordRepository;

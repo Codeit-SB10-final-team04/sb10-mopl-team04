@@ -33,6 +33,21 @@ spring:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  mail:
+    host: localhost
+    port: 1025
+    username:
+    password:
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
 # 더미 값 추가
 tmdb:
   api:
@@ -63,3 +78,6 @@ mopl:
     refresh-token-cookie-name: REFRESH_TOKEN
     refresh-token-cookie-secure: false
     refresh-token-cookie-same-site: Lax
+  mail:
+    from: no-reply@test.local
+    from-name: MOPL_test

@@ -13,6 +13,21 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.team04.mopl.auth.exception.AuthException;
 import com.team04.mopl.user.entity.User;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import com.team04.mopl.auth.exception.AuthErrorCode;
+import com.team04.mopl.auth.exception.AuthException;
+import com.team04.mopl.user.entity.User;
+
 class TemporaryPasswordTest {
 
 	@Test
@@ -104,66 +119,204 @@ class TemporaryPasswordTest {
 	}
 
 	@Test
-	@DisplayName("사용자가 null이면 예외를 던진다")
-	void create_throwException_whenUserNull() {
+	@DisplayName("사용자가 null이면 AuthException을 던진다")
+	void create_throwAuthException_whenUserNull() {
 		// given
 		Instant createdAt = Instant.now();
 		Instant expiresAt = createdAt.plusSeconds(180);
 
 		// when, then
-		assertThatThrownBy(() -> TemporaryPassword.builder()
-			.user(null)
-			.passwordHash("password-hash")
-			.createdAt(createdAt)
-			.expiresAt(expiresAt)
-			.build())
-			.isInstanceOf(AuthException.class);
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE,
+			() -> TemporaryPassword.builder()
+				.user(null)
+				.passwordHash("password-hash")
+				.createdAt(createdAt)
+				.expiresAt(expiresAt)
+				.build()
+		);
 	}
 
 	@Test
-	@DisplayName("비밀번호 해시가 blank이면 예외를 던진다")
-	void create_throwException_whenPasswordHashBlank() {
+	@DisplayName("비밀번호 해시가 null이면 AuthException을 던진다")
+	void create_throwAuthException_whenPasswordHashNull() {
 		// given
 		Instant createdAt = Instant.now();
 		Instant expiresAt = createdAt.plusSeconds(180);
 
 		// when, then
-		assertThatThrownBy(() -> TemporaryPassword.builder()
-			.user(createUser())
-			.passwordHash(" ")
-			.createdAt(createdAt)
-			.expiresAt(expiresAt)
-			.build())
-			.isInstanceOf(AuthException.class);
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE,
+			() -> TemporaryPassword.builder()
+				.user(createUser())
+				.passwordHash(null)
+				.createdAt(createdAt)
+				.expiresAt(expiresAt)
+				.build()
+		);
 	}
 
 	@Test
-	@DisplayName("만료 시각이 발급 시각보다 빠르거나 같으면 예외를 던진다")
-	void create_throwException_whenExpiresAtNotAfterCreatedAt() {
+	@DisplayName("비밀번호 해시가 blank이면 AuthException을 던진다")
+	void create_throwAuthException_whenPasswordHashBlank() {
+		// given
+		Instant createdAt = Instant.now();
+		Instant expiresAt = createdAt.plusSeconds(180);
+
+		// when, then
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE,
+			() -> TemporaryPassword.builder()
+				.user(createUser())
+				.passwordHash(" ")
+				.createdAt(createdAt)
+				.expiresAt(expiresAt)
+				.build()
+		);
+	}
+
+	@Test
+	@DisplayName("발급 시각이 null이면 AuthException을 던진다")
+	void create_throwAuthException_whenCreatedAtNull() {
+		// given
+		Instant expiresAt = Instant.now().plusSeconds(180);
+
+		// when, then
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE,
+			() -> TemporaryPassword.builder()
+				.user(createUser())
+				.passwordHash("password-hash")
+				.createdAt(null)
+				.expiresAt(expiresAt)
+				.build()
+		);
+	}
+
+	@Test
+	@DisplayName("만료 시각이 null이면 AuthException을 던진다")
+	void create_throwAuthException_whenExpiresAtNull() {
 		// given
 		Instant createdAt = Instant.now();
 
 		// when, then
-		assertThatThrownBy(() -> TemporaryPassword.builder()
-			.user(createUser())
-			.passwordHash("password-hash")
-			.createdAt(createdAt)
-			.expiresAt(createdAt)
-			.build())
-			.isInstanceOf(AuthException.class);
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE,
+			() -> TemporaryPassword.builder()
+				.user(createUser())
+				.passwordHash("password-hash")
+				.createdAt(createdAt)
+				.expiresAt(null)
+				.build()
+		);
 	}
 
 	@Test
-	@DisplayName("만료 여부 확인 시 현재 시각이 null이면 예외를 던진다")
-	void isExpired_throwException_whenNowNull() {
+	@DisplayName("만료 시각이 발급 시각보다 빠르거나 같으면 AuthException을 던진다")
+	void create_throwAuthException_whenExpiresAtNotAfterCreatedAt() {
+		// given
+		Instant createdAt = Instant.now();
+
+		// when, then
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_EXPIRATION_INVALID,
+			() -> TemporaryPassword.builder()
+				.user(createUser())
+				.passwordHash("password-hash")
+				.createdAt(createdAt)
+				.expiresAt(createdAt)
+				.build()
+		);
+	}
+
+	@Test
+	@DisplayName("재발급 시 비밀번호 해시가 null이면 AuthException을 던진다")
+	void reissue_throwAuthException_whenPasswordHashNull() {
 		// given
 		Instant createdAt = Instant.now();
 		Instant expiresAt = createdAt.plusSeconds(180);
 		TemporaryPassword temporaryPassword = createTemporaryPassword(createdAt, expiresAt);
 
 		// when, then
-		assertThatThrownBy(() -> temporaryPassword.isExpired(null))
-			.isInstanceOf(AuthException.class);
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE,
+			() -> temporaryPassword.reissue(null, createdAt, expiresAt)
+		);
+	}
+
+	@Test
+	@DisplayName("재발급 시 비밀번호 해시가 blank이면 AuthException을 던진다")
+	void reissue_throwAuthException_whenPasswordHashBlank() {
+		// given
+		Instant createdAt = Instant.now();
+		Instant expiresAt = createdAt.plusSeconds(180);
+		TemporaryPassword temporaryPassword = createTemporaryPassword(createdAt, expiresAt);
+
+		// when, then
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE,
+			() -> temporaryPassword.reissue(" ", createdAt, expiresAt)
+		);
+	}
+
+	@Test
+	@DisplayName("재발급 시 발급 시각이 null이면 AuthException을 던진다")
+	void reissue_throwAuthException_whenCreatedAtNull() {
+		// given
+		Instant createdAt = Instant.now();
+		Instant expiresAt = createdAt.plusSeconds(180);
+		TemporaryPassword temporaryPassword = createTemporaryPassword(createdAt, expiresAt);
+
+		// when, then
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE,
+			() -> temporaryPassword.reissue("new-password-hash", null, expiresAt)
+		);
+	}
+
+	@Test
+	@DisplayName("재발급 시 만료 시각이 null이면 AuthException을 던진다")
+	void reissue_throwAuthException_whenExpiresAtNull() {
+		// given
+		Instant createdAt = Instant.now();
+		Instant expiresAt = createdAt.plusSeconds(180);
+		TemporaryPassword temporaryPassword = createTemporaryPassword(createdAt, expiresAt);
+
+		// when, then
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE,
+			() -> temporaryPassword.reissue("new-password-hash", createdAt, null)
+		);
+	}
+
+	@Test
+	@DisplayName("재발급 시 만료 시각이 발급 시각보다 빠르거나 같으면 AuthException을 던진다")
+	void reissue_throwAuthException_whenExpiresAtNotAfterCreatedAt() {
+		// given
+		Instant createdAt = Instant.now();
+		Instant expiresAt = createdAt.plusSeconds(180);
+		TemporaryPassword temporaryPassword = createTemporaryPassword(createdAt, expiresAt);
+
+		// when, then
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_EXPIRATION_INVALID,
+			() -> temporaryPassword.reissue("new-password-hash", createdAt, createdAt)
+		);
+	}
+
+	@Test
+	@DisplayName("만료 여부 확인 시 현재 시각이 null이면 AuthException을 던진다")
+	void isExpired_throwAuthException_whenNowNull() {
+		// given
+		Instant createdAt = Instant.now();
+		Instant expiresAt = createdAt.plusSeconds(180);
+		TemporaryPassword temporaryPassword = createTemporaryPassword(createdAt, expiresAt);
+
+		// when, then
+		assertAuthException(
+			AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE,
+			() -> temporaryPassword.isExpired(null)
+		);
 	}
 
 	private TemporaryPassword createTemporaryPassword(Instant createdAt, Instant expiresAt) {
@@ -185,5 +338,17 @@ class TemporaryPasswordTest {
 		ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
 
 		return user;
+	}
+
+	private static void assertAuthException(
+		AuthErrorCode expectedErrorCode,
+		ThrowingCallable callable
+	) {
+		assertThatThrownBy(callable)
+			.isInstanceOfSatisfying(AuthException.class, exception ->
+				assertThat(exception)
+					.extracting("errorCode")
+					.isEqualTo(expectedErrorCode)
+			);
 	}
 }

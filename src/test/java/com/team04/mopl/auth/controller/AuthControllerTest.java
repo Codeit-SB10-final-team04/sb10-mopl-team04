@@ -3,10 +3,15 @@ package com.team04.mopl.auth.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -270,5 +275,28 @@ class AuthControllerTest {
 					}
 					"""))
 			.andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("비밀번호 초기화 처리 중 메일 발송에 실패하면 500 Internal Server Error를 반환한다")
+	void resetPassword_returnInternalServerError_whenMailSendFailed() throws Exception {
+		// given
+		String email = "user@example.com";
+
+		doThrow(new AuthException(AuthErrorCode.AUTH_MAIL_SEND_FAILED))
+			.when(temporaryPasswordService)
+			.resetPassword(email);
+
+		// when, then
+		mockMvc.perform(post("/api/auth/reset-password")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"email": "user@example.com"
+					}
+					"""))
+			.andExpect(status().isInternalServerError())
+			.andExpect(jsonPath("$.exceptionName").value("AuthException"))
+			.andExpect(jsonPath("$.message").value("임시 비밀번호 이메일 전송에 실패했습니다."));
 	}
 }
