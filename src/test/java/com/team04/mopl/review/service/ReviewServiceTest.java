@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.content.entity.Content;
@@ -156,6 +157,35 @@ class ReviewServiceTest {
 			.isInstanceOf(ReviewException.class);
 
 		verify(reviewRepository, never()).save(any());
+		verify(applicationEventPublisher, never()).publishEvent(any());
+	}
+
+	@Test
+	@DisplayName("동시 요청으로 save 시 유니크 제약 충돌이 발생하면 ReviewException이 발생한다")
+	void createReview_throwReviewException_whenDataIntegrityViolation() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID contentId = UUID.randomUUID();
+
+		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
+		when(moplUserDetails.getUserId()).thenReturn(userId);
+
+		User user = mock(User.class);
+		when(user.getId()).thenReturn(userId);
+
+		Content content = mock(Content.class);
+
+		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(reviewRepository.existsByUserIdAndContentIdAndDeletedAtIsNull(userId, contentId)).thenReturn(false);
+		when(reviewRepository.save(any(Review.class))).thenThrow(new DataIntegrityViolationException("unique constraint violation"));
+
+		ReviewCreateRequest request = new ReviewCreateRequest(contentId, "재밌어요", (short)5);
+
+		// when & then
+		assertThatThrownBy(() -> reviewService.createReview(request, moplUserDetails))
+			.isInstanceOf(ReviewException.class);
+
 		verify(applicationEventPublisher, never()).publishEvent(any());
 	}
 }
