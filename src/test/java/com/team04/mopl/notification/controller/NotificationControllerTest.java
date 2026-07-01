@@ -172,6 +172,35 @@ class NotificationControllerTest {
 			.andExpect(status().isBadRequest());
 	}
 
+	@Test
+	@DisplayName("알림 읽음 요청에 성공하면 204 No Content가 발생한다.")
+	void readNotification_returnNoContent_whenValidRequest() throws Exception {
+		// given
+		UUID notificationId = UUID.randomUUID();
+		UUID currentUserId = UUID.randomUUID();
+
+		doNothing()
+			.when(notificationService)
+			.readNotification(notificationId, currentUserId);
+
+		// when, then
+		mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
+				.with(moplUser(currentUserId)))
+			.andExpect(status().isNoContent());
+	}
+
+	@Test
+	@DisplayName("notificationId가 잘못된 UUID 형식으로 들어오면 400 Bad Request가 발생한다.")
+	void readNotification_returnNoContent_whenInvalidNotificationIdFormat() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		// when, then
+		mockMvc.perform(delete("/api/notifications/{notificationId}", "Invalid-UUID")
+				.with(moplUser(currentUserId)))
+			.andExpect(status().isBadRequest());
+	}
+
 	private RequestPostProcessor moplUser(UUID userId) {
 		return request -> {
 			MoplUserDetails moplUserDetails = MoplUserDetails.authenticated(
