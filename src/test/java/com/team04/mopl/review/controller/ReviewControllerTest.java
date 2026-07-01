@@ -1,5 +1,6 @@
 package com.team04.mopl.review.controller;
 
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -21,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.review.dto.request.ReviewCreateRequest;
+import com.team04.mopl.review.dto.request.ReviewUpdateRequest;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.exception.ReviewErrorCode;
 import com.team04.mopl.review.exception.ReviewException;
@@ -128,5 +130,70 @@ class ReviewControllerTest {
 				.content(objectMapper.writeValueAsString(request)))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.message").value(ReviewErrorCode.REVIEW_ALREADY_EXISTS.getMessage()));
+	}
+
+	// ========== updateReview ==========
+
+	@Test
+	@DisplayName("리뷰 수정 요청에 성공하면 200 OK와 ReviewDto를 반환한다")
+	void updateReview_returnOk_whenValidRequest() throws Exception {
+		// given
+		UUID reviewId = UUID.randomUUID();
+		UUID contentId = UUID.randomUUID();
+		ReviewUpdateRequest request = new ReviewUpdateRequest("수정된 리뷰", (short)4);
+
+		ReviewDto response = new ReviewDto(
+			reviewId,
+			contentId,
+			new UserSummary(UUID.randomUUID(), "테스트유저", null),
+			"수정된 리뷰",
+			(short)4
+		);
+
+		when(reviewService.updateReview(eq(reviewId), any(), any())).thenReturn(response);
+
+		// when & then
+		mockMvc.perform(patch("/api/reviews/{reviewId}", reviewId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(request)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.text").value("수정된 리뷰"))
+			.andExpect(jsonPath("$.rating").value(4));
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 리뷰이면 404 Not Found를 반환한다")
+	void updateReview_returnNotFound_whenReviewNotFound() throws Exception {
+		// given
+		UUID reviewId = UUID.randomUUID();
+		ReviewUpdateRequest request = new ReviewUpdateRequest("수정된 리뷰", (short)4);
+
+		when(reviewService.updateReview(eq(reviewId), any(), any()))
+			.thenThrow(new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND));
+
+		// when & then
+		mockMvc.perform(patch("/api/reviews/{reviewId}", reviewId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(request)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.message").value(ReviewErrorCode.REVIEW_NOT_FOUND.getMessage()));
+	}
+
+	@Test
+	@DisplayName("리뷰 작성자가 아니면 403 Forbidden을 반환한다")
+	void updateReview_returnForbidden_whenNotOwner() throws Exception {
+		// given
+		UUID reviewId = UUID.randomUUID();
+		ReviewUpdateRequest request = new ReviewUpdateRequest("수정된 리뷰", (short)4);
+
+		when(reviewService.updateReview(eq(reviewId), any(), any()))
+			.thenThrow(new ReviewException(ReviewErrorCode.REVIEW_FORBIDDEN));
+
+		// when & then
+		mockMvc.perform(patch("/api/reviews/{reviewId}", reviewId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(request)))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.message").value(ReviewErrorCode.REVIEW_FORBIDDEN.getMessage()));
 	}
 }
