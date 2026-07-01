@@ -11,6 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Tag(name = "리뷰 API", description = "리뷰 관리")
 public interface ReviewControllerDocs {
-	@Operation
+	@Operation(summary = "리뷰 등록")
 	ResponseEntity<ReviewDto> createReview(ReviewCreateRequest reviewCreateRequest, MoplUserDetails moplUserDetails);
 }
