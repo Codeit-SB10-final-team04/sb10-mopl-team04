@@ -1,24 +1,16 @@
-package com.team04.mopl.playlist.dto.request;
+package com.team04.mopl.notification.dto.request;
 
 import java.util.UUID;
 
-import org.springframework.util.StringUtils;
-
 import com.team04.mopl.common.enums.SortDirection;
-import com.team04.mopl.playlist.enums.PlaylistSortBy;
+import com.team04.mopl.notification.enums.NotificationSortBy;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
-public record PlaylistSearchRequest(
-
-	String keywordLike,
-
-	UUID ownerIdEqual,
-
-	UUID subscriberIdEqual,
+public record NotificationSearchRequest(
 
 	String cursor,
 
@@ -33,14 +25,8 @@ public record PlaylistSearchRequest(
 	SortDirection sortDirection,
 
 	@NotNull(message = "정렬 기준은 필수 입니다.")
-	PlaylistSortBy sortBy
+	NotificationSortBy sortBy
 ) {
-	public String normalizedKeyword() {
-		// keywordLike가 null, 공백, 탭, 줄바꿈 등이 있는 문자열이면 -> false
-		return StringUtils.hasText(keywordLike)
-			? keywordLike.strip()
-			: null;
-	}
 
 	@AssertTrue(message = "cursor와 idAfter는 함께 요청되어야 합니다.")
 	public boolean isCursorAndIdAfterPaired() {
