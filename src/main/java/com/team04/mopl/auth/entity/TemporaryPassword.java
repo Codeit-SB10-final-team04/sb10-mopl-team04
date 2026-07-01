@@ -1,9 +1,10 @@
 package com.team04.mopl.auth.entity;
 
 import java.time.Instant;
-import java.util.Objects;
 import java.util.UUID;
 
+import com.team04.mopl.auth.exception.AuthErrorCode;
+import com.team04.mopl.auth.exception.AuthException;
 import com.team04.mopl.user.entity.User;
 
 import jakarta.persistence.Column;
@@ -34,11 +35,7 @@ public class TemporaryPassword {
 	// @MapsId를 통해 User의 id를 TemporaryPassword의 PK로 사용
 	@MapsId
 	@OneToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(
-		name = "user_id",
-		nullable = false,
-		columnDefinition = "UUID"
-	)
+	@JoinColumn(name = "user_id", nullable = false, columnDefinition = "UUID")
 	private User user;
 
 	// 임시 비밀번호 원문이 아닌 해시값
@@ -60,51 +57,70 @@ public class TemporaryPassword {
 		Instant expiresAt,
 		Instant createdAt
 	) {
-		this.user = Objects.requireNonNull(user, "user는 필수입니다.");
-		this.passwordHash = requireText(passwordHash);
-		this.expiresAt = Objects.requireNonNull(expiresAt, "expiresAt은 필수입니다.");
-		this.createdAt = Objects.requireNonNull(createdAt, "createdAt은 필수입니다.");
-
+		validateUser(user);
+		validatePasswordHash(passwordHash);
+		validateExpiresAt(expiresAt);
+		validateCreatedAt(createdAt);
 		validateExpiration(createdAt, expiresAt);
+
+		this.user = user;
+		this.passwordHash = passwordHash;
+		this.expiresAt = expiresAt;
+		this.createdAt = createdAt;
 	}
 
-	// 기존 임시 비밀번호를 새로운 임시 비밀번호로 교체
-	public void reissue(
-		String passwordHash,
-		Instant expiresAt,
-		Instant issuedAt
-	) {
-		Objects.requireNonNull(expiresAt, "expiresAt은 필수입니다.");
-		Objects.requireNonNull(issuedAt, "issuedAt은 필수입니다.");
+	// 임시 비밀번호 재발급
+	public void reissue(String passwordHash, Instant createdAt, Instant expiresAt) {
+		validatePasswordHash(passwordHash);
+		validateCreatedAt(createdAt);
+		validateExpiresAt(expiresAt);
+		validateExpiration(createdAt, expiresAt);
 
-		validateExpiration(issuedAt, expiresAt);
-
-		this.passwordHash = requireText(passwordHash);
+		this.passwordHash = passwordHash;
+		this.createdAt = createdAt;
 		this.expiresAt = expiresAt;
-		this.createdAt = issuedAt;
 	}
 
 	// 임시 비밀번호가 만료되었는지 확인
 	public boolean isExpired(Instant now) {
-		Objects.requireNonNull(now, "now는 필수입니다.");
+		validateCurrentTime(now);
 
 		return !now.isBefore(expiresAt);
 	}
 
-	private static void validateExpiration(
-		Instant issuedAt,
-		Instant expiresAt
-	) {
-		if (!expiresAt.isAfter(issuedAt)) {
-			throw new IllegalArgumentException("임시 비밀번호 만료 시각은 발급 시각 이후여야 합니다.");
+	private static void validateUser(User user) {
+		if (user == null) {
+			throw new AuthException(AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE);
 		}
 	}
 
-	private static String requireText(String value) {
-		if (value == null || value.isBlank()) {
-			throw new IllegalArgumentException("임시 비밀번호 해시는 필수입니다.");
+	private static void validatePasswordHash(String passwordHash) {
+		if (passwordHash == null || passwordHash.isBlank()) {
+			throw new AuthException(AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE);
 		}
+	}
 
-		return value;
+	private static void validateExpiresAt(Instant expiresAt) {
+		if (expiresAt == null) {
+			throw new AuthException(AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE);
+		}
+	}
+
+	private static void validateCreatedAt(Instant createdAt) {
+		if (createdAt == null) {
+			throw new AuthException(AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE);
+		}
+	}
+
+	private static void validateCurrentTime(Instant now) {
+		if (now == null) {
+			throw new AuthException(AuthErrorCode.AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE);
+		}
+	}
+
+	private static void validateExpiration(Instant createdAt, Instant expiresAt) {
+		if (!expiresAt.isAfter(createdAt)) {
+			throw new AuthException(AuthErrorCode.AUTH_TEMPORARY_PASSWORD_EXPIRATION_INVALID);
+		}
 	}
 }
