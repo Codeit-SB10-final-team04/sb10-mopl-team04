@@ -17,7 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.config.QuerydslConfig;
-import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
+import com.team04.mopl.notification.dto.request.NotificationPageRequest;
 import com.team04.mopl.notification.dto.response.NotificationCursorPage;
 import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationSortBy;
@@ -64,7 +64,7 @@ class NotificationQdslRepositoryImplTest {
 	@DisplayName("현재 사용자의 읽지 않은 알림을 생성일 내림차순으로 조회한다.")
 	void findAllNotifications_returnCursorPage_whenOrderByCreatedAtDesc() {
 		// given
-		NotificationSearchRequest request = new NotificationSearchRequest(
+		NotificationPageRequest request = new NotificationPageRequest(
 			null, null,
 			3,
 			SortDirection.DESCENDING,
@@ -92,7 +92,7 @@ class NotificationQdslRepositoryImplTest {
 	@DisplayName("현재 사용자의 읽지 않은 알림을 생성일 오름차순으로 조회한다.")
 	void findAllNotifications_returnCursorPage_whenOrderByCreatedAtAsc() {
 		// given
-		NotificationSearchRequest request = new NotificationSearchRequest(
+		NotificationPageRequest request = new NotificationPageRequest(
 			null, null,
 			3,
 			SortDirection.ASCENDING,
@@ -122,7 +122,7 @@ class NotificationQdslRepositoryImplTest {
 		UUID noNotificationUser = UUID.fromString("00000000-0000-0000-0000-000000000003");
 		insertUser(noNotificationUser, "receiver3");
 
-		NotificationSearchRequest request = new NotificationSearchRequest(
+		NotificationPageRequest request = new NotificationPageRequest(
 			null, null,
 			5,
 			SortDirection.DESCENDING,
@@ -142,7 +142,7 @@ class NotificationQdslRepositoryImplTest {
 	@DisplayName("cursor가 Instant 형식이 아니면 예외가 발생한다.")
 	void findAllNotifications_throwException_whenInvalidCursorFormat() {
 		// given
-		NotificationSearchRequest request = new NotificationSearchRequest(
+		NotificationPageRequest request = new NotificationPageRequest(
 			"invalid_cursor_format",
 			notification1,
 			5,

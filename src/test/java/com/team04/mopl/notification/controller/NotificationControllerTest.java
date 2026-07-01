@@ -27,7 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.enums.SortDirection;
-import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
+import com.team04.mopl.notification.dto.request.NotificationPageRequest;
 import com.team04.mopl.notification.dto.response.CursorResponseNotificationDto;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.enums.NotificationLevel;
@@ -67,7 +67,7 @@ class NotificationControllerTest {
 		UUID notificationId1 = UUID.randomUUID();
 		UUID notificationId2 = UUID.randomUUID();
 
-		NotificationSearchRequest request = new NotificationSearchRequest(
+		NotificationPageRequest request = new NotificationPageRequest(
 			null, null,
 			2,
 			SortDirection.DESCENDING,
@@ -169,6 +169,35 @@ class NotificationControllerTest {
 				.param("sortBy", NotificationSortBy.createdAt.toString())
 				.with(moplUser(currentUserId))
 				.contentType(MediaType.APPLICATION_JSON))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("알림 읽음 요청에 성공하면 204 No Content가 발생한다.")
+	void readNotification_returnNoContent_whenValidRequest() throws Exception {
+		// given
+		UUID notificationId = UUID.randomUUID();
+		UUID currentUserId = UUID.randomUUID();
+
+		doNothing()
+			.when(notificationService)
+			.readNotification(notificationId, currentUserId);
+
+		// when, then
+		mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
+				.with(moplUser(currentUserId)))
+			.andExpect(status().isNoContent());
+	}
+
+	@Test
+	@DisplayName("notificationId가 잘못된 UUID 형식으로 들어오면 400 Bad Request가 발생한다.")
+	void readNotification_returnBadRequest_whenInvalidNotificationIdFormat() throws Exception {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+
+		// when, then
+		mockMvc.perform(delete("/api/notifications/{notificationId}", "Invalid-UUID")
+				.with(moplUser(currentUserId)))
 			.andExpect(status().isBadRequest());
 	}
 

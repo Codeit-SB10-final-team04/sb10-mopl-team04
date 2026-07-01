@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
-import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistPageRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
@@ -60,7 +60,7 @@ public class PlaylistController implements PlaylistControllerDocs {
 	@GetMapping
 	@Override
 	public ResponseEntity<CursorResponsePlaylistDto> findAllPlaylists(
-		@Valid @ModelAttribute PlaylistSearchRequest request,
+		@Valid @ModelAttribute PlaylistPageRequest request,
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 		UUID currentUserId = moplUserDetails.getUserId();

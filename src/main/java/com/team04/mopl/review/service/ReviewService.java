@@ -14,9 +14,11 @@ import com.team04.mopl.content.exception.ContentErrorCode;
 import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.review.dto.request.ReviewCreateRequest;
+import com.team04.mopl.review.dto.request.ReviewUpdateRequest;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.entity.Review;
 import com.team04.mopl.review.event.ReviewCreatedEvent;
+import com.team04.mopl.review.event.ReviewUpdatedEvent;
 import com.team04.mopl.review.exception.ReviewErrorCode;
 import com.team04.mopl.review.exception.ReviewException;
 import com.team04.mopl.review.mapper.ReviewMapper;
@@ -83,6 +85,30 @@ public class ReviewService {
 		return reviewMapper.toDto(review, userSummary);
 	}
 
+	@Transactional
+	public ReviewDto updateReview(
+		UUID reviewId,
+		ReviewUpdateRequest reviewUpdateRequest,
+		MoplUserDetails moplUserDetails
+	) {
+		UUID userId = moplUserDetails.getUserId();
+
+		// 리뷰 검증 (존재, soft delete 여부)
+		Review review = getReviewOrThrow(reviewId);
+
+		// 오너 검증
+		validateReviewOwner(review, userId);
+
+		// 수정
+		review.update(reviewUpdateRequest.text(), reviewUpdateRequest.rating());
+
+		UserSummary userSummary = getUserSummary(review.getUser());
+
+		// 리뷰 수정 이벤트 발행
+		applicationEventPublisher.publishEvent(new ReviewUpdatedEvent(review.getContent().getId()));
+		return reviewMapper.toDto(review, userSummary);
+	}
+
 	// 사용자 엔티티 검증 및 반환
 	private User getUserOrThrow(UUID userId) {
 		return userRepository.findById(userId)
@@ -106,10 +132,26 @@ public class ReviewService {
 				.addDetail("contentId", contentId));
 	}
 
+	// 리뷰 엔티티 검증 및 반환 (soft delete 제외)
+	private Review getReviewOrThrow(UUID reviewId) {
+		return reviewRepository.findByIdAndDeletedAtIsNull(reviewId)
+			.orElseThrow(() -> new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND)
+				.addDetail("reviewId", reviewId));
+	}
+
 	// 해당 콘텐츠 리뷰 1개 제한 확인
 	private void validateReviewByUserId(UUID userId, UUID contentId) {
 		if (reviewRepository.existsByUserIdAndContentIdAndDeletedAtIsNull(userId, contentId)) {
 			throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
+		}
+	}
+
+	// 리뷰 오너 검증
+	private void validateReviewOwner(Review review, UUID userId) {
+		if (!review.getUser().getId().equals(userId)) {
+			throw new ReviewException(ReviewErrorCode.REVIEW_FORBIDDEN)
+				.addDetail("reviewId", review.getId())
+				.addDetail("userId", userId);
 		}
 	}
 }
