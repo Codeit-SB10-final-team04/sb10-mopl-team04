@@ -182,6 +182,60 @@ class JwtAuthenticationFilterTest {
 	}
 
 	@Test
+	@DisplayName("POST /api/auth/reset-password 요청은 JWT 인증 필터를 적용하지 않는다")
+	void doFilter_passesRequest_whenRequestIsPostResetPasswordPath() throws Exception {
+		// given
+		MockHttpServletRequest request = new MockHttpServletRequest(
+			HttpMethod.POST.name(),
+			"/api/auth/reset-password"
+		);
+		request.setServletPath("/api/auth/reset-password");
+		request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer invalid-token");
+
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		FilterChain filterChain = mock(FilterChain.class);
+
+		// when
+		jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+		// then
+		verify(filterChain).doFilter(request, response);
+		verifyNoInteractions(jwtTokenProvider);
+		verifyNoInteractions(authSessionStore);
+		verifyNoInteractions(authResponseWriter);
+	}
+
+	@Test
+	@DisplayName("reset-password 경로라도 POST가 아니면 JWT 필터를 적용한다")
+	void doFilter_writesError_whenResetPasswordPathMethodIsNotPost() throws Exception {
+		// given
+		MockHttpServletRequest request = new MockHttpServletRequest(
+			HttpMethod.GET.name(),
+			"/api/auth/reset-password"
+		);
+		request.setServletPath("/api/auth/reset-password");
+		request.addHeader(HttpHeaders.AUTHORIZATION, "Token invalid-token");
+
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		FilterChain filterChain = mock(FilterChain.class);
+
+		ArgumentCaptor<AuthException> exceptionCaptor = ArgumentCaptor.forClass(AuthException.class);
+
+		// when
+		jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+		// then
+		verify(authResponseWriter).writeError(same(response), exceptionCaptor.capture());
+		verify(filterChain, never()).doFilter(request, response);
+		verifyNoInteractions(jwtTokenProvider);
+		verifyNoInteractions(authSessionStore);
+
+		assertThat(exceptionCaptor.getValue())
+			.extracting("errorCode")
+			.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
+	}
+
+	@Test
 	@DisplayName("Bearer 형식이 아니면 인증 에러 응답을 반환한다")
 	void doFilterInternal_writesError_whenAuthorizationHeaderIsNotBearerType() throws Exception {
 		// given
