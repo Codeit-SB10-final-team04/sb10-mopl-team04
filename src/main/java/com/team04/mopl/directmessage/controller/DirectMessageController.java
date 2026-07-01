@@ -30,7 +30,7 @@ public class DirectMessageController implements DirectMessageControllerDocs {
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		directMessageService.markAsRead(conversationId, directMessageId, moplUserDetails);
+		directMessageService.markAsRead(conversationId, directMessageId, moplUserDetails.getUserId());
 
 		return ResponseEntity.status(HttpStatus.OK).build();
 	}
