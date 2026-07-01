@@ -30,6 +30,11 @@ playlist:
     cron: "0 1 0 * * *"
     retention-months: 1
 
+content:
+  hard-delete:
+    cron: "0 0 2 * * MON"
+    retention-days: 1
+
 mopl:
   jwt:
     issuer: ${MOPL_JWT_ISSUER}

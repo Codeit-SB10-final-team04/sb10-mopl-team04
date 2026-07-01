@@ -505,4 +505,37 @@ class ContentServiceTest {
 		verify(thumbnailStorage).delete(newUrl);
 		verify(thumbnailStorage, never()).delete(oldUrl);
 	}
+
+	// ========== deleteContent ==========
+
+	@Test
+	@DisplayName("콘텐츠 삭제에 성공하면 markDeleted가 호출된다")
+	void deleteContent_callsMarkDeleted_whenContentExists() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		Content content = mock(Content.class);
+
+		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+
+		// when
+		contentService.deleteContent(contentId);
+
+		// then
+		verify(content).markDeleted(any());
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 콘텐츠를 삭제하면 예외가 발생한다")
+	void deleteContent_throwException_whenContentNotFound() {
+		// given
+		UUID contentId = UUID.randomUUID();
+
+		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> contentService.deleteContent(contentId))
+			.isInstanceOf(ContentException.class);
+
+		verify(contentRepository).findByIdAndDeletedAtIsNull(contentId);
+	}
 }

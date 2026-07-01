@@ -65,6 +65,11 @@ public class DirectMessage extends BaseEntity {
 
 	// 읽음 상태로 전환 (역은 성립하지 않음)
 	public void markAsRead() {
+		// 이미 읽음 상태일 경우, 덮어쓰기 방지를 위하여 반환
+		if (this.read) {
+			return;
+		}
+
 		this.read = true;
 		this.readAt = Instant.now();
 	}

@@ -3,6 +3,8 @@ package com.team04.mopl.directmessage.entity;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
+import java.time.Instant;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,6 +39,31 @@ class DirectMessageTest {
 		assertThat(dm.getContent()).isEqualTo(content);
 		assertThat(dm.isRead()).isFalse();
 		assertThat(dm.getReadAt()).isNull();
+	}
+
+	@Test
+	@DisplayName("성공: 이미 읽은 메시지를 다시 읽음 처리해도 readAt이 덮어써지지 않는다 (멱등성 보장)")
+	void markAsRead_Idempotent_DoesNotOverwriteReadAt() throws InterruptedException {
+		// given
+		DirectMessage dm = DirectMessage.builder()
+			.sender(mock(User.class))
+			.receiver(mock(User.class))
+			.conversation(mock(Conversation.class))
+			.content("테스트 메시지")
+			.build();
+
+		// 첫 번째 호출: 정상적으로 시간이 기록됨
+		dm.markAsRead();
+		Instant firstReadAt = dm.getReadAt();
+
+		// 두 번째 호출까지 대기 시간
+		Thread.sleep(10);
+
+		// when
+		dm.markAsRead();
+
+		// then
+		assertThat(dm.getReadAt()).isEqualTo(firstReadAt);
 	}
 
 	@Test

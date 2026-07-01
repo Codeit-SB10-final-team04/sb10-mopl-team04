@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -74,5 +75,17 @@ public class ContentController implements ContentControllerDocs {
 		ContentDto contentDto = contentService.updateContent(contentId, contentUpdateRequest, thumbnail);
 
 		return ResponseEntity.status(HttpStatus.OK).body(contentDto);
+	}
+
+	@Override
+	@PreAuthorize("hasRole('ADMIN')")
+	@DeleteMapping("/{contentId}")
+	public ResponseEntity<Void> deleteContent(
+		@PathVariable UUID contentId
+	) {
+
+		contentService.deleteContent(contentId);
+
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 	}
 }

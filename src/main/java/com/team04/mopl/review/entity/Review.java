@@ -4,6 +4,7 @@ import java.time.Instant;
 
 import com.team04.mopl.common.entity.BaseUpdatableEntity;
 import com.team04.mopl.content.entity.Content;
+import com.team04.mopl.user.entity.User;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -21,10 +22,9 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Review extends BaseUpdatableEntity {
-	// Todo: User 생성 후 변경
-	// @ManyToOne(fetch = FetchType.LAZY)
-	// @JoinColumn(name = "user_id", nullable = false, columnDefinition = "UUID")
-	// private User user;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "user_id", nullable = false, columnDefinition = "UUID")
+	private User user;
 
 	// 콘텐츠
 	@ManyToOne(fetch = FetchType.LAZY)
@@ -44,7 +44,8 @@ public class Review extends BaseUpdatableEntity {
 	private Instant deletedAt;
 
 	@Builder
-	protected Review(Content content, String text, short rating) {
+	protected Review(User user, Content content, String text, short rating) {
+		this.user = user;
 		this.content = content;
 		this.text = text;
 		this.rating = rating;

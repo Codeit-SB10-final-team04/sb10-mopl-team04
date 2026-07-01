@@ -2,6 +2,8 @@ package com.team04.mopl.content.entity;
 
 import static org.assertj.core.api.Assertions.*;
 
+import java.time.Instant;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -72,5 +74,36 @@ class ContentTest {
         content.updateThumbnailUrl(null);
 
         assertThat(content.getThumbnailUrl()).isEqualTo("https://example.com/old.jpg");
+    }
+
+    // ========== markDeleted ==========
+
+    @Test
+    @DisplayName("deletedAt이 설정된다")
+    void markDeleted_setsDeletedAt() {
+        Instant now = Instant.now();
+
+        content.markDeleted(now);
+
+        assertThat(content.getDeletedAt()).isEqualTo(now);
+    }
+
+    @Test
+    @DisplayName("이미 삭제된 경우 deletedAt이 변경되지 않는다")
+    void markDeleted_doesNotOverwrite_whenAlreadyDeleted() {
+        Instant first = Instant.parse("2026-01-01T00:00:00Z");
+        Instant second = Instant.parse("2026-06-01T00:00:00Z");
+
+        content.markDeleted(first);
+        content.markDeleted(second);
+
+        assertThat(content.getDeletedAt()).isEqualTo(first);
+    }
+
+    @Test
+    @DisplayName("null을 전달하면 NullPointerException이 발생한다")
+    void markDeleted_throwsNullPointerException_whenNull() {
+        assertThatThrownBy(() -> content.markDeleted(null))
+            .isInstanceOf(NullPointerException.class);
     }
 }
