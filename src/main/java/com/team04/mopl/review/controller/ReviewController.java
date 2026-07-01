@@ -4,6 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,7 +24,7 @@ public class ReviewController implements ReviewControllerDocs {
 
 	@Override
 	@PostMapping
-	public ResponseEntity<ReviewDto> createReview(@RequestBody ReviewCreateRequest reviewCreateRequest,
+	public ResponseEntity<ReviewDto> createReview(@Valid @RequestBody ReviewCreateRequest reviewCreateRequest,
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails) {
 
 		ReviewDto reviewDto = reviewService.createReview(reviewCreateRequest, moplUserDetails);
