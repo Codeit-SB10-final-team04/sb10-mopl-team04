@@ -21,7 +21,6 @@ import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.review.entity.Review;
-import com.team04.mopl.user.repository.UserRepository;
 
 @DataJpaTest
 @Import({JpaAuditingConfig.class, QuerydslConfig.class})
@@ -35,9 +34,6 @@ class ReviewRepositoryTest {
 	private ContentRepository contentRepository;
 
 	@Autowired
-	private UserRepository userRepository;
-
-	@Autowired
 	private TestEntityManager em;
 
 	@Autowired
@@ -48,14 +44,8 @@ class ReviewRepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		// H2가 email_type NAMED_ENUM을 인식 못하므로 JdbcTemplate으로 직접 insert
+		// H2가 email_type NAMED_ENUM을 인식 못해 users 테이블 생성 실패 → FK 제약도 없으므로 user_id는 임의 UUID 사용
 		userId = UUID.randomUUID();
-		jdbcTemplate.update("""
-				INSERT INTO users (id, name, email, email_type, role, is_locked, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-				""",
-			userId, "테스트유저", "test@test.com", "REAL", "USER", false
-		);
 
 		content = contentRepository.save(Content.builder()
 			.title("인터스텔라")
