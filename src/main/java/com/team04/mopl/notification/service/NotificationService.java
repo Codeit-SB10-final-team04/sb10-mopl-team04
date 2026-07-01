@@ -2,6 +2,7 @@ package com.team04.mopl.notification.service;
 
 import static java.util.stream.Collectors.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -138,6 +139,21 @@ public class NotificationService {
 		return cursorResponseNotificationDto;
 	}
 
+	@Transactional
+	public void readNotification(UUID notificationId, UUID currentUserId) {
+		log.info("[NOTIFICATION_READ] 알림 읽기 시작: notificationId={}, currentUserId={}",
+			notificationId, currentUserId);
+
+		// 알림 조회
+		Notification notification = getNotificationOrThrow(notificationId, currentUserId);
+
+		// readAt 갱신
+		notification.markRead(Instant.now());
+
+		log.info("[NOTIFICATION_READ] 알림 읽기 완료: notificationId={}, currentUserId={}",
+			notificationId, currentUserId);
+	}
+
 	// 수신인 Map 조회 및 누락 검증
 	private Map<UUID, User> getReceiverMapOrThrow(Set<UUID> receiverIds) {
 		Map<UUID, User> receiverMap = userRepository.findAllByIdInAndLockedFalse(receiverIds).stream()
@@ -155,6 +171,15 @@ public class NotificationService {
 		}
 
 		return receiverMap;
+	}
+
+	// 알림 id와 현재 사용자 id로 알림 조회
+	private Notification getNotificationOrThrow(UUID notificationId, UUID currentUserId) {
+		// 멱등성 보장을 위해 `readAt IS NULL` X
+		return notificationRepository.findByIdAndReceiverId(notificationId, currentUserId)
+			.orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND)
+				.addDetail("notificationId", notificationId)
+				.addDetail("currentUserId", currentUserId));
 	}
 
 	private List<Notification> saveNotificationList(

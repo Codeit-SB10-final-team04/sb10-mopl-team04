@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -361,6 +362,76 @@ class NotificationServiceTest {
 		assertEquals(SortDirection.DESCENDING, result.sortDirection());
 
 		verify(notificationRepository).findAllNotifications(request, currentUserId);
+	}
+
+	@Test
+	@DisplayName("알림 읽음 요청에 성공하면 readAt을 기록한다.")
+	void readNotification_markReadAt_whenValidRequest() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID notificationId = UUID.randomUUID();
+
+		User receiver = createUser(currentUserId);
+		Notification notification = createNotification(
+			receiver,
+			"테스트 제목",
+			"테스트 내용",
+			NotificationType.DM,
+			NotificationLevel.INFO
+		);
+
+		when(notificationRepository.findByIdAndReceiverId(notificationId, currentUserId))
+			.thenReturn(Optional.of(notification));
+
+		// when
+		notificationService.readNotification(notificationId, currentUserId);
+
+		// then
+		assertNotNull(notification.getReadAt());
+		verify(notificationRepository).findByIdAndReceiverId(notificationId, currentUserId);
+	}
+
+	@Test
+	@DisplayName("이미 읽은 알림을 다시 읽음 처리해도 readAt이 변경되지 않는다.")
+	void readNotification_markReadAt_whenDuplicateRequest() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID notificationId = UUID.randomUUID();
+		Instant existingReadAt = Instant.parse("2026-06-24T00:00:00Z");
+
+		User receiver = createUser(currentUserId);
+		Notification notification = createNotification(
+			receiver,
+			"테스트 제목",
+			"테스트 내용",
+			NotificationType.DM,
+			NotificationLevel.WARNING
+		);
+		ReflectionTestUtils.setField(notification, "readAt", existingReadAt);
+
+		when(notificationRepository.findByIdAndReceiverId(notificationId, currentUserId))
+			.thenReturn(Optional.of(notification));
+
+		// when
+		notificationService.readNotification(notificationId, currentUserId);
+
+		// then
+		assertEquals(existingReadAt, notification.getReadAt());
+		verify(notificationRepository).findByIdAndReceiverId(notificationId, currentUserId);
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 알림이면 예외가 발생한다.")
+	void readNotification_throwException_whenNotificationNotFound() {
+		// given
+		UUID currentUserId = UUID.randomUUID();
+		UUID notificationId = UUID.randomUUID();
+
+		// when, then
+		assertThrows(NotificationException.class,
+			() -> notificationService.readNotification(notificationId, currentUserId));
+
+		verify(notificationRepository).findByIdAndReceiverId(notificationId, currentUserId);
 	}
 
 	private User createUser(UUID userId) {
