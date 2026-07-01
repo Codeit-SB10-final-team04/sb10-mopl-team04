@@ -146,7 +146,7 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 			return createdAtOrder(sortDirection);
 		}
 
-		// 정렬 조건에 updatedAt이나 subscriberCount 이외의 것이 입력되었을 경우 예외 발생
+		// 정렬 조건에 createdAt 이외의 것이 입력되었을 경우 예외 발생
 		throw invalidSortByException(sortBy);
 	}
 
@@ -196,7 +196,7 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 			.addDetail("message", "적합하지 않은 sortDirection입니다.");
 	}
 
-	// 정렬 조건에 updatedAt이나 subscriberCount 이외의 것이 입력되었을 경우 예외 발생
+	// 정렬 조건에 createdAt 이외의 것이 입력되었을 경우 예외 발생
 	private MoplException invalidSortByException(NotificationSortBy sortBy) {
 		return new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
 			.addDetail("sortBy", sortBy)
