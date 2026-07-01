@@ -177,7 +177,9 @@ public class NotificationService {
 	private Notification getNotificationOrThrow(UUID notificationId, UUID currentUserId) {
 		// 멱등성 보장을 위해 `readAt IS NULL` X
 		return notificationRepository.findByIdAndReceiverId(notificationId, currentUserId)
-			.orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
+			.orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND)
+				.addDetail("notificationId", notificationId)
+				.addDetail("currentUserId", currentUserId));
 	}
 
 	private List<Notification> saveNotificationList(
