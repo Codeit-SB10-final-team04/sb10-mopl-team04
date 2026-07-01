@@ -17,6 +17,8 @@ import org.springframework.test.context.ActiveProfiles;
 
 import com.team04.mopl.config.JpaAuditingConfig;
 import com.team04.mopl.config.QuerydslConfig;
+import java.util.Optional;
+
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
 import com.team04.mopl.content.repository.ContentRepository;
@@ -107,5 +109,57 @@ class ReviewRepositoryTest {
 
 		// then
 		assertThat(result).isFalse();
+	}
+
+	// ========== findByIdAndDeletedAtIsNull ==========
+
+	@Test
+	@DisplayName("삭제되지 않은 리뷰가 존재하면 Optional로 반환한다")
+	void findByIdAndDeletedAtIsNull_returnsReview_whenReviewExists() {
+		// given
+		UUID reviewId = UUID.randomUUID();
+		jdbcTemplate.update("""
+				INSERT INTO content_reviews (id, user_id, content_id, text, rating, deleted_at, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+				""",
+			reviewId, userId, content.getId(), "재밌어요", (short)5
+		);
+
+		// when
+		Optional<Review> result = reviewRepository.findByIdAndDeletedAtIsNull(reviewId);
+
+		// then
+		assertThat(result).isPresent();
+		assertThat(result.get().getText()).isEqualTo("재밌어요");
+	}
+
+	@Test
+	@DisplayName("소프트 딜리트된 리뷰이면 Optional.empty를 반환한다")
+	void findByIdAndDeletedAtIsNull_returnsEmpty_whenReviewSoftDeleted() {
+		// given
+		UUID reviewId = UUID.randomUUID();
+		jdbcTemplate.update("""
+				INSERT INTO content_reviews (id, user_id, content_id, text, rating, deleted_at, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+				""",
+			reviewId, userId, content.getId(), "재밌어요", (short)5,
+			java.sql.Timestamp.from(Instant.now())
+		);
+
+		// when
+		Optional<Review> result = reviewRepository.findByIdAndDeletedAtIsNull(reviewId);
+
+		// then
+		assertThat(result).isEmpty();
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 리뷰 ID이면 Optional.empty를 반환한다")
+	void findByIdAndDeletedAtIsNull_returnsEmpty_whenReviewNotExists() {
+		// when
+		Optional<Review> result = reviewRepository.findByIdAndDeletedAtIsNull(UUID.randomUUID());
+
+		// then
+		assertThat(result).isEmpty();
 	}
 }

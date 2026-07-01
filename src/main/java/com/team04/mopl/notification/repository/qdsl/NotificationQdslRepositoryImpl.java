@@ -14,7 +14,7 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.common.exception.MoplException;
-import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
+import com.team04.mopl.notification.dto.request.NotificationPageRequest;
 import com.team04.mopl.notification.dto.response.NotificationCursorPage;
 import com.team04.mopl.notification.entity.Notification;
 import com.team04.mopl.notification.enums.NotificationSortBy;
@@ -32,7 +32,7 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 
 	@Override
 	public NotificationCursorPage findAllNotifications(
-		NotificationSearchRequest request,
+		NotificationPageRequest request,
 		UUID currentUserId
 	) {
 		String cursor = request.cursor();

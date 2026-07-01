@@ -18,7 +18,7 @@ import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
-import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistPageRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
@@ -115,7 +115,7 @@ public class PlaylistService {
 
 	@Transactional(readOnly = true)
 	public CursorResponsePlaylistDto findAllPlaylists(
-		PlaylistSearchRequest request,
+		PlaylistPageRequest request,
 		UUID currentUserId
 	) {
 		int limit = request.limit();
