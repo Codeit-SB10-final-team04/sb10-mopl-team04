@@ -3,7 +3,7 @@ package com.team04.mopl.review.controller;
 import org.springframework.http.ResponseEntity;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
-import com.team04.mopl.review.dto.requeset.ReviewCreateRequest;
+import com.team04.mopl.review.dto.request.ReviewCreateRequest;
 import com.team04.mopl.review.dto.response.ReviewDto;
 
 import io.swagger.v3.oas.annotations.Operation;

@@ -1,4 +1,4 @@
-package com.team04.mopl.review.dto.requeset;
+package com.team04.mopl.review.dto.request;
 
 import java.util.UUID;
 

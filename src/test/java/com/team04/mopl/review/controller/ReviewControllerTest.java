@@ -18,15 +18,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.dto.UserSummary;
-import com.team04.mopl.review.dto.requeset.ReviewCreateRequest;
+import com.team04.mopl.review.dto.request.ReviewCreateRequest;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.exception.ReviewErrorCode;
 import com.team04.mopl.review.exception.ReviewException;
 import com.team04.mopl.review.service.ReviewService;
-import com.team04.mopl.user.entity.UserRole;
 
 @WebMvcTest(
 	controllers = ReviewController.class,

@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
-import com.team04.mopl.review.dto.requeset.ReviewCreateRequest;
+import com.team04.mopl.review.dto.request.ReviewCreateRequest;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.service.ReviewService;
 

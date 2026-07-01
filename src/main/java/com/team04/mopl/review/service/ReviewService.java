@@ -12,7 +12,7 @@ import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.exception.ContentErrorCode;
 import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.repository.ContentRepository;
-import com.team04.mopl.review.dto.requeset.ReviewCreateRequest;
+import com.team04.mopl.review.dto.request.ReviewCreateRequest;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.entity.Review;
 import com.team04.mopl.review.event.ReviewCreatedEvent;
