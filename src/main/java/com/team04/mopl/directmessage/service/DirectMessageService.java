@@ -49,7 +49,9 @@ public class DirectMessageService {
 		validateReceiver(directMessage, requestUserId);
 
 		// 6. DM 읽음 처리 및 저장
-		directMessage.markAsRead();
+		if (!directMessage.isRead()) {
+			directMessage.markAsRead();
+		}
 
 		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}",
 			conversationId, directMessageId);
