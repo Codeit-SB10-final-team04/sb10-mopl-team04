@@ -8,6 +8,7 @@ import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
 
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
@@ -25,6 +26,7 @@ public record PlaylistSearchRequest(
 
 	@NotNull(message = "조회할 데이터 개수는 필수 입니다.")
 	@Min(value = 1, message = "조회할 데이터 개수는 1 개 이상이어야 합니다.")
+	@Max(value = 100, message = "조회할 데이터 개수는 100 개를 초과할 수 없습니다.")
 	Integer limit,
 
 	@NotNull(message = "정렬 방향은 필수 입니다.")
