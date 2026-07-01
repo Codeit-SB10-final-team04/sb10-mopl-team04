@@ -21,7 +21,7 @@ import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
-import com.team04.mopl.playlist.dto.response.PlaylistCursorPageDto;
+import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.dto.row.PlaylistContentRow;
 import com.team04.mopl.playlist.entity.Playlist;
@@ -129,9 +129,9 @@ public class PlaylistService {
 
 		// 조건에 따라 플레이리스트 목록 조회
 		// 정렬 조건에 구독자 수 포함 -> 플레이리스트 조회 시 구독자 수도 같이 조회
-		PlaylistCursorPageDto playlistCursorPageDto = playlistRepository.findAllPlaylists(request);
+		PlaylistCursorPage playlistCursorPage = playlistRepository.findAllPlaylists(request);
 
-		List<UUID> playlistIds = playlistCursorPageDto.playlistRows().stream()
+		List<UUID> playlistIds = playlistCursorPage.playlistRows().stream()
 			.map(row -> row.playlist().getId())
 			.toList();
 
@@ -143,7 +143,7 @@ public class PlaylistService {
 			getContentSummariesByPlaylistIds(playlistIds);
 
 		// PlaylistDto로 조립 (OwnerSummary, 구독 여부, ContentSummary)
-		List<PlaylistDto> playlistDtoList = playlistCursorPageDto.playlistRows().stream()
+		List<PlaylistDto> playlistDtoList = playlistCursorPage.playlistRows().stream()
 			.map(row -> {
 				Playlist playlist = row.playlist();
 				UUID playlistId = playlist.getId();
@@ -159,7 +159,7 @@ public class PlaylistService {
 
 		// 조회된 플레이리스트 수
 		int playlistDtoListSize = playlistDtoList.size();
-		boolean hasNext = playlistCursorPageDto.hasNext();
+		boolean hasNext = playlistCursorPage.hasNext();
 
 		// 마지막 요소
 		PlaylistDto lastPlaylistDto = playlistDtoList.isEmpty()
@@ -181,7 +181,7 @@ public class PlaylistService {
 			nextCursor,
 			nextIdAfter,
 			hasNext,
-			playlistCursorPageDto.totalCount(),
+			playlistCursorPage.totalCount(),
 			sortBy.toString(),
 			sortDirection
 		);

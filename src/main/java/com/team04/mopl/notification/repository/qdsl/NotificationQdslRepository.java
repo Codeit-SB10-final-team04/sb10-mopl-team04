@@ -3,11 +3,11 @@ package com.team04.mopl.notification.repository.qdsl;
 import java.util.UUID;
 
 import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
-import com.team04.mopl.notification.dto.response.NotificationCursorPageDto;
+import com.team04.mopl.notification.dto.response.NotificationCursorPage;
 
 public interface NotificationQdslRepository {
 
-	NotificationCursorPageDto findAllNotifications(
+	NotificationCursorPage findAllNotifications(
 		NotificationSearchRequest request,
 		UUID currentUserId
 	);

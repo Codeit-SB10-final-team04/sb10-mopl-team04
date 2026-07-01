@@ -14,7 +14,7 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
-import com.team04.mopl.notification.dto.response.NotificationCursorPageDto;
+import com.team04.mopl.notification.dto.response.NotificationCursorPage;
 import com.team04.mopl.notification.entity.Notification;
 import com.team04.mopl.notification.enums.NotificationSortBy;
 import com.team04.mopl.notification.exception.NotificationErrorCode;
@@ -30,7 +30,7 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 	}
 
 	@Override
-	public NotificationCursorPageDto findAllNotifications(
+	public NotificationCursorPage findAllNotifications(
 		NotificationSearchRequest request,
 		UUID currentUserId
 	) {
@@ -75,7 +75,7 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 		// 조건에 따른 전체 데이터 개수 조회
 		Long totalCount = getTotalCount(currentUserId);
 
-		return new NotificationCursorPageDto(notificationList, hasNext, totalCount);
+		return new NotificationCursorPage(notificationList, hasNext, totalCount);
 	}
 
 	private BooleanExpression createdAtCursorCondition(

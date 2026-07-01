@@ -20,7 +20,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
 import com.team04.mopl.notification.dto.response.CursorResponseNotificationDto;
-import com.team04.mopl.notification.dto.response.NotificationCursorPageDto;
+import com.team04.mopl.notification.dto.response.NotificationCursorPage;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.entity.Notification;
 import com.team04.mopl.notification.enums.NotificationLevel;
@@ -277,7 +277,7 @@ class NotificationServiceTest {
 			notification2.getLevel()
 		);
 
-		NotificationCursorPageDto notificationCursorPageDto = new NotificationCursorPageDto(
+		NotificationCursorPage notificationCursorPage = new NotificationCursorPage(
 			List.of(notification1, notification2),
 			true,
 			3L
@@ -294,7 +294,7 @@ class NotificationServiceTest {
 		);
 
 		when(notificationRepository.findAllNotifications(request, currentUserId))
-			.thenReturn(notificationCursorPageDto);
+			.thenReturn(notificationCursorPage);
 		when(notificationMapper.toDto(any(Notification.class)))
 			.thenReturn(notificationDto1, notificationDto2);
 
@@ -338,14 +338,14 @@ class NotificationServiceTest {
 			NotificationSortBy.createdAt
 		);
 
-		NotificationCursorPageDto notificationCursorPageDto = new NotificationCursorPageDto(
+		NotificationCursorPage notificationCursorPage = new NotificationCursorPage(
 			List.of(),
 			false,
 			0L
 		);
 
 		when(notificationRepository.findAllNotifications(request, currentUserId))
-			.thenReturn(notificationCursorPageDto);
+			.thenReturn(notificationCursorPage);
 
 		// when
 		CursorResponseNotificationDto result = notificationService.findAllNotifications(

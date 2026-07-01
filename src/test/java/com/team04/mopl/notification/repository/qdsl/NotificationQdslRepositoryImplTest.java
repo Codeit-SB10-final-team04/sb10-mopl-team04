@@ -18,7 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.config.QuerydslConfig;
 import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
-import com.team04.mopl.notification.dto.response.NotificationCursorPageDto;
+import com.team04.mopl.notification.dto.response.NotificationCursorPage;
 import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationSortBy;
 import com.team04.mopl.notification.enums.NotificationType;
@@ -72,7 +72,7 @@ class NotificationQdslRepositoryImplTest {
 		);
 
 		// when
-		NotificationCursorPageDto result =
+		NotificationCursorPage result =
 			notificationRepository.findAllNotifications(request, receiver1);
 
 		// then
@@ -103,7 +103,7 @@ class NotificationQdslRepositoryImplTest {
 		);
 
 		// when
-		NotificationCursorPageDto result = notificationRepository.findAllNotifications(request, noNotificationUser);
+		NotificationCursorPage result = notificationRepository.findAllNotifications(request, noNotificationUser);
 
 		// then
 		assertTrue(result.notificationList().isEmpty());

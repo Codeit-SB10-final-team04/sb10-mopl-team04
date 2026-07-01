@@ -18,7 +18,7 @@ import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
-import com.team04.mopl.playlist.dto.response.PlaylistCursorPageDto;
+import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
 import com.team04.mopl.playlist.dto.row.PlaylistRow;
 import com.team04.mopl.playlist.entity.QPlaylistSubscription;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
@@ -46,7 +46,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 	}
 
 	@Override
-	public PlaylistCursorPageDto findAllPlaylists(PlaylistSearchRequest request) {
+	public PlaylistCursorPage findAllPlaylists(PlaylistSearchRequest request) {
 		String cursor = request.cursor();
 		PlaylistSortBy sortBy = request.sortBy();
 		SortDirection sortDirection = request.sortDirection();
@@ -125,7 +125,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 		// 조건에 따른 전체 데이터 개수 조회
 		Long totalCount = getTotalCount(request);
 
-		return new PlaylistCursorPageDto(playlistRows, hasNext, totalCount);
+		return new PlaylistCursorPage(playlistRows, hasNext, totalCount);
 	}
 
 	private BooleanExpression keywordLike(String keyword) {
