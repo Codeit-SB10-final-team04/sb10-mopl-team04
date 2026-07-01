@@ -63,4 +63,48 @@ class ReviewRatingEventListenerTest {
 
 		verify(contentRepository).refreshRatingAggregate(contentId);
 	}
+
+	// ========== handleReviewUpdated ==========
+
+	@Test
+	@DisplayName("리뷰 수정 이벤트 수신 시 평점 재집계가 호출된다")
+	void handleReviewUpdated_success_whenUpdated() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		when(contentRepository.refreshRatingAggregate(contentId)).thenReturn(1);
+
+		// when
+		listener.handleReviewUpdated(new ReviewUpdatedEvent(contentId));
+
+		// then
+		verify(contentRepository).refreshRatingAggregate(contentId);
+	}
+
+	@Test
+	@DisplayName("리뷰 수정 이벤트 처리 시 업데이트된 행이 0이면 warn 로그만 남기고 정상 종료된다")
+	void handleReviewUpdated_warn_whenNothingUpdated() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		when(contentRepository.refreshRatingAggregate(contentId)).thenReturn(0);
+
+		// when
+		listener.handleReviewUpdated(new ReviewUpdatedEvent(contentId));
+
+		// then
+		verify(contentRepository).refreshRatingAggregate(contentId);
+	}
+
+	@Test
+	@DisplayName("리뷰 수정 이벤트 처리 시 예외 발생해도 전파하지 않는다")
+	void handleReviewUpdated_doesNotThrow_whenExceptionOccurs() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		when(contentRepository.refreshRatingAggregate(contentId))
+			.thenThrow(new RuntimeException("DB 오류"));
+
+		// when & then
+		listener.handleReviewUpdated(new ReviewUpdatedEvent(contentId));
+
+		verify(contentRepository).refreshRatingAggregate(contentId);
+	}
 }
