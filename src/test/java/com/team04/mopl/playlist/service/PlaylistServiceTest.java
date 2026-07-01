@@ -30,7 +30,7 @@ import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
-import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
+import com.team04.mopl.playlist.dto.response.PlaylistCursorPageDto;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.dto.row.PlaylistContentRow;
 import com.team04.mopl.playlist.dto.row.PlaylistRow;
@@ -495,7 +495,7 @@ class PlaylistServiceTest {
 			currentUser.getProfileImageUrl()
 		);
 
-		PlaylistCursorPage playlistCursorPage = new PlaylistCursorPage(
+		PlaylistCursorPageDto playlistCursorPageDto = new PlaylistCursorPageDto(
 			List.of(playlistRow1, playlistRow2),
 			true,
 			3L
@@ -553,7 +553,7 @@ class PlaylistServiceTest {
 		);
 
 		when(playlistRepository.findAllPlaylists(request))
-			.thenReturn(playlistCursorPage);
+			.thenReturn(playlistCursorPageDto);
 		when(playlistSubscriptionRepository.findSubscribedPlaylistIds(
 			List.of(playlistId1, playlistId2),
 			currentUserId)
@@ -659,7 +659,7 @@ class PlaylistServiceTest {
 			playlist2Owner.getProfileImageUrl()
 		);
 
-		PlaylistCursorPage playlistCursorPage = new PlaylistCursorPage(
+		PlaylistCursorPageDto playlistCursorPageDto = new PlaylistCursorPageDto(
 			List.of(playlistRow2, playlistRow1),
 			true,
 			3L
@@ -723,7 +723,7 @@ class PlaylistServiceTest {
 		);
 
 		when(playlistRepository.findAllPlaylists(request))
-			.thenReturn(playlistCursorPage);
+			.thenReturn(playlistCursorPageDto);
 		when(playlistSubscriptionRepository.findSubscribedPlaylistIds(
 			List.of(playlistId2, playlistId1),
 			currentUserId)
@@ -802,14 +802,14 @@ class PlaylistServiceTest {
 			PlaylistSortBy.updatedAt
 		);
 
-		PlaylistCursorPage playlistCursorPage = new PlaylistCursorPage(
+		PlaylistCursorPageDto playlistCursorPageDto = new PlaylistCursorPageDto(
 			List.of(),
 			false,
 			0L
 		);
 
 		when(playlistRepository.findAllPlaylists(request))
-			.thenReturn(playlistCursorPage);
+			.thenReturn(playlistCursorPageDto);
 
 		// when
 		CursorResponsePlaylistDto result = playlistService.findAllPlaylists(request, currentUserId);

@@ -18,7 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.config.QuerydslConfig;
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
-import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
+import com.team04.mopl.playlist.dto.response.PlaylistCursorPageDto;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 
@@ -69,7 +69,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
+		PlaylistCursorPageDto result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertEquals(2, result.playlistRows().size());
@@ -95,7 +95,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
+		PlaylistCursorPageDto result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertThat(result.playlistRows())
@@ -120,7 +120,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
+		PlaylistCursorPageDto result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertThat(result.playlistRows())
@@ -144,7 +144,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
+		PlaylistCursorPageDto result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertThat(result.playlistRows())
@@ -166,7 +166,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
+		PlaylistCursorPageDto result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertThat(result.playlistRows())
@@ -191,7 +191,7 @@ class PlaylistQdslRepositoryImplTest {
 		);
 
 		// when
-		PlaylistCursorPage result = playlistRepository.findAllPlaylists(request);
+		PlaylistCursorPageDto result = playlistRepository.findAllPlaylists(request);
 
 		// then
 		assertThat(result.playlistRows())

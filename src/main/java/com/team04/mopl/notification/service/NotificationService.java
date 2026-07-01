@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
 import com.team04.mopl.notification.dto.response.CursorResponseNotificationDto;
-import com.team04.mopl.notification.dto.response.NotificationCursorPage;
+import com.team04.mopl.notification.dto.response.NotificationCursorPageDto;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.entity.Notification;
 import com.team04.mopl.notification.enums.NotificationLevel;
@@ -96,16 +96,16 @@ public class NotificationService {
 			request.cursor(), request.idAfter(), limit, sortDirection, sortBy);
 
 		// 조건에 따라 알림 목록 조회
-		NotificationCursorPage notificationCursorPage =
+		NotificationCursorPageDto notificationCursorPageDto =
 			notificationRepository.findAllNotifications(request, currentUserId);
 
 		// notificationDto 조립
-		List<NotificationDto> notificationDtoList = notificationCursorPage.notificationList().stream()
+		List<NotificationDto> notificationDtoList = notificationCursorPageDto.notificationList().stream()
 			.map(notification -> notificationMapper.toDto(notification))
 			.toList();
 
 		int notificationListSize = notificationDtoList.size();
-		boolean hasNext = notificationCursorPage.hasNext();
+		boolean hasNext = notificationCursorPageDto.hasNext();
 
 		// 마지막 요소
 		NotificationDto lastNotificationDto = notificationDtoList.isEmpty()
@@ -127,7 +127,7 @@ public class NotificationService {
 			nextCursor,
 			nextIdAfter,
 			hasNext,
-			notificationCursorPage.totalCount(),
+			notificationCursorPageDto.totalCount(),
 			sortBy.toString(),
 			sortDirection
 		);

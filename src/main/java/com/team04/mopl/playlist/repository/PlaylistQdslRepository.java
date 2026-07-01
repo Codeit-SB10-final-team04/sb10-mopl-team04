@@ -1,9 +1,9 @@
 package com.team04.mopl.playlist.repository;
 
 import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
-import com.team04.mopl.playlist.dto.response.PlaylistCursorPage;
+import com.team04.mopl.playlist.dto.response.PlaylistCursorPageDto;
 
 public interface PlaylistQdslRepository {
 
-	PlaylistCursorPage findAllPlaylists(PlaylistSearchRequest request);
+	PlaylistCursorPageDto findAllPlaylists(PlaylistSearchRequest request);
 }

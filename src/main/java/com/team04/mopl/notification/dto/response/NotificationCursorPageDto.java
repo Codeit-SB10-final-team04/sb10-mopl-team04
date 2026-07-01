@@ -4,14 +4,14 @@ import java.util.List;
 
 import com.team04.mopl.notification.entity.Notification;
 
-public record NotificationCursorPage(
+public record NotificationCursorPageDto(
 
 	List<Notification> notificationList,
 	boolean hasNext,
 	long totalCount
 ) {
 
-	public NotificationCursorPage {
+	public NotificationCursorPageDto {
 		notificationList = (notificationList == null)
 			? List.of()
 			: List.copyOf(notificationList);
