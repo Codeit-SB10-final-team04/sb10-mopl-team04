@@ -26,7 +26,7 @@ public record NotificationSearchRequest(
 	NotificationSortBy sortBy
 ) {
 
-	@AssertTrue(message = "cursor와 idAfter는 함께 요청되어여 합니다.")
+	@AssertTrue(message = "cursor와 idAfter는 함께 요청되어야 합니다.")
 	public boolean isCursorAndIdAfterPaired() {
 		return (cursor == null) == (idAfter == null);
 	}
