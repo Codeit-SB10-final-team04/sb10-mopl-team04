@@ -177,6 +177,10 @@ CREATE TABLE content_reviews (
                                  CONSTRAINT chk_content_reviews_rating CHECK (rating BETWEEN 1 AND 5)
 );
 
+CREATE UNIQUE INDEX uk_content_reviews_user_content_active
+    ON content_reviews (user_id, content_id)
+    WHERE deleted_at IS NULL;
+
 CREATE TABLE watching_sessions (
                                    id          UUID        NOT NULL,
                                    content_id  UUID        NOT NULL,
