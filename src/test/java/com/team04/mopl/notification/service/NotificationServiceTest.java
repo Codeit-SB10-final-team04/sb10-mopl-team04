@@ -19,7 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.team04.mopl.common.enums.SortDirection;
-import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
+import com.team04.mopl.notification.dto.request.NotificationPageRequest;
 import com.team04.mopl.notification.dto.response.CursorResponseNotificationDto;
 import com.team04.mopl.notification.dto.response.NotificationCursorPage;
 import com.team04.mopl.notification.dto.response.NotificationDto;
@@ -254,7 +254,7 @@ class NotificationServiceTest {
 		ReflectionTestUtils.setField(notification1, "createdAt", createdAt1);
 		ReflectionTestUtils.setField(notification2, "createdAt", createdAt2);
 
-		NotificationSearchRequest request = new NotificationSearchRequest(
+		NotificationPageRequest request = new NotificationPageRequest(
 			null, null,
 			2,
 			SortDirection.DESCENDING,
@@ -332,7 +332,7 @@ class NotificationServiceTest {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 
-		NotificationSearchRequest request = new NotificationSearchRequest(
+		NotificationPageRequest request = new NotificationPageRequest(
 			null, null,
 			2,
 			SortDirection.DESCENDING,

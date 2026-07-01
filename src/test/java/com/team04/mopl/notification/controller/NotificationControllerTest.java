@@ -27,7 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.enums.SortDirection;
-import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
+import com.team04.mopl.notification.dto.request.NotificationPageRequest;
 import com.team04.mopl.notification.dto.response.CursorResponseNotificationDto;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.enums.NotificationLevel;
@@ -67,7 +67,7 @@ class NotificationControllerTest {
 		UUID notificationId1 = UUID.randomUUID();
 		UUID notificationId2 = UUID.randomUUID();
 
-		NotificationSearchRequest request = new NotificationSearchRequest(
+		NotificationPageRequest request = new NotificationPageRequest(
 			null, null,
 			2,
 			SortDirection.DESCENDING,

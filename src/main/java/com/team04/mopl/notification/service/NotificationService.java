@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.common.enums.SortDirection;
-import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
+import com.team04.mopl.notification.dto.request.NotificationPageRequest;
 import com.team04.mopl.notification.dto.response.CursorResponseNotificationDto;
 import com.team04.mopl.notification.dto.response.NotificationCursorPage;
 import com.team04.mopl.notification.dto.response.NotificationDto;
@@ -86,7 +86,7 @@ public class NotificationService {
 
 	@Transactional(readOnly = true)
 	public CursorResponseNotificationDto findAllNotifications(
-		NotificationSearchRequest request,
+		NotificationPageRequest request,
 		UUID currentUserId
 	) {
 		int limit = request.limit();

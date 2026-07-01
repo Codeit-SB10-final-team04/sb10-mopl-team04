@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
-import com.team04.mopl.notification.dto.request.NotificationSearchRequest;
+import com.team04.mopl.notification.dto.request.NotificationPageRequest;
 import com.team04.mopl.notification.dto.response.CursorResponseNotificationDto;
 import com.team04.mopl.notification.service.NotificationService;
 
@@ -30,7 +30,7 @@ public class NotificationController implements NotificationControllerDocs {
 	@GetMapping
 	@Override
 	public ResponseEntity<CursorResponseNotificationDto> findAllNotifications(
-		@Valid @ModelAttribute NotificationSearchRequest request,
+		@Valid @ModelAttribute NotificationPageRequest request,
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 		UUID currentUserId = moplUserDetails.getUserId();

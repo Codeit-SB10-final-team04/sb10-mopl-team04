@@ -29,7 +29,7 @@ import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.playlist.dto.request.PlaylistCreateRequest;
-import com.team04.mopl.playlist.dto.request.PlaylistSearchRequest;
+import com.team04.mopl.playlist.dto.request.PlaylistPageRequest;
 import com.team04.mopl.playlist.dto.request.PlaylistUpdateRequest;
 import com.team04.mopl.playlist.dto.response.CursorResponsePlaylistDto;
 import com.team04.mopl.playlist.dto.response.PlaylistDto;
@@ -265,7 +265,7 @@ class PlaylistControllerTest {
 		UUID playlistId1 = UUID.randomUUID();
 		UUID playlistId2 = UUID.randomUUID();
 
-		PlaylistSearchRequest request = new PlaylistSearchRequest(
+		PlaylistPageRequest request = new PlaylistPageRequest(
 			"제목",
 			null, null, null, null,
 			2,
