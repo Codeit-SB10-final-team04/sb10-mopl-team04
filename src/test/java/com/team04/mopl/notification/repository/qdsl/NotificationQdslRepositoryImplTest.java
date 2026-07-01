@@ -89,6 +89,33 @@ class NotificationQdslRepositoryImplTest {
 	}
 
 	@Test
+	@DisplayName("현재 사용자의 읽지 않은 알림을 생성일 오름차순으로 조회한다.")
+	void findAllNotifications_returnCursorPage_whenOrderByCreatedAtAsc() {
+		// given
+		NotificationSearchRequest request = new NotificationSearchRequest(
+			null, null,
+			3,
+			SortDirection.ASCENDING,
+			NotificationSortBy.createdAt
+		);
+
+		// when
+		NotificationCursorPage result =
+			notificationRepository.findAllNotifications(request, receiver1);
+
+		// then
+		assertEquals(3, result.notificationList().size());
+		assertThat(result.notificationList())
+			.extracting(notification -> notification.getId())
+			.containsExactly(notification4, notification3, notification2);
+		assertThat(result.notificationList())
+			.extracting(notification -> notification.getReceiver().getId())
+			.containsOnly(receiver1);
+		assertTrue(result.hasNext());
+		assertEquals(4L, result.totalCount());
+	}
+
+	@Test
 	@DisplayName("알림이 없을 경우 빈 리스트를 반환한다.")
 	void findAllNotifications_returnEmptyCursorPage_whenNoNotification() {
 		// given
