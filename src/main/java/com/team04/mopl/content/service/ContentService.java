@@ -1,5 +1,6 @@
 package com.team04.mopl.content.service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -144,7 +145,6 @@ public class ContentService {
 
 		if (thumbnail != null) {
 			newThumbnailUrl = thumbnailStorage.store(thumbnail);
-			log.info("[콘텐츠 수정] 썸네일 교체 예정: contentId={}, oldUrl={}, newUrl={}", contentId, oldThumbnailUrl, newThumbnailUrl);
 		}
 
 		try {
@@ -201,6 +201,16 @@ public class ContentService {
 			}
 			throw e;
 		}
+	}
+
+	@Transactional
+	public void deleteContent(UUID contentId) {
+		log.info("[콘텐츠 삭제 시작] contentId={}", contentId);
+		// 삭제되지 않은 콘텐츠 조회
+		Content content = getNotDeletedContentEntityOrThrow(contentId);
+
+		content.markDeleted(Instant.now());
+		log.info("[콘텐츠 삭제 완료] contentId={}", contentId);
 	}
 
 	// 태그명 목록으로 태그 조회 or 생성 (N+1 방지)

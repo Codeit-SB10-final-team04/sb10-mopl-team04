@@ -28,4 +28,7 @@ public interface ContentControllerDocs {
 	@Operation(summary = "[어드민] 콘텐츠 수정")
 	ResponseEntity<ContentDto> updateContent(UUID contentId, ContentUpdateRequest contentUpdateRequest,
 		MultipartFile thumbnail);
+
+	@Operation(summary = "[어드민] 콘텐츠 삭제")
+	ResponseEntity<Void> deleteContent(UUID contentId);
 }

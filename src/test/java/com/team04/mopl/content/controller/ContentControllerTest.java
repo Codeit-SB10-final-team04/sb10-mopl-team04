@@ -302,4 +302,35 @@ class ContentControllerTest {
 			.andExpect(jsonPath("$.exceptionName").value("ContentException"))
 			.andExpect(jsonPath("$.message").value("콘텐츠를 찾을 수 없습니다."));
 	}
+
+	// ========== deleteContent ==========
+
+	@Test
+	@DisplayName("콘텐츠 삭제 요청에 성공하면 204 No Content를 반환한다.")
+	void deleteContent_returnNoContent_whenValidRequest() throws Exception {
+		// given
+		UUID contentId = UUID.randomUUID();
+
+		doNothing().when(contentService).deleteContent(contentId);
+
+		// when & then
+		mockMvc.perform(delete("/api/contents/{contentId}", contentId))
+			.andExpect(status().isNoContent());
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 콘텐츠를 삭제하면 404 Not Found를 반환한다.")
+	void deleteContent_returnNotFound_whenContentNotExists() throws Exception {
+		// given
+		UUID contentId = UUID.randomUUID();
+
+		doThrow(new ContentException(ContentErrorCode.CONTENT_NOT_FOUND))
+			.when(contentService).deleteContent(contentId);
+
+		// when & then
+		mockMvc.perform(delete("/api/contents/{contentId}", contentId))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("ContentException"))
+			.andExpect(jsonPath("$.message").value("콘텐츠를 찾을 수 없습니다."));
+	}
 }

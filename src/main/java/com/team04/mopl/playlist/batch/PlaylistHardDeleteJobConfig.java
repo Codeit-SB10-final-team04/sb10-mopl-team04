@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.team04.mopl.common.batch.BatchTimeZone;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -76,7 +77,7 @@ public class PlaylistHardDeleteJobConfig {
 		@Value("#{jobParameters['deleteDate']}") LocalDate deleteDate
 	) {
 		// 한국 시간 기준 deleteDate를 물리 삭제 기준 시간으로 변환
-		Instant deletedAtBefore = deleteDate.atStartOfDay(PlaylistBatchTimeZone.KST).toInstant();
+		Instant deletedAtBefore = deleteDate.atStartOfDay(BatchTimeZone.KST).toInstant();
 
 		// JDBC Cursor ItemReader Builder 생성
 		return new JdbcCursorItemReaderBuilder<UUID>()
