@@ -83,6 +83,7 @@ public class NotificationService {
 		return notificationDtoList;
 	}
 
+	@Transactional(readOnly = true)
 	public CursorResponseNotificationDto findAllNotifications(
 		NotificationSearchRequest request,
 		UUID currentUserId
