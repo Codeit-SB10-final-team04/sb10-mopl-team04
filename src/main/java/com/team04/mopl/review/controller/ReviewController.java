@@ -26,7 +26,7 @@ public class ReviewController implements ReviewControllerDocs {
 	public ResponseEntity<ReviewDto> createReview(@RequestBody ReviewCreateRequest reviewCreateRequest,
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails) {
 
-		ReviewDto reviewDto = reviewService.createReview(reviewCreateRequest);
+		ReviewDto reviewDto = reviewService.createReview(reviewCreateRequest, moplUserDetails);
 
 		return ResponseEntity.ok(reviewDto);
 	}
