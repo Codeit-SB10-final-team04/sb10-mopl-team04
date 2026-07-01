@@ -45,28 +45,25 @@ class DirectMessageServiceTest {
 	=========================
 	 */
 	@Test
-	@DisplayName("성공: 조건이 모두 맞으면 DM 읽음 처리가 정상 수행된다 (멱등성 보장 포함)")
+	@DisplayName("성공: 조건이 모두 맞으면 DM 읽음 처리가 정상 수행된다")
 	void markAsRead_Success() {
 		// given
 		UUID conversationId = UUID.randomUUID();
-		UUID directMessageId = UUID.randomUUID();
-		UUID requestUserId = UUID.randomUUID();
-
 		Conversation conversation = mock(Conversation.class);
 		given(conversation.getId()).willReturn(conversationId);
 
+		UUID requestUserId = UUID.randomUUID();
 		User receiver = mock(User.class);
 		given(receiver.getId()).willReturn(requestUserId);
 
+		UUID directMessageId = UUID.randomUUID();
 		DirectMessage directMessage = mock(DirectMessage.class);
 		given(directMessage.getConversation()).willReturn(conversation);
 		given(directMessage.getReceiver()).willReturn(receiver);
 
-		// Repository Mocking
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 		given(directMessageRepository.findById(directMessageId)).willReturn(Optional.of(directMessage));
 
-		// 참여자 검증 로직 Mocking (구현체에 맞게 조정 필요: existBy... 혹은 findBy...)
 		ConversationParticipant participant = mock(ConversationParticipant.class);
 		given(participant.getUser()).willReturn(receiver);
 		given(conversationParticipantRepository.findByConversationId(conversationId))
@@ -92,42 +89,53 @@ class DirectMessageServiceTest {
 	}
 
 	@Test
-	@DisplayName("실패: 대화방 참여자가 아니면 예외가 발생한다")
+	@DisplayName("실패: 대화방에 다른 참여자는 있지만 요청자가 그 목록에 없으면 예외가 발생한다")
 	void markAsRead_Fail_NotParticipant() {
 		// given
-		UUID conversationId = UUID.randomUUID();
 		UUID requestUserId = UUID.randomUUID();
 
+		// 요청자가 아닌 다른 참여자
+		UUID otherUserId = UUID.randomUUID();
+		ConversationParticipant otherParticipant = mock(ConversationParticipant.class);
+		User otherUser = mock(User.class);
+		given(otherUser.getId()).willReturn(otherUserId);
+		given(otherParticipant.getUser()).willReturn(otherUser);
+
+		UUID conversationId = UUID.randomUUID();
 		Conversation conversation = mock(Conversation.class);
 		given(conversation.getId()).willReturn(conversationId);
+
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 
-		// 참여자가 없는 빈 리스트 반환
-		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of());
+		// 다른 참여자 리스트 반환
+		given(conversationParticipantRepository.findByConversationId(conversationId))
+			.willReturn(List.of(otherParticipant));
 
 		// when & then
-		assertThatThrownBy(() -> directMessageService.markAsRead(conversationId, UUID.randomUUID(), requestUserId))
-			.isInstanceOf(ConversationException.class);
+		org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+				directMessageService.markAsRead(conversationId, UUID.randomUUID(), requestUserId))
+			.isInstanceOf(ConversationException.class); // 접근 권한 예외 발생 기대
 	}
 
 	@Test
 	@DisplayName("실패: DM이 존재하지 않으면 예외가 발생한다")
 	void markAsRead_Fail_DmNotFound() {
 		// given
-		UUID conversationId = UUID.randomUUID();
-		UUID directMessageId = UUID.randomUUID();
 		UUID requestUserId = UUID.randomUUID();
-
-		Conversation conversation = mock(Conversation.class);
-		given(conversation.getId()).willReturn(conversationId);
-		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
-
-		ConversationParticipant participant = mock(ConversationParticipant.class);
 		User user = mock(User.class);
 		given(user.getId()).willReturn(requestUserId);
-		given(participant.getUser()).willReturn(user);
-		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));
 
+		ConversationParticipant participant = mock(ConversationParticipant.class);
+		given(participant.getUser()).willReturn(user);
+
+		UUID conversationId = UUID.randomUUID();
+		Conversation conversation = mock(Conversation.class);
+		given(conversation.getId()).willReturn(conversationId);
+
+		UUID directMessageId = UUID.randomUUID();
+
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));
 		given(directMessageRepository.findById(directMessageId)).willReturn(Optional.empty());
 
 		// when & then
@@ -139,62 +147,61 @@ class DirectMessageServiceTest {
 	@DisplayName("실패: DM이 해당 대화방 소속이 아니면 예외가 발생한다")
 	void markAsRead_Fail_DmNotInConversation() {
 		// given
-		UUID conversationId = UUID.randomUUID();
-		UUID wrongConversationId = UUID.randomUUID(); // 다른 대화방 ID
-		UUID directMessageId = UUID.randomUUID();
 		UUID requestUserId = UUID.randomUUID();
-
-		Conversation conversation = mock(Conversation.class);
-		given(conversation.getId()).willReturn(conversationId);
-		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
-
-		// ... 참여자 모킹 생략 (동일) ...
-		ConversationParticipant participant = mock(ConversationParticipant.class);
 		User user = mock(User.class);
 		given(user.getId()).willReturn(requestUserId);
-		given(participant.getUser()).willReturn(user);
-		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));
 
-		// 메시지가 다른 대화방(wrongConversationId)을 가리킴
-		DirectMessage directMessage = mock(DirectMessage.class);
+		ConversationParticipant participant = mock(ConversationParticipant.class);
+		given(participant.getUser()).willReturn(user);
+
+		UUID conversationId = UUID.randomUUID();
+		Conversation conversation = mock(Conversation.class);
+		given(conversation.getId()).willReturn(conversationId);
+
+		UUID wrongConversationId = UUID.randomUUID();
 		Conversation wrongConversation = mock(Conversation.class);
 		given(wrongConversation.getId()).willReturn(wrongConversationId);
+
+		UUID directMessageId = UUID.randomUUID();
+		DirectMessage directMessage = mock(DirectMessage.class);
 		given(directMessage.getConversation()).willReturn(wrongConversation);
 
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));
 		given(directMessageRepository.findById(directMessageId)).willReturn(Optional.of(directMessage));
 
 		// when & then
 		assertThatThrownBy(() -> directMessageService.markAsRead(conversationId, directMessageId, requestUserId))
-			.isInstanceOf(DirectMessageException.class); // DM_NOT_IN_CONVERSATION 기대
+			.isInstanceOf(DirectMessageException.class);
 	}
 
 	@Test
 	@DisplayName("실패: DM 수신자가 아니면 예외가 발생한다")
 	void markAsRead_Fail_NotReceiver() {
 		// given
-		UUID conversationId = UUID.randomUUID();
-		UUID directMessageId = UUID.randomUUID();
 		UUID requestUserId = UUID.randomUUID();
-		UUID receiverId = UUID.randomUUID(); // 요청자와 다른 수신자 ID
-
-		Conversation conversation = mock(Conversation.class);
-		given(conversation.getId()).willReturn(conversationId);
-		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
-
-		// ... 참여자 모킹 생략 (동일) ...
-		ConversationParticipant participant = mock(ConversationParticipant.class);
 		User user = mock(User.class);
 		given(user.getId()).willReturn(requestUserId);
+
+		ConversationParticipant participant = mock(ConversationParticipant.class);
 		given(participant.getUser()).willReturn(user);
-		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));
 
-		DirectMessage directMessage = mock(DirectMessage.class);
-		given(directMessage.getConversation()).willReturn(conversation);
-
+		// 요청자와 다른 수신자
+		UUID receiverId = UUID.randomUUID();
 		User actualReceiver = mock(User.class);
 		given(actualReceiver.getId()).willReturn(receiverId);
+
+		UUID conversationId = UUID.randomUUID();
+		Conversation conversation = mock(Conversation.class);
+		given(conversation.getId()).willReturn(conversationId);
+
+		UUID directMessageId = UUID.randomUUID();
+		DirectMessage directMessage = mock(DirectMessage.class);
+		given(directMessage.getConversation()).willReturn(conversation);
 		given(directMessage.getReceiver()).willReturn(actualReceiver);
 
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));
 		given(directMessageRepository.findById(directMessageId)).willReturn(Optional.of(directMessage));
 
 		// when & then
