@@ -1,5 +1,6 @@
 package com.team04.mopl.review.repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,4 +21,6 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 		""", nativeQuery = true)
 	boolean existsByUserIdAndContentIdAndDeletedAtIsNull(@Param("userId") UUID userId,
 		@Param("contentId") UUID contentId);
+
+	Optional<Review> findByIdAndDeletedAtIsNull(UUID id);
 }
