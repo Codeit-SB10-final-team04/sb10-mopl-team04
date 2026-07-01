@@ -10,6 +10,14 @@ import com.team04.mopl.review.entity.Review;
 
 public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
-	@Query(value = "SELECT EXISTS(SELECT 1 FROM content_reviews WHERE user_id = :userId AND content_id = :contentId AND deleted_at IS NULL)", nativeQuery = true)
-	boolean existsByUserIdAndContentIdAndDeletedAtIsNull(@Param("userId") UUID userId, @Param("contentId") UUID contentId);
+	@Query(value = """
+		SELECT EXISTS(
+		    SELECT 1 FROM content_reviews
+		    WHERE user_id = :userId
+		      AND content_id = :contentId
+		      AND deleted_at IS NULL
+		)
+		""", nativeQuery = true)
+	boolean existsByUserIdAndContentIdAndDeletedAtIsNull(@Param("userId") UUID userId,
+		@Param("contentId") UUID contentId);
 }
