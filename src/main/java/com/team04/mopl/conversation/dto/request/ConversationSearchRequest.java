@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Positive;
 
 public record ConversationSearchRequest(
 	// 검색 키워드: 사용자 이름, 메시지 내용
-	String keyWordLike,
+	String keywordLike,
 
 	// 메인 커서
 	String cursor,
