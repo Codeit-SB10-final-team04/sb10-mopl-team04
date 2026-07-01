@@ -188,7 +188,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 
 		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
 			.addDetail("sortBy", sortBy)
-			.addDetail("message", "적합하지 않은 sortBy 입니다.");
+			.addDetail("message", "적합하지 않은 sortBy입니다.");
 	}
 
 	// String 타입의 cursor -> Instant 타입으로 parse
@@ -198,7 +198,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 		} catch (DateTimeParseException e) {
 			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT, e)
 				.addDetail("cursor", cursor)
-				.addDetail("message", "적합하지 않은 cursor 타입 입니다.");
+				.addDetail("message", "적합하지 않은 cursor 타입입니다.");
 		}
 	}
 
@@ -253,7 +253,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 
 		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
 			.addDetail("sortBy", sortBy)
-			.addDetail("message", "적합하지 않은 sortBy 입니다.");
+			.addDetail("message", "적합하지 않은 sortBy입니다.");
 	}
 
 	// String 타입 cursor -> Long 타입으로 parse
@@ -263,7 +263,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 		} catch (NumberFormatException e) {
 			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT, e)
 				.addDetail("cursor", cursor)
-				.addDetail("message", "적합하지 않은 cursor 타입 입니다.");
+				.addDetail("message", "적합하지 않은 cursor 타입입니다.");
 		}
 	}
 
@@ -311,7 +311,7 @@ public class PlaylistQdslRepositoryImpl implements PlaylistQdslRepository {
 		// 정렬 조건에 updatedAt이나 subscriberCount 이외의 것이 입력되었을 경우 예외 발생
 		throw new PlaylistException(PlaylistErrorCode.PLAYLIST_INVALID_INPUT)
 			.addDetail("sortBy", sortBy)
-			.addDetail("message", "적합하지 않은 sortBy 입니다.");
+			.addDetail("message", "적합하지 않은 sortBy입니다.");
 	}
 
 	private OrderSpecifier<?>[] updatedAtOrder(SortDirection sortDirection) {

@@ -109,7 +109,7 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 		} catch (DateTimeParseException e) {
 			throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT, e)
 				.addDetail("cursor", cursor)
-				.addDetail("message", "적합하지 않은 cursor 타입 입니다.");
+				.addDetail("message", "적합하지 않은 cursor 타입입니다.");
 		}
 	}
 
@@ -149,7 +149,7 @@ public class NotificationQdslRepositoryImpl implements NotificationQdslRepositor
 
 		throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
 			.addDetail("sortBy", sortBy)
-			.addDetail("message", "적합하지 않은 sortBy 입니다.");
+			.addDetail("message", "적합하지 않은 sortBy입니다.");
 	}
 
 	private OrderSpecifier<?>[] createdAtOrder(SortDirection sortDirection) {
