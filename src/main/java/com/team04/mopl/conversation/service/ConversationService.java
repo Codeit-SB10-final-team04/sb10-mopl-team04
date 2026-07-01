@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
-import com.team04.mopl.conversation.dto.request.ConversationSearchRequest;
+import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
 import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 import com.team04.mopl.conversation.entity.Conversation;
@@ -112,7 +112,10 @@ public class ConversationService {
 	}
 
 	// 대화 단건 조회
-	public ConversationDto findConversationById(UUID conversationId, MoplUserDetails moplUserDetails) {
+	public ConversationDto findConversationById(
+		UUID conversationId,
+		MoplUserDetails moplUserDetails
+	) {
 		log.debug("[CONVERSATION_FIND] 대화 단건 조회 시작: conversationId={}", conversationId);
 
 		// 1. 로그인 정보로부터 요청자 ID 추출
@@ -129,7 +132,10 @@ public class ConversationService {
 	}
 
 	// 대화 상대 정보 조회
-	private User getWithUserEntityOrThrow(UUID conversationId, UUID requestUserId) {
+	private User getWithUserEntityOrThrow(
+		UUID conversationId,
+		UUID requestUserId
+	) {
 		List<ConversationParticipant> participants =
 			conversationParticipantRepository.findByConversationId(conversationId);
 
@@ -143,7 +149,10 @@ public class ConversationService {
 	}
 
 	// 특정 사용자와의 대화 조회
-	public ConversationDto findConversationByUserId(UUID userId, MoplUserDetails moplUserDetails) {
+	public ConversationDto findConversationByUserId(
+		UUID userId,
+		MoplUserDetails moplUserDetails
+	) {
 		log.debug("[CONVERSATION_FIND_BY_USER_ID] 특정 사용자와의 대화 조회 시작: userId={}", userId);
 
 		// 1. 로그인 정보로부터 요청자 ID 추출
@@ -164,33 +173,67 @@ public class ConversationService {
 	}
 
 	// 대화 ID 반환
-	private UUID findExistingConversationId(UUID requestUserId, UUID withUserId) {
+	private UUID findExistingConversationId(
+		UUID requestUserId,
+		UUID withUserId
+	) {
 		return conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
 			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
 	}
 
 	// 대화 목록 조회 (정렬 + 필터링 + 커서 페이지네이션)
-	private CursorResponseConversationDto findAll(
-		ConversationSearchRequest request,
+	public CursorResponseConversationDto findAll(
+		ConversationPageRequest conversationPageRequest,
 		UUID requestUserId
 	) {
-		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 시작: keyword={}", request.keywordLike());
+		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 시작: keyword={}", conversationPageRequest.keywordLike());
 
 		// 1. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
+		List<Conversation> conversations = conversationRepository.searchConversation(conversationPageRequest);
 
-		// 대화 전체 개수 조회
+		// 2. 대화 전체 개수 조회
+		Long totalCount = conversationRepository.countConversation(conversationPageRequest);
 
-		// 2. 다음 페이지 유무 확인
+		// 3. 다음 페이지 유무 확인
+		boolean hasNext = conversations.size() > conversationPageRequest.limit();
 
-		// 3. 다음 커서 값 계산 (메인 커서, 보조 커서)
+		// 4.
+		List<Conversation> pagedConversations = hasNext
+			? conversations.subList(0, conversationPageRequest.limit())
+			: conversations;
 
-		// 4. Conversation -> ConversationDto (내부 메서드 활용)
+		// 5. 다음 커서 값 계산 (메인 커서, 보조 커서)
+		String nextCursor = null;
+		UUID nextIdAfter = null;
 
-		// 5. CursorResponseConversationDto 전환 (Mapper 활용)
+		if (!pagedConversations.isEmpty() && hasNext) {
+			Conversation lastConversation = pagedConversations.get(pagedConversations.size() - 1);
 
-		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 완료: keyword={}", request.keywordLike());
+			nextCursor = lastConversation.getCreatedAt().toString();
+			nextIdAfter = lastConversation.getId();
+		}
 
-		return null;
+		// 6. Conversation -> ConversationDto (내부 메서드 활용)
+		List<ConversationDto> data = pagedConversations.stream()
+			.map(conversation -> {
+				// 기존 메서드를 활용하여 현재 대화방의 상대방 유저 조회
+				User withUser = getWithUserEntityOrThrow(conversation.getId(), requestUserId);
+				return mapToConversationDto(conversation, withUser, requestUserId);
+			})
+			.toList();
+
+		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 완료: keyword={}", conversationPageRequest.keywordLike());
+
+		// 7. CursorResponseConversationDto 전환 (Mapper 활용)
+		return new CursorResponseConversationDto(
+			data,
+			nextCursor,
+			nextIdAfter,
+			hasNext,
+			totalCount,
+			conversationPageRequest.sortBy(),
+			conversationPageRequest.sortDirection().name()
+		);
 	}
 
 	// 유효성 검증: 대화 중복 검사
@@ -243,7 +286,11 @@ public class ConversationService {
 	}
 
 	// DTO 변환 로직
-	private ConversationDto mapToConversationDto(Conversation conversation, User withUser, UUID requestUserId) {
+	private ConversationDto mapToConversationDto(
+		Conversation conversation,
+		User withUser,
+		UUID requestUserId
+	) {
 		// 1. 대화 상대방 정보 조회
 		UserSummary with = getUserSummary(withUser);
 
