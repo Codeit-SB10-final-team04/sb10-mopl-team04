@@ -68,13 +68,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		}
 	}
 
-	// 로그인/로그아웃/토큰 재발급/CSRF 토큰 조회 요청은 JWT 인증 필터를 적용하지 않도록 제외
+	// 로그인/로그아웃/토큰 재발급/CSRF 토큰 조회/비밀번호 초기화 요청은 JWT 인증 필터를 적용하지 않도록 제외
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
 		return isPost(request, "/api/auth/sign-in")
 			|| isPost(request, "/api/auth/sign-out")
 			|| isPost(request, "/api/auth/refresh")
-			|| isGet(request, "/api/auth/csrf-token");
+			|| isGet(request, "/api/auth/csrf-token")
+			|| isPost(request, "/api/auth/reset-password");
 	}
 
 	// Authorization 헤더에서 Bearer Access Token 추출

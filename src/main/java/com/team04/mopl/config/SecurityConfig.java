@@ -28,6 +28,7 @@ import org.springframework.security.web.savedrequest.NullRequestCache;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.team04.mopl.auth.security.csrf.SpaCsrfTokenRequestHandler;
+import com.team04.mopl.auth.security.provider.MoplAuthenticationProvider;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.auth.security.handler.AuthSessionLogoutHandler;
 import com.team04.mopl.auth.security.handler.LoginFailureHandler;
@@ -46,6 +47,7 @@ public class SecurityConfig {
 	@Bean
 	public SecurityFilterChain securityFilterChain(
 		HttpSecurity http,
+		MoplAuthenticationProvider moplAuthenticationProvider,
 		LoginSuccessHandler loginSuccessHandler,
 		LoginFailureHandler loginFailureHandler,
 		AuthSessionLogoutHandler authSessionLogoutHandler,
@@ -65,6 +67,9 @@ public class SecurityConfig {
 				.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.requestCache(requestCache -> requestCache
 				.requestCache(new NullRequestCache()))
+
+			// 로그인 인증 Provider 등록
+			.authenticationProvider(moplAuthenticationProvider)
 
 			// 로그인 요청
 			.formLogin(formLogin -> formLogin
@@ -98,6 +103,7 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/auth/sign-out").permitAll() // 로그아웃
 				.requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll() // 토큰 재발급
 				.requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll() // CSRF 토큰 조회
+				.requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll() // 비밀번호 초기화
 				.requestMatchers(
 					"/swagger-ui/**",
 					"/v3/api-docs/**",
