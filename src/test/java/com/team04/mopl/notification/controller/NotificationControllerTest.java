@@ -191,7 +191,7 @@ class NotificationControllerTest {
 
 	@Test
 	@DisplayName("notificationId가 잘못된 UUID 형식으로 들어오면 400 Bad Request가 발생한다.")
-	void readNotification_returnNoContent_whenInvalidNotificationIdFormat() throws Exception {
+	void readNotification_returnBadRequest_whenInvalidNotificationIdFormat() throws Exception {
 		// given
 		UUID currentUserId = UUID.randomUUID();
 
