@@ -6,7 +6,7 @@ import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.entity.Conversation;
 
 /*
-  ReviewRepository
+  ConversationQdslRepository
   ----------------------------
   정렬 및 페이지네이션에 활용할 Query DSL 전용 인터페이스 선언
  */
