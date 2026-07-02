@@ -1,6 +1,7 @@
 package com.team04.mopl.review.service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -10,14 +11,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.common.dto.UserSummary;
+import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.exception.ContentErrorCode;
 import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.review.dto.request.ReviewCreateRequest;
+import com.team04.mopl.review.dto.request.ReviewPageRequest;
 import com.team04.mopl.review.dto.request.ReviewUpdateRequest;
+import com.team04.mopl.review.dto.response.CursorResponseReviewDto;
+import com.team04.mopl.review.dto.response.ReviewCursorPage;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.entity.Review;
+import com.team04.mopl.review.enums.ReviewSortBy;
 import com.team04.mopl.review.event.ReviewCreatedEvent;
 import com.team04.mopl.review.event.ReviewDeletedEvent;
 import com.team04.mopl.review.event.ReviewUpdatedEvent;
@@ -44,6 +50,51 @@ public class ReviewService {
 	private final ContentRepository contentRepository;
 	private final ReviewMapper reviewMapper;
 	private final ApplicationEventPublisher applicationEventPublisher;
+
+	public CursorResponseReviewDto getReviews(ReviewPageRequest request) {
+		SortDirection sortDirection = request.sortDirection();
+		ReviewSortBy sortBy = request.sortBy();
+
+		// 1. 조건에 따라 리뷰 목록 조회 (커서 기반 페이지네이션)
+		ReviewCursorPage reviewCursorPage = reviewRepository.getReviews(request);
+
+		// 2. Review 엔티티 → ReviewDto 변환
+		List<ReviewDto> reviewDtoList = reviewCursorPage.reviewList().stream()
+			.map(review -> {
+				UserSummary userSummary = getUserSummary(review.getUser());
+				return reviewMapper.toDto(review, userSummary);
+			})
+			.toList();
+
+		boolean hasNext = reviewCursorPage.hasNext();
+		List<Review> reviewList = reviewCursorPage.reviewList();
+
+		// 3. 마지막 엔티티에서 다음 커서 값 계산
+		Review lastReview = reviewList.isEmpty()
+			? null
+			: reviewList.get(reviewList.size() - 1);
+
+		String nextCursor = hasNext && lastReview != null
+			? (sortBy.equals(ReviewSortBy.createdAt)
+			? lastReview.getCreatedAt().toString()
+			: String.valueOf(lastReview.getRating()))
+			: null;
+
+		UUID nextIdAfter = hasNext && lastReview != null
+			? lastReview.getId()
+			: null;
+
+		// 4. 커서 페이지네이션 응답 조립
+		return new CursorResponseReviewDto(
+			reviewDtoList,
+			nextCursor,
+			nextIdAfter,
+			hasNext,
+			reviewCursorPage.totalCount(),
+			sortBy.toString(),
+			sortDirection
+		);
+	}
 
 	@Transactional
 	public ReviewDto createReview(ReviewCreateRequest reviewCreateRequest, MoplUserDetails moplUserDetails) {
