@@ -1,6 +1,7 @@
 package com.team04.mopl.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -26,6 +27,7 @@ import com.team04.mopl.auth.entity.TemporaryPassword;
 import com.team04.mopl.auth.repository.TemporaryPasswordRepository;
 import com.team04.mopl.auth.service.event.TemporaryPasswordIssuedEvent;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -83,6 +85,7 @@ class TemporaryPasswordServiceTest {
 		assertThat(savedTemporaryPassword.getCreatedAt()).isNotNull();
 		assertThat(savedTemporaryPassword.getExpiresAt()).isAfter(savedTemporaryPassword.getCreatedAt());
 
+		assertThat(event.userId()).isEqualTo(user.getId());
 		assertThat(event.email()).isEqualTo(EMAIL);
 		assertThat(event.temporaryPassword()).isEqualTo(TEMPORARY_PASSWORD);
 		assertThat(event.expiresAt()).isEqualTo(savedTemporaryPassword.getExpiresAt());
@@ -125,22 +128,23 @@ class TemporaryPasswordServiceTest {
 
 		TemporaryPasswordIssuedEvent event = eventCaptor.getValue();
 
+		assertThat(event.userId()).isEqualTo(user.getId());
 		assertThat(event.email()).isEqualTo(EMAIL);
 		assertThat(event.temporaryPassword()).isEqualTo(TEMPORARY_PASSWORD);
 		assertThat(event.expiresAt()).isEqualTo(savedTemporaryPassword.getExpiresAt());
 	}
 
 	@Test
-	@DisplayName("존재하지 않는 이메일이면 계정 존재 여부를 숨기기 위해 정상 종료한다")
-	void resetPassword_doNothing_whenUserNotFound() {
+	@DisplayName("존재하지 않는 이메일이면 UserException을 던지고 저장과 이벤트 발행을 하지 않는다")
+	void resetPassword_throwUserException_whenUserNotFound() {
 		// given
 		when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
-		// when
-		temporaryPasswordService.resetPassword(EMAIL);
+		// when, then
+		assertThatThrownBy(() -> temporaryPasswordService.resetPassword(EMAIL))
+			.isInstanceOf(UserException.class);
 
-		// then
-		verify(temporaryPasswordGenerator, never()).generate();
+		verifyNoInteractions(temporaryPasswordGenerator);
 		verifyNoInteractions(passwordEncoder);
 		verifyNoInteractions(temporaryPasswordRepository);
 		verifyNoInteractions(eventPublisher);

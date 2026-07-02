@@ -3,8 +3,6 @@ package com.team04.mopl.auth.service.mail;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
@@ -78,7 +76,7 @@ public class TemporaryPasswordMailSender {
 			// 실제 SMTP 서버로 이메일 발송
 			javaMailSender.send(message);
 		} catch (MailException | MessagingException | UnsupportedEncodingException exception) {
-			log.error("[AUTH_RESET_PASSWORD] 임시 비밀번호 이메일 전송 실패: email={}", maskEmail(email), exception);
+			log.warn("[AUTH_RESET_PASSWORD] 임시 비밀번호 이메일 전송 실패 - 재시도 대상: email={}", maskEmail(email), exception);
 			throw new AuthException(AuthErrorCode.AUTH_MAIL_SEND_FAILED, exception);
 		}
 	}

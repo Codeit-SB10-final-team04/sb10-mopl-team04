@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import com.team04.mopl.auth.service.TemporaryPasswordMailDeliveryService;
 import com.team04.mopl.auth.service.mail.TemporaryPasswordMailSender;
 
 import lombok.RequiredArgsConstructor;
@@ -13,14 +14,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TemporaryPasswordIssuedEventListener {
 
-	private final TemporaryPasswordMailSender temporaryPasswordMailSender;
+	private final TemporaryPasswordMailDeliveryService temporaryPasswordMailDeliveryService;
 
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	public void sendTemporaryPasswordMail(TemporaryPasswordIssuedEvent event) {
-		temporaryPasswordMailSender.sendTemporaryPassword(
-			event.email(),
-			event.temporaryPassword(),
-			event.expiresAt()
-		);
+		// DB에 임시 비밀번호가 정상 저장된 이후에만 메일 발송 시작
+		temporaryPasswordMailDeliveryService.deliver(event);
 	}
 }

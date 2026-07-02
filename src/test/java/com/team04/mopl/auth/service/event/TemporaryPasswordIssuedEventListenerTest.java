@@ -5,6 +5,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,26 +16,28 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.exception.AuthException;
-import com.team04.mopl.auth.service.mail.TemporaryPasswordMailSender;
+import com.team04.mopl.auth.service.TemporaryPasswordMailDeliveryService;
 
 @ExtendWith(MockitoExtension.class)
 class TemporaryPasswordIssuedEventListenerTest {
 
+	private static final UUID USER_ID = UUID.randomUUID();
 	private static final String EMAIL = "user@example.com";
 	private static final String TEMPORARY_PASSWORD = "TempPassword1";
 
 	@Mock
-	private TemporaryPasswordMailSender temporaryPasswordMailSender;
+	private TemporaryPasswordMailDeliveryService temporaryPasswordMailDeliveryService;
 
 	@InjectMocks
 	private TemporaryPasswordIssuedEventListener temporaryPasswordIssuedEventListener;
 
 	@Test
-	@DisplayName("임시 비밀번호 발급 이벤트를 받으면 이메일을 발송한다")
-	void sendTemporaryPasswordMail_sendMail_whenEventReceived() {
+	@DisplayName("임시 비밀번호 발급 이벤트를 받으면 메일 발송 서비스에 위임한다")
+	void sendTemporaryPasswordMail_deliverMail_whenEventReceived() {
 		// given
 		Instant expiresAt = Instant.now().plusSeconds(180);
 		TemporaryPasswordIssuedEvent event = new TemporaryPasswordIssuedEvent(
+			USER_ID,
 			EMAIL,
 			TEMPORARY_PASSWORD,
 			expiresAt
@@ -44,27 +47,24 @@ class TemporaryPasswordIssuedEventListenerTest {
 		temporaryPasswordIssuedEventListener.sendTemporaryPasswordMail(event);
 
 		// then
-		verify(temporaryPasswordMailSender).sendTemporaryPassword(
-			EMAIL,
-			TEMPORARY_PASSWORD,
-			expiresAt
-		);
+		verify(temporaryPasswordMailDeliveryService).deliver(event);
 	}
 
 	@Test
-	@DisplayName("이메일 발송 중 예외가 발생하면 AuthException을 전파한다")
-	void sendTemporaryPasswordMail_throwAuthException_whenMailSendFails() {
+	@DisplayName("메일 발송 서비스에서 예외가 발생하면 AuthException을 전파한다")
+	void sendTemporaryPasswordMail_throwAuthException_whenDeliveryFails() {
 		// given
 		Instant expiresAt = Instant.now().plusSeconds(180);
 		TemporaryPasswordIssuedEvent event = new TemporaryPasswordIssuedEvent(
+			USER_ID,
 			EMAIL,
 			TEMPORARY_PASSWORD,
 			expiresAt
 		);
 
 		doThrow(new AuthException(AuthErrorCode.AUTH_MAIL_SEND_FAILED))
-			.when(temporaryPasswordMailSender)
-			.sendTemporaryPassword(EMAIL, TEMPORARY_PASSWORD, expiresAt);
+			.when(temporaryPasswordMailDeliveryService)
+			.deliver(event);
 
 		// when, then
 		assertThatThrownBy(() -> temporaryPasswordIssuedEventListener.sendTemporaryPasswordMail(event))

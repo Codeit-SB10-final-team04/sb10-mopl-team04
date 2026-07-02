@@ -42,16 +42,9 @@ public class TemporaryPasswordService {
 		String maskedEmail = maskEmail(email);
 		log.info("[AUTH_RESET_PASSWORD] 임시 비밀번호 발급 시작: email={}", maskedEmail);
 
-		Optional<User> userOptional = userRepository.findByEmail(email);
-
-		// 가입 여부를 외부에 노출하지 않기 위해 미가입 이메일이면 조용히 종료
-		if (userOptional.isEmpty()) {
-			log.info("[AUTH_RESET_PASSWORD] 가입되지 않은 이메일 요청: email={}", maskedEmail);
-
-			return;
-		}
-
-		User user = userOptional.get();
+		// 명세상 미가입 이메일은 404로 응답해야 하므로 UserException 던짐
+		User user = userRepository.findByEmail(email)
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 
 		//임시 비밀번호 원문 생성
 		String temporaryPassword = temporaryPasswordGenerator.generate();
@@ -82,6 +75,7 @@ public class TemporaryPasswordService {
 
 		// 실제 메일 발송은 트랜잭션 커밋 이후 리스너에서 처리
 		eventPublisher.publishEvent(new TemporaryPasswordIssuedEvent(
+			user.getId(),
 			user.getEmail(),
 			temporaryPassword,
 			expiresAt
