@@ -1,5 +1,6 @@
 package com.team04.mopl.review.service;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -107,6 +108,23 @@ public class ReviewService {
 		// 리뷰 수정 이벤트 발행
 		applicationEventPublisher.publishEvent(new ReviewUpdatedEvent(review.getContent().getId()));
 		return reviewMapper.toDto(review, userSummary);
+	}
+
+	@Transactional
+	public void deleteReview(UUID reviewId, MoplUserDetails moplUserDetails) {
+		UUID userId = moplUserDetails.getUserId();
+
+		// 리뷰 검증
+		Review review = getReviewOrThrow(reviewId);
+
+		// 오너 검증
+		validateReviewOwner(review, userId);
+
+		// 리뷰 삭제 (논리)
+		review.markDeleted(Instant.now());
+
+		// 평점 재집계 이벤트 발행
+		applicationEventPublisher.publishEvent(new ReviewUpdatedEvent(review.getContent().getId()));
 	}
 
 	// 사용자 엔티티 검증 및 반환
