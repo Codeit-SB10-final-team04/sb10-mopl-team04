@@ -8,7 +8,6 @@ import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.stereotype.Component;
 
-import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.review.repository.ReviewRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 public class ReviewHardDeleteItemWriter implements ItemWriter<UUID> {
 
 	private final ReviewRepository reviewRepository;
-	private final ContentRepository contentRepository;
 
 	@Override
 	public void write(Chunk<? extends UUID> chunk) {
@@ -29,6 +27,6 @@ public class ReviewHardDeleteItemWriter implements ItemWriter<UUID> {
 			return;
 		}
 
-		contentRepository.deleteAllByIdInBatch(ids);
+		reviewRepository.deleteAllByIdInBatch(ids);
 	}
 }
