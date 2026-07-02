@@ -194,15 +194,13 @@ public class ConversationService {
 		// 2. 대화 전체 개수 조회
 		Long totalCount = conversationRepository.countConversation(conversationPageRequest);
 
-		// 3. 다음 페이지 유무 확인
+		// 3. 다음 페이지 유무 확인 및 limit 만큼 자르기
 		boolean hasNext = conversations.size() > conversationPageRequest.limit();
-
-		// 4.
 		List<Conversation> pagedConversations = hasNext
 			? conversations.subList(0, conversationPageRequest.limit())
 			: conversations;
 
-		// 5. 다음 커서 값 계산 (메인 커서, 보조 커서)
+		// 4. 다음 커서 값 계산 (메인 커서, 보조 커서)
 		String nextCursor = null;
 		UUID nextIdAfter = null;
 
@@ -213,7 +211,8 @@ public class ConversationService {
 			nextIdAfter = lastConversation.getId();
 		}
 
-		// 6. Conversation -> ConversationDto (내부 메서드 활용)
+		// TODO: N+3 문제 해결 필요
+		// 5. Conversation -> ConversationDto (내부 메서드 활용)
 		List<ConversationDto> data = pagedConversations.stream()
 			.map(conversation -> {
 				// 기존 메서드를 활용하여 현재 대화방의 상대방 유저 조회
@@ -224,8 +223,8 @@ public class ConversationService {
 
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 완료: keyword={}", conversationPageRequest.keywordLike());
 
-		// 7. CursorResponseConversationDto 전환 (Mapper 활용)
-		return new CursorResponseConversationDto(
+		// 6. CursorResponseConversationDto 전환 (Mapper 활용)
+		return conversationMapper.toCursorPageResponse(
 			data,
 			nextCursor,
 			nextIdAfter,
