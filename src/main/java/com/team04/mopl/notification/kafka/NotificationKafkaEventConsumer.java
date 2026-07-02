@@ -15,8 +15,10 @@ import com.team04.mopl.notification.enums.NotificationType;
 import com.team04.mopl.notification.kafka.exception.KafkaEventErrorCode;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
 import com.team04.mopl.notification.service.NotificationService;
+import com.team04.mopl.playlist.event.PlaylistContentAddEvent;
 import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
+import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
 import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -32,11 +34,12 @@ public class NotificationKafkaEventConsumer {
 
 	private final UserRepository userRepository;
 	private final PlaylistRepository playlistRepository;
+	private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
 	private final NotificationService notificationService;
 
 	private final ObjectMapper objectMapper;
 
-	// 특정 사용자가 플레이리스트 구독 시 플레이리스트 소유주에게 알림을 보내는 listener
+	// 특정 사용자가 플레이리스트를 구독 완료 후 플레이리스트 소유주에게 알림을 보내는 listener
 	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_SUBSCRIBED)
 	public void consumePlaylistSubscribedEvent(String kafkaEvent) {
 		PlaylistSubscribedEvent event = deserialize(kafkaEvent, PlaylistSubscribedEvent.class);
@@ -56,6 +59,34 @@ public class NotificationKafkaEventConsumer {
 			title,
 			content,
 			NotificationType.SUBSCRIBE,
+			NotificationLevel.INFO
+		);
+	}
+
+	// 구독 중인 플레이리스트에 콘텐츠가 추가되면 해당 플레이리스트 구독자에게 알림을 보내는 listener
+	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_CONTENT_ADD)
+	public void consumePlaylistContentAddEvent(String kafkaEvent) {
+		PlaylistContentAddEvent event = deserialize(kafkaEvent, PlaylistContentAddEvent.class);
+
+		// title
+		String title = "새 콘텐츠가 추가 알림";
+
+		// content
+		String content = String.format("[%s] 플레이리스트에 [%s] 이(가) 추가되었습니다.",
+			event.playlistTitle(),
+			event.contentTitle()
+		);
+
+		// 보낼 사용자 찾기
+		Set<UUID> subscriberIds = playlistSubscriptionRepository
+			.findSubscriberIdsByPlaylistId(event.playlistId());
+
+		// 알림 저장 및 TODO: SSE 전송
+		sendNotification(
+			subscriberIds,
+			title,
+			content,
+			NotificationType.CONTENT_ADDED,
 			NotificationLevel.INFO
 		);
 	}
