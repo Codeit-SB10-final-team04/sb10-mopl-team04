@@ -14,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -23,6 +24,7 @@ import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.entity.PlaylistContent;
+import com.team04.mopl.playlist.event.PlaylistContentAddEvent;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.repository.PlaylistContentRepository;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
@@ -39,6 +41,9 @@ class PlaylistContentServiceTest {
 
 	@Mock
 	private PlaylistContentRepository playlistContentRepository;
+
+	@Mock
+	private ApplicationEventPublisher applicationEventPublisher;
 
 	@InjectMocks
 	private PlaylistContentService playlistContentService;
@@ -71,6 +76,7 @@ class PlaylistContentServiceTest {
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(contentRepository).findByIdAndDeletedAtIsNull(contentId);
 		verify(playlistContentRepository).existsByPlaylistIdAndContentId(playlistId, contentId);
+		verify(applicationEventPublisher).publishEvent(any(PlaylistContentAddEvent.class));
 
 		ArgumentCaptor<PlaylistContent> playlistContentCaptor =
 			ArgumentCaptor.forClass(PlaylistContent.class);
@@ -100,6 +106,7 @@ class PlaylistContentServiceTest {
 		verify(contentRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
 		verify(playlistContentRepository, never()).existsByPlaylistIdAndContentId(any(UUID.class), any(UUID.class));
 		verify(playlistContentRepository, never()).saveAndFlush(any(PlaylistContent.class));
+		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistContentAddEvent.class));
 	}
 
 	@Test
@@ -127,6 +134,7 @@ class PlaylistContentServiceTest {
 		verify(contentRepository).findByIdAndDeletedAtIsNull(contentId);
 		verify(playlistContentRepository, never()).existsByPlaylistIdAndContentId(any(UUID.class), any(UUID.class));
 		verify(playlistContentRepository, never()).saveAndFlush(any(PlaylistContent.class));
+		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistContentAddEvent.class));
 	}
 
 	@Test
@@ -157,6 +165,7 @@ class PlaylistContentServiceTest {
 		verify(contentRepository).findByIdAndDeletedAtIsNull(contentId);
 		verify(playlistContentRepository).existsByPlaylistIdAndContentId(playlistId, contentId);
 		verify(playlistContentRepository, never()).saveAndFlush(any(PlaylistContent.class));
+		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistContentAddEvent.class));
 	}
 
 	@Test
@@ -189,6 +198,7 @@ class PlaylistContentServiceTest {
 		verify(contentRepository).findByIdAndDeletedAtIsNull(contentId);
 		verify(playlistContentRepository).existsByPlaylistIdAndContentId(any(UUID.class), any(UUID.class));
 		verify(playlistContentRepository).saveAndFlush(any(PlaylistContent.class));
+		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistContentAddEvent.class));
 	}
 
 	@Test
