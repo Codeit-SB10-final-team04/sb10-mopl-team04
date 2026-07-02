@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,7 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
+import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
+import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 import com.team04.mopl.conversation.service.ConversationService;
 
 import jakarta.validation.Valid;
@@ -35,8 +38,10 @@ public class ConversationController implements ConversationControllerDocs {
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		ConversationDto conversationDto = conversationService.createConversation(conversationCreateRequest,
-			moplUserDetails);
+		ConversationDto conversationDto = conversationService.createConversation(
+			conversationCreateRequest,
+			moplUserDetails.getUserId()
+		);
 
 		return ResponseEntity.status(HttpStatus.CREATED).body(conversationDto);
 	}
@@ -48,7 +53,10 @@ public class ConversationController implements ConversationControllerDocs {
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		ConversationDto conversationDto = conversationService.findConversationById(conversationId, moplUserDetails);
+		ConversationDto conversationDto = conversationService.findConversationById(
+			conversationId,
+			moplUserDetails.getUserId()
+		);
 
 		return ResponseEntity.status(HttpStatus.OK).body(conversationDto);
 	}
@@ -57,10 +65,29 @@ public class ConversationController implements ConversationControllerDocs {
 	@GetMapping("/with")
 	public ResponseEntity<ConversationDto> findConversationByUserId(
 		@RequestParam UUID userId,
-		@AuthenticationPrincipal MoplUserDetails moplUserDetails) {
+		@AuthenticationPrincipal MoplUserDetails moplUserDetails
+	) {
 
-		ConversationDto conversationDto = conversationService.findConversationByUserId(userId, moplUserDetails);
+		ConversationDto conversationDto = conversationService.findConversationByUserId(
+			userId,
+			moplUserDetails.getUserId()
+		);
 
 		return ResponseEntity.status(HttpStatus.OK).body(conversationDto);
+	}
+
+	@Override
+	@GetMapping
+	public ResponseEntity<CursorResponseConversationDto> findAll(
+		@Valid @ModelAttribute ConversationPageRequest conversationPageRequest,
+		@AuthenticationPrincipal MoplUserDetails moplUserDetails
+	) {
+
+		CursorResponseConversationDto cursorResponseConversationDto = conversationService.findAll(
+			conversationPageRequest,
+			moplUserDetails.getUserId()
+		);
+
+		return ResponseEntity.status(HttpStatus.OK).body(cursorResponseConversationDto);
 	}
 }

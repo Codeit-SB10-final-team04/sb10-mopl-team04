@@ -1,7 +1,6 @@
 package com.team04.mopl.conversation.controller;
 
 import static org.mockito.BDDMockito.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -9,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +17,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -36,7 +38,7 @@ import com.team04.mopl.user.exception.UserException;
 
 @WebMvcTest(
 	controllers = ConversationController.class,
-	excludeFilters = @ComponentScan.Filter( // 컨트롤러 테스트에서 JWT 인증 필터 제외
+	excludeFilters = @ComponentScan.Filter(
 		type = FilterType.ASSIGNABLE_TYPE,
 		classes = JwtAuthenticationFilter.class
 	)
@@ -53,9 +55,25 @@ class ConversationControllerTest {
 	@MockitoBean
 	private ConversationService conversationService;
 
+	// 매 테스트마다 context 삭제
+	@AfterEach
+	void tearDown() {
+		SecurityContextHolder.clearContext();
+	}
+
+	// Security 대신 사용자 정보를 수동으로 context에 담는 헬퍼 메서드
+	private void mockSecurityContext(MoplUserDetails userDetails) {
+		UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+			userDetails,
+			null,
+			userDetails.getAuthorities()
+		);
+		SecurityContextHolder.getContext().setAuthentication(auth);
+	}
+
 	/*
 	=========================
-		대화 생성
+	   대화 생성
 	=========================
 	 */
 	@Test
@@ -68,18 +86,17 @@ class ConversationControllerTest {
 			"test@test.com",
 			UserRole.USER
 		);
+		mockSecurityContext(mockUserDetails);
 
 		UUID withUserId = UUID.randomUUID();
 		ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
 		ConversationDto responseDto = mock(ConversationDto.class);
 
-		given(conversationService.createConversation(any(ConversationCreateRequest.class), any(MoplUserDetails.class)))
+		given(conversationService.createConversation(any(ConversationCreateRequest.class), eq(requesterUser)))
 			.willReturn(responseDto);
 
 		// when & then
 		mockMvc.perform(post("/api/conversations")
-				// security 인증 객체 주입
-				.with(user(mockUserDetails))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(request)))
 			.andDo(print())
@@ -96,13 +113,12 @@ class ConversationControllerTest {
 			"test@test.com",
 			UserRole.USER
 		);
+		mockSecurityContext(mockUserDetails);
 
-		// 요청 DTO 내 대화 상대 ID 값 (withUserId) 누락
 		ConversationCreateRequest invalidRequest = new ConversationCreateRequest(null);
 
 		// when & then
 		mockMvc.perform(post("/api/conversations")
-				.with(user(mockUserDetails))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(invalidRequest)))
 			.andDo(print())
@@ -119,16 +135,16 @@ class ConversationControllerTest {
 			"test@test.com",
 			UserRole.USER
 		);
+		mockSecurityContext(mockUserDetails);
 
 		UUID withUserId = UUID.randomUUID();
 		ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
 
-		given(conversationService.createConversation(any(), any()))
+		given(conversationService.createConversation(any(ConversationCreateRequest.class), eq(requesterUser)))
 			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS));
 
 		// when & then
 		mockMvc.perform(post("/api/conversations")
-				.with(user(mockUserDetails))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(request)))
 			.andDo(print())
@@ -138,13 +154,21 @@ class ConversationControllerTest {
 
 	/*
 	=========================
-		대화 단건 조회
+	   대화 단건 조회
 	=========================
 	 */
 	@Test
 	@DisplayName("성공: 유효한 대화방 ID를 전달하면 대화방 단건 정보를 200 OK와 함께 반환한다.")
 	void findConversationById_Success() throws Exception {
 		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
 		UUID conversationId = UUID.randomUUID();
 
 		UserSummary withUser = new UserSummary(
@@ -158,9 +182,7 @@ class ConversationControllerTest {
 			conversationId,
 			Instant.now(),
 			withUser,
-			new UserSummary(UUID.randomUUID(),
-				"나",
-				"https://my.img"),
+			new UserSummary(UUID.randomUUID(), "나", "https://my.img"),
 			"안녕"
 		);
 
@@ -171,7 +193,7 @@ class ConversationControllerTest {
 			.hasUnread(false)
 			.build();
 
-		given(conversationService.findConversationById(eq(conversationId), any()))
+		given(conversationService.findConversationById(eq(conversationId), eq(requesterUserId)))
 			.willReturn(response);
 
 		// when & then
@@ -189,9 +211,17 @@ class ConversationControllerTest {
 	@DisplayName("실패: 존재하지 않는 대화방 ID로 조회하면 404 Not Found를 반환한다.")
 	void findConversationById_ConversationNotFound_Fail() throws Exception {
 		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
 		UUID invalidConversationId = UUID.randomUUID();
 
-		given(conversationService.findConversationById(eq(invalidConversationId), any()))
+		given(conversationService.findConversationById(eq(invalidConversationId), eq(requesterUserId)))
 			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
 
 		// when & then
@@ -206,9 +236,17 @@ class ConversationControllerTest {
 	@DisplayName("실패: 대화방 참여자 중 상대방 유저 정보를 찾을 수 없으면 404 Not Found를 반환한다.")
 	void findConversationById_UserNotFound_Fail() throws Exception {
 		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
 		UUID conversationId = UUID.randomUUID();
 
-		given(conversationService.findConversationById(eq(conversationId), any()))
+		given(conversationService.findConversationById(eq(conversationId), eq(requesterUserId)))
 			.willThrow(new UserException(UserErrorCode.USER_NOT_FOUND));
 
 		// when & then
@@ -221,7 +259,7 @@ class ConversationControllerTest {
 
 	/*
 	=========================
-		특정 사용자와의 대화 조회
+	   특정 사용자와의 대화 조회
 	=========================
 	 */
 	@Test
@@ -234,18 +272,16 @@ class ConversationControllerTest {
 			"test@test.com",
 			UserRole.USER
 		);
+		mockSecurityContext(mockUserDetails);
 
 		UUID userId = UUID.randomUUID();
 		ConversationDto responseDto = mock(ConversationDto.class);
 
-		given(conversationService.findConversationByUserId(
-			eq(userId),
-			argThat(userDetails -> userDetails != null && requesterUserId.equals(userDetails.getUserId()))))
+		given(conversationService.findConversationByUserId(eq(userId), eq(requesterUserId)))
 			.willReturn(responseDto);
 
-		mockMvc.perform(get("/api/conversations/with", UUID.randomUUID())
-				.param("userId", userId.toString())
-				.with(user(mockUserDetails)))
+		mockMvc.perform(get("/api/conversations/with")
+				.param("userId", userId.toString()))
 			.andExpect(status().isOk());
 	}
 
@@ -259,16 +295,16 @@ class ConversationControllerTest {
 			"test@test.com",
 			UserRole.USER
 		);
+		mockSecurityContext(mockUserDetails);
 
 		UUID userId = UUID.randomUUID();
 
-		// when & then
-		given(conversationService.findConversationByUserId(any(), any()))
+		given(conversationService.findConversationByUserId(any(UUID.class), eq(requesterUserId)))
 			.willThrow(new UserException(UserErrorCode.USER_NOT_FOUND));
 
+		// when & then
 		mockMvc.perform(get("/api/conversations/with")
-				.param("userId", userId.toString())
-				.with(user(mockUserDetails)))
+				.param("userId", userId.toString()))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.message").value(UserErrorCode.USER_NOT_FOUND.getMessage()));
 	}
@@ -283,14 +319,14 @@ class ConversationControllerTest {
 			"test@test.com",
 			UserRole.USER
 		);
+		mockSecurityContext(mockUserDetails);
 
-		given(conversationService.findConversationByUserId(any(), any()))
+		given(conversationService.findConversationByUserId(any(UUID.class), eq(requesterUserId)))
 			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
 
 		// when & then
 		mockMvc.perform(get("/api/conversations/with")
-				.param("userId", UUID.randomUUID().toString())
-				.with(user(mockUserDetails)))
+				.param("userId", UUID.randomUUID().toString()))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage()));
 	}
