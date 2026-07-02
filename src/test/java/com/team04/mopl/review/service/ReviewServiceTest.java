@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +26,7 @@ import com.team04.mopl.review.dto.request.ReviewUpdateRequest;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.entity.Review;
 import com.team04.mopl.review.event.ReviewCreatedEvent;
+import com.team04.mopl.review.event.ReviewDeletedEvent;
 import com.team04.mopl.review.event.ReviewUpdatedEvent;
 import com.team04.mopl.review.exception.ReviewException;
 import com.team04.mopl.review.mapper.ReviewMapper;
@@ -276,6 +278,85 @@ class ReviewServiceTest {
 			.isInstanceOf(ReviewException.class);
 
 		verify(review, never()).update(any(), anyShort());
+		verify(applicationEventPublisher, never()).publishEvent(any());
+	}
+
+	// ========== deleteReview ==========
+
+	@Test
+	@DisplayName("리뷰 삭제에 성공하면 soft delete 처리 후 이벤트를 발행한다")
+	void deleteReview_success_whenValidRequest() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID reviewId = UUID.randomUUID();
+		UUID contentId = UUID.randomUUID();
+
+		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
+		when(moplUserDetails.getUserId()).thenReturn(userId);
+
+		User user = mock(User.class);
+		when(user.getId()).thenReturn(userId);
+
+		Content content = mock(Content.class);
+		when(content.getId()).thenReturn(contentId);
+
+		Review review = mock(Review.class);
+		when(review.getUser()).thenReturn(user);
+		when(review.getContent()).thenReturn(content);
+
+		when(reviewRepository.findByIdAndDeletedAtIsNull(reviewId)).thenReturn(Optional.of(review));
+
+		// when
+		reviewService.deleteReview(reviewId, moplUserDetails);
+
+		// then
+		verify(review).markDeleted(any(Instant.class));
+		verify(applicationEventPublisher).publishEvent(any(ReviewDeletedEvent.class));
+	}
+
+	@Test
+	@DisplayName("존재하지 않거나 삭제된 리뷰이면 ReviewException이 발생한다")
+	void deleteReview_throwReviewException_whenReviewNotFound() {
+		// given
+		UUID reviewId = UUID.randomUUID();
+
+		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
+		when(moplUserDetails.getUserId()).thenReturn(UUID.randomUUID());
+
+		when(reviewRepository.findByIdAndDeletedAtIsNull(reviewId)).thenReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> reviewService.deleteReview(reviewId, moplUserDetails))
+			.isInstanceOf(ReviewException.class);
+
+		verify(applicationEventPublisher, never()).publishEvent(any());
+	}
+
+	@Test
+	@DisplayName("리뷰 작성자가 아니면 ReviewException이 발생한다")
+	void deleteReview_throwReviewException_whenNotOwner() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID anotherUserId = UUID.randomUUID();
+		UUID reviewId = UUID.randomUUID();
+
+		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
+		when(moplUserDetails.getUserId()).thenReturn(userId);
+
+		User anotherUser = mock(User.class);
+		when(anotherUser.getId()).thenReturn(anotherUserId);
+
+		Review review = mock(Review.class);
+		when(review.getId()).thenReturn(reviewId);
+		when(review.getUser()).thenReturn(anotherUser);
+
+		when(reviewRepository.findByIdAndDeletedAtIsNull(reviewId)).thenReturn(Optional.of(review));
+
+		// when & then
+		assertThatThrownBy(() -> reviewService.deleteReview(reviewId, moplUserDetails))
+			.isInstanceOf(ReviewException.class);
+
+		verify(review, never()).markDeleted(any());
 		verify(applicationEventPublisher, never()).publishEvent(any());
 	}
 }

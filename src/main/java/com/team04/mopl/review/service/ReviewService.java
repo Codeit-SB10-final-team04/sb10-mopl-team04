@@ -1,5 +1,6 @@
 package com.team04.mopl.review.service;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -18,6 +19,7 @@ import com.team04.mopl.review.dto.request.ReviewUpdateRequest;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.entity.Review;
 import com.team04.mopl.review.event.ReviewCreatedEvent;
+import com.team04.mopl.review.event.ReviewDeletedEvent;
 import com.team04.mopl.review.event.ReviewUpdatedEvent;
 import com.team04.mopl.review.exception.ReviewErrorCode;
 import com.team04.mopl.review.exception.ReviewException;
@@ -107,6 +109,27 @@ public class ReviewService {
 		// 리뷰 수정 이벤트 발행
 		applicationEventPublisher.publishEvent(new ReviewUpdatedEvent(review.getContent().getId()));
 		return reviewMapper.toDto(review, userSummary);
+	}
+
+	@Transactional
+	public void deleteReview(UUID reviewId, MoplUserDetails moplUserDetails) {
+		UUID userId = moplUserDetails.getUserId();
+
+		log.info("[REVIEW_DELETE] 리뷰 삭제 시작: userId={}, reviewId={}", userId, reviewId);
+
+		// 리뷰 검증
+		Review review = getReviewOrThrow(reviewId);
+
+		// 오너 검증
+		validateReviewOwner(review, userId);
+
+		// 리뷰 삭제 (논리)
+		review.markDeleted(Instant.now());
+
+		// 평점 재집계 이벤트 발행
+		applicationEventPublisher.publishEvent(new ReviewDeletedEvent(review.getContent().getId()));
+
+		log.info("[REVIEW_DELETE] 리뷰 삭제 완료: userId={}, reviewId={}", userId, reviewId);
 	}
 
 	// 사용자 엔티티 검증 및 반환

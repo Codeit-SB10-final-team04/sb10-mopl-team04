@@ -1,4 +1,4 @@
-package com.team04.mopl.content.batch.step;
+package com.team04.mopl.review.batch;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -15,27 +15,31 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Configuration
 @RequiredArgsConstructor
-public class ContentHardDeleteItemReader {
+@Slf4j
+public class ReviewHardDeleteItemReader {
 
 	private final DataSource dataSource;
 
-	@Value("${content.hard-delete.retention-days}")
+	@Value("${review.hard-delete.retention-days}")
 	private long retentionDays;
 
 	@Bean
 	@StepScope
-	public JdbcCursorItemReader<UUID> contentHardDeleteReader() {
+	public JdbcCursorItemReader<UUID> reviewHardDeleteReader() {
 		Instant deletedAtBefore = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
 
+		log.info("[REVIEW_HARD_DELETE] Reader 시작: retentionDays={}, cutoff={}", retentionDays, deletedAtBefore);
+
 		return new JdbcCursorItemReaderBuilder<UUID>()
-			.name("contentHardDeleteReader")
+			.name("reviewHardDeleteReader")
 			.dataSource(dataSource)
 			.sql("""
 					SELECT id
-					FROM contents
+					FROM content_reviews
 					WHERE deleted_at IS NOT NULL
 					AND deleted_at < ?
 					ORDER BY deleted_at ASC, id ASC

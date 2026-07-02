@@ -54,6 +54,11 @@ content:
     cron: "0 0 2 * * MON"
     retention-days: 1
 
+review:
+  hard-delete:
+    cron: "0 0 2 * * MON"
+    retention-days: 1
+
 mopl:
   jwt:
     secret: test-secret-key-must-be-at-least-32-bytes

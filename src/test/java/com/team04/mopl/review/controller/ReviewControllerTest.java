@@ -196,4 +196,49 @@ class ReviewControllerTest {
 			.andExpect(status().isForbidden())
 			.andExpect(jsonPath("$.message").value(ReviewErrorCode.REVIEW_FORBIDDEN.getMessage()));
 	}
+
+	// ========== deleteReview ==========
+
+	@Test
+	@DisplayName("리뷰 삭제 요청에 성공하면 204 No Content를 반환한다")
+	void deleteReview_returnNoContent_whenValidRequest() throws Exception {
+		// given
+		UUID reviewId = UUID.randomUUID();
+
+		doNothing().when(reviewService).deleteReview(eq(reviewId), any());
+
+		// when & then
+		mockMvc.perform(delete("/api/reviews/{reviewId}", reviewId))
+			.andExpect(status().isNoContent());
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 리뷰 삭제 시 404 Not Found를 반환한다")
+	void deleteReview_returnNotFound_whenReviewNotFound() throws Exception {
+		// given
+		UUID reviewId = UUID.randomUUID();
+
+		doThrow(new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND))
+			.when(reviewService).deleteReview(eq(reviewId), any());
+
+		// when & then
+		mockMvc.perform(delete("/api/reviews/{reviewId}", reviewId))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.message").value(ReviewErrorCode.REVIEW_NOT_FOUND.getMessage()));
+	}
+
+	@Test
+	@DisplayName("리뷰 작성자가 아니면 삭제 시 403 Forbidden을 반환한다")
+	void deleteReview_returnForbidden_whenNotOwner() throws Exception {
+		// given
+		UUID reviewId = UUID.randomUUID();
+
+		doThrow(new ReviewException(ReviewErrorCode.REVIEW_FORBIDDEN))
+			.when(reviewService).deleteReview(eq(reviewId), any());
+
+		// when & then
+		mockMvc.perform(delete("/api/reviews/{reviewId}", reviewId))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.message").value(ReviewErrorCode.REVIEW_FORBIDDEN.getMessage()));
+	}
 }
