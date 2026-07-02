@@ -19,6 +19,7 @@ import com.team04.mopl.review.dto.request.ReviewUpdateRequest;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.entity.Review;
 import com.team04.mopl.review.event.ReviewCreatedEvent;
+import com.team04.mopl.review.event.ReviewDeletedEvent;
 import com.team04.mopl.review.event.ReviewUpdatedEvent;
 import com.team04.mopl.review.exception.ReviewErrorCode;
 import com.team04.mopl.review.exception.ReviewException;
@@ -126,7 +127,7 @@ public class ReviewService {
 		review.markDeleted(Instant.now());
 
 		// 평점 재집계 이벤트 발행
-		applicationEventPublisher.publishEvent(new ReviewUpdatedEvent(review.getContent().getId()));
+		applicationEventPublisher.publishEvent(new ReviewDeletedEvent(review.getContent().getId()));
 
 		log.info("[REVIEW_DELETE] 리뷰 삭제 완료: userId={}, reviewId={}", userId, reviewId);
 	}

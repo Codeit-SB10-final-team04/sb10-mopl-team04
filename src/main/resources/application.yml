@@ -23,7 +23,7 @@ content:
 
 review:
   hard-delete:
-    cron: "0 0 2 * * MON"
+    cron: "0 30 2 * * MON"
     retention-days: 1
 
 mopl:

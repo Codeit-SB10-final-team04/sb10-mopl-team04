@@ -26,6 +26,7 @@ import com.team04.mopl.review.dto.request.ReviewUpdateRequest;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.entity.Review;
 import com.team04.mopl.review.event.ReviewCreatedEvent;
+import com.team04.mopl.review.event.ReviewDeletedEvent;
 import com.team04.mopl.review.event.ReviewUpdatedEvent;
 import com.team04.mopl.review.exception.ReviewException;
 import com.team04.mopl.review.mapper.ReviewMapper;
@@ -310,7 +311,7 @@ class ReviewServiceTest {
 
 		// then
 		verify(review).markDeleted(any(Instant.class));
-		verify(applicationEventPublisher).publishEvent(any(ReviewUpdatedEvent.class));
+		verify(applicationEventPublisher).publishEvent(any(ReviewDeletedEvent.class));
 	}
 
 	@Test
