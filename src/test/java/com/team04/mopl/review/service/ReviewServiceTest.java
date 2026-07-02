@@ -75,12 +75,9 @@ class ReviewServiceTest {
 
 		User user = mock(User.class);
 		when(user.getId()).thenReturn(UUID.randomUUID());
-		when(user.getName()).thenReturn("테스트유저");
 
 		Review review = mock(Review.class);
 		when(review.getUser()).thenReturn(user);
-		when(review.getId()).thenReturn(UUID.randomUUID());
-		when(review.getCreatedAt()).thenReturn(Instant.now());
 
 		ReviewCursorPage cursorPage = new ReviewCursorPage(List.of(review), false, 1L);
 		when(reviewRepository.getReviews(request)).thenReturn(cursorPage);

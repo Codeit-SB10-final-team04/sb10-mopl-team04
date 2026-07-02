@@ -57,17 +57,16 @@ public class ReviewService {
 
 		// 1. 조건에 따라 리뷰 목록 조회 (커서 기반 페이지네이션)
 		ReviewCursorPage reviewCursorPage = reviewRepository.getReviews(request);
+		List<Review> reviewList = reviewCursorPage.reviewList();
+		boolean hasNext = reviewCursorPage.hasNext();
 
 		// 2. Review 엔티티 → ReviewDto 변환
-		List<ReviewDto> reviewDtoList = reviewCursorPage.reviewList().stream()
+		List<ReviewDto> reviewDtoList = reviewList.stream()
 			.map(review -> {
 				UserSummary userSummary = getUserSummary(review.getUser());
 				return reviewMapper.toDto(review, userSummary);
 			})
 			.toList();
-
-		boolean hasNext = reviewCursorPage.hasNext();
-		List<Review> reviewList = reviewCursorPage.reviewList();
 
 		// 3. 마지막 엔티티에서 다음 커서 값 계산
 		Review lastReview = reviewList.isEmpty()
