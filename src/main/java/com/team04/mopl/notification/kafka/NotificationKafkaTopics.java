@@ -5,6 +5,7 @@ public final class NotificationKafkaTopics {
 
 	public static final String PLAYLIST_SUBSCRIBED = "mopl.playlist.subscribed";
 	public static final String PLAYLIST_CONTENT_ADDED = "mopl.playlist.content.add";
+	public static final String FOLLOW_CREATED = "mopl.follow.created";
 
 	private NotificationKafkaTopics() {
 	}
