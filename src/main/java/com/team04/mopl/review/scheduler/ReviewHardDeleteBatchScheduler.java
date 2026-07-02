@@ -28,6 +28,7 @@ public class ReviewHardDeleteBatchScheduler {
 		zone = BatchTimeZone.ZONE_ID
 	)
 	public void runReviewHardDeleteBatch() {
+		log.info("[REVIEW_HARD_DELETE_BATCH] 배치 시작");
 		try {
 			JobParameters jobParameters = new JobParametersBuilder()
 				.addLong("runId", System.currentTimeMillis())
@@ -39,7 +40,10 @@ public class ReviewHardDeleteBatchScheduler {
 				throw new IllegalStateException("리뷰 물리 삭제 배치 실패. jobExecutionId="
 					+ jobExecution.getId() + ", status=" + jobExecution.getStatus());
 			}
+
+			log.info("[REVIEW_HARD_DELETE_BATCH] 배치 완료: jobExecutionId={}", jobExecution.getId());
 		} catch (Exception e) {
+			log.error("[REVIEW_HARD_DELETE_BATCH] 배치 실패", e);
 			throw new BatchException("리뷰 물리 삭제 배치에 실패했습니다. ", e);
 		}
 	}

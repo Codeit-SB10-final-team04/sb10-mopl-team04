@@ -114,6 +114,8 @@ public class ReviewService {
 	public void deleteReview(UUID reviewId, MoplUserDetails moplUserDetails) {
 		UUID userId = moplUserDetails.getUserId();
 
+		log.info("[REVIEW_DELETE] 리뷰 삭제 시작: userId={}, reviewId={}", userId, reviewId);
+
 		// 리뷰 검증
 		Review review = getReviewOrThrow(reviewId);
 
@@ -125,6 +127,8 @@ public class ReviewService {
 
 		// 평점 재집계 이벤트 발행
 		applicationEventPublisher.publishEvent(new ReviewUpdatedEvent(review.getContent().getId()));
+
+		log.info("[REVIEW_DELETE] 리뷰 삭제 완료: userId={}, reviewId={}", userId, reviewId);
 	}
 
 	// 사용자 엔티티 검증 및 반환

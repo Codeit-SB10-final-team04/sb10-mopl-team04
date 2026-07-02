@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import javax.sql.DataSource;
 
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,7 @@ public class ContentHardDeleteItemReader {
 	private long retentionDays;
 
 	@Bean
+	@StepScope
 	public JdbcCursorItemReader<UUID> contentHardDeleteReader() {
 		Instant deletedAtBefore = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
 

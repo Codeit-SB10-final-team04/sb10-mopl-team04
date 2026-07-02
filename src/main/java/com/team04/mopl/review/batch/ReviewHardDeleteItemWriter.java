@@ -24,9 +24,12 @@ public class ReviewHardDeleteItemWriter implements ItemWriter<UUID> {
 	public void write(Chunk<? extends UUID> chunk) {
 		List<UUID> ids = new ArrayList<>(chunk.getItems());
 		if (ids.isEmpty()) {
+			log.debug("[REVIEW_HARD_DELETE] 삭제 대상 없음, 스킵");
 			return;
 		}
 
+		log.info("[REVIEW_HARD_DELETE] 리뷰 물리 삭제 시작: count={}", ids.size());
 		reviewRepository.deleteAllByIdInBatch(ids);
+		log.info("[REVIEW_HARD_DELETE] 리뷰 물리 삭제 완료: count={}", ids.size());
 	}
 }
