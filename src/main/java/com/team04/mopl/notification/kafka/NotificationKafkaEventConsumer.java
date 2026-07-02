@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
+import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationType;
@@ -17,10 +18,9 @@ import com.team04.mopl.notification.kafka.exception.KafkaEventErrorCode;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
 import com.team04.mopl.notification.service.NotificationService;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
+import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
 import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
-import com.team04.mopl.playlist.repository.PlaylistRepository;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
-import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,9 +33,9 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class NotificationKafkaEventConsumer {
 
-	private final UserRepository userRepository;
-	private final PlaylistRepository playlistRepository;
 	private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
+	private final FollowRepository followRepository;
+
 	private final NotificationService notificationService;
 
 	private final ObjectMapper objectMapper;
@@ -109,6 +109,33 @@ public class NotificationKafkaEventConsumer {
 			title,
 			content,
 			NotificationType.FOLLOW,
+			NotificationLevel.INFO
+		);
+	}
+
+	// 특정 사용자가 플레이리스트를 생성하면 해당 사용자의 팔로워에게 알림을 보내는 listener
+	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_CREATED)
+	public void consumePlaylistCreatedEvent(String kafkaEvent) {
+		PlaylistCreatedEvent event = deserialize(kafkaEvent, PlaylistCreatedEvent.class);
+
+		// title
+		String title = "새 활동 알림";
+
+		// content
+		String content = String.format("[%s] 님이 [%s] 플레이리스트를 생성하셨습니다.",
+			event.playlistOwnerName(),
+			event.playlistTitle()
+		);
+
+		// 해당 사용자를 팔로우한 사용자 id 목록 조회
+		Set<UUID> followerIds = followRepository
+			.findFollowerIdsByFolloweeId(event.playlistOwnerId());
+
+		sendNotification(
+			followerIds,
+			title,
+			content,
+			NotificationType.FOLLOWING_ACTIVITY,
 			NotificationLevel.INFO
 		);
 	}
