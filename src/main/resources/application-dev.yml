@@ -69,9 +69,3 @@ thumbnail:
     type: local
     local:
       path: thumbnails/
-
-mopl:
-  jwt:
-    secret: ${MOPL_JWT_SECRET:local-development-secret-key-must-be-at-least-32-bytes}
-    refresh-token-cookie-secure: ${MOPL_REFRESH_TOKEN_COOKIE_SECURE:false}
-    refresh-token-cookie-same-site: ${MOPL_REFRESH_TOKEN_COOKIE_SAME_SITE:Lax}

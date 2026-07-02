@@ -21,7 +21,10 @@ public enum AuthErrorCode implements ErrorCode {
 	AUTH_INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AU10", "유효하지 않은 refresh token입니다."),
 	AUTH_EXPIRED_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AU11", "만료된 refresh token입니다."),
 	AUTH_SESSION_REQUIRED_VALUE(HttpStatus.INTERNAL_SERVER_ERROR, "AU12", "인증 세션 필수값이 누락되었습니다."),
-	AUTH_TOKEN_EXPIRATION_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "AU13", "토큰 만료 시각이 올바르지 않습니다.");
+	AUTH_TOKEN_EXPIRATION_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "AU13", "토큰 만료 시각이 올바르지 않습니다."),
+	AUTH_MAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "AU14", "임시 비밀번호 이메일 전송에 실패했습니다."),
+	AUTH_TEMPORARY_PASSWORD_REQUIRED_VALUE(HttpStatus.INTERNAL_SERVER_ERROR, "AU15", "임시 비밀번호 필수값이 누락되었습니다."),
+	AUTH_TEMPORARY_PASSWORD_EXPIRATION_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "AU16", "임시 비밀번호 만료 시각이 올바르지 않습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String code;
