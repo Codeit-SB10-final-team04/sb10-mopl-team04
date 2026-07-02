@@ -4,7 +4,7 @@ package com.team04.mopl.notification.kafka;
 public final class NotificationKafkaTopics {
 
 	public static final String PLAYLIST_SUBSCRIBED = "mopl.playlist.subscribed";
-	public static final String PLAYLIST_CONTENT_ADD = "mopl.playlist.content.add";
+	public static final String PLAYLIST_CONTENT_ADDED = "mopl.playlist.content.add";
 
 	private NotificationKafkaTopics() {
 	}

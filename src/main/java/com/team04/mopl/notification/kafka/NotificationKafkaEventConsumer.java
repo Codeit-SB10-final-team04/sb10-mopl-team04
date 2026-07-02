@@ -64,7 +64,7 @@ public class NotificationKafkaEventConsumer {
 	}
 
 	// 구독 중인 플레이리스트에 콘텐츠가 추가되면 해당 플레이리스트 구독자에게 알림을 보내는 listener
-	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_CONTENT_ADD)
+	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_CONTENT_ADDED)
 	public void consumePlaylistContentAddEvent(String kafkaEvent) {
 		PlaylistContentAddedEvent event = deserialize(kafkaEvent, PlaylistContentAddedEvent.class);
 

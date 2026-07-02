@@ -36,7 +36,7 @@ public class NotificationKafkaEventPublisher {
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	public void publishPlaylistContentAddEvent(PlaylistContentAddedEvent event) {
 		// PlaylistContentAddEvent를 String으로 변환 후 payload 변수에 할당
-		sendEvent(NotificationKafkaTopics.PLAYLIST_CONTENT_ADD, event);
+		sendEvent(NotificationKafkaTopics.PLAYLIST_CONTENT_ADDED, event);
 	}
 
 	private void sendEvent(String topic, Object event) {
