@@ -87,7 +87,7 @@ public class NotificationKafkaEventConsumer {
 			subscriberIds,
 			title,
 			content,
-			NotificationType.CONTENT_ADDED,
+			NotificationType.CONTENT_ADD,
 			NotificationLevel.INFO
 		);
 	}
