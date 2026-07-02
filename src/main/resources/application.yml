@@ -21,6 +21,11 @@ content:
     cron: "0 0 2 * * MON"
     retention-days: 1
 
+review:
+  hard-delete:
+    cron: "0 0 2 * * MON"
+    retention-days: 1
+
 mopl:
   jwt:
     issuer: ${MOPL_JWT_ISSUER:mopl}
