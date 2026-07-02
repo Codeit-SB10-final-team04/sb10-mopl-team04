@@ -8,6 +8,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.notification.kafka.exception.KafkaEventErrorCode;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
@@ -37,6 +38,13 @@ public class NotificationKafkaEventPublisher {
 	public void publishPlaylistContentAddEvent(PlaylistContentAddedEvent event) {
 		// PlaylistContentAddEvent를 String으로 변환 후 payload 변수에 할당
 		sendEvent(NotificationKafkaTopics.PLAYLIST_CONTENT_ADDED, event);
+	}
+
+	@Async("eventTaskExecutor")
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	public void publishFollowCreatedEvent(FollowCreatedEvent event) {
+		// FollowCreatedEvent를 String으로 변환 후 payload 변수에 할당
+		sendEvent(NotificationKafkaTopics.FOLLOW_CREATED, event);
 	}
 
 	private void sendEvent(String topic, Object event) {
