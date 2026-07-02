@@ -35,7 +35,7 @@ public class FollowService {
 
 	// 팔로우 생성
 	@Transactional
-	@PreAuthorize("#followRequest.followeeId() != #moplUserDetails.userId")
+	@PreAuthorize("#followRequest.followeeId() != #requestUserId")
 	public FollowDto createFollow(
 		FollowRequest followRequest,
 		UUID requestUserId

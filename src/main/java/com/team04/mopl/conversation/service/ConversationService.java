@@ -51,7 +51,7 @@ public class ConversationService {
 
 	// 대화 생성
 	@Transactional
-	@PreAuthorize("#conversationCreateRequest.withUserId() != #moplUserDetails.userId")
+	@PreAuthorize("#conversationCreateRequest.withUserId() != #requestUserId")
 	public ConversationDto createConversation(
 		ConversationCreateRequest conversationCreateRequest,
 		UUID requestUserId
