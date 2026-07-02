@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -21,8 +22,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.dto.UserSummary;
+import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.review.dto.request.ReviewCreateRequest;
 import com.team04.mopl.review.dto.request.ReviewUpdateRequest;
+import com.team04.mopl.review.dto.response.CursorResponseReviewDto;
 import com.team04.mopl.review.dto.response.ReviewDto;
 import com.team04.mopl.review.exception.ReviewErrorCode;
 import com.team04.mopl.review.exception.ReviewException;
@@ -46,6 +49,67 @@ class ReviewControllerTest {
 
 	@MockitoBean
 	private ReviewService reviewService;
+
+	// ========== getReviews ==========
+
+	@Test
+	@DisplayName("리뷰 목록 조회 요청에 성공하면 200 OK와 CursorResponseReviewDto를 반환한다")
+	void getReviews_returnOk_whenValidRequest() throws Exception {
+		// given
+		UUID contentId = UUID.randomUUID();
+		ReviewDto reviewDto = new ReviewDto(
+			UUID.randomUUID(),
+			contentId,
+			new UserSummary(UUID.randomUUID(), "테스트유저", null),
+			"재밌어요",
+			(short)5
+		);
+
+		CursorResponseReviewDto response = new CursorResponseReviewDto(
+			List.of(reviewDto),
+			null,
+			null,
+			false,
+			1L,
+			"createdAt",
+			SortDirection.DESCENDING
+		);
+
+		when(reviewService.getReviews(any())).thenReturn(response);
+
+		// when & then
+		mockMvc.perform(get("/api/reviews")
+				.param("contentId", contentId.toString())
+				.param("limit", "20")
+				.param("sortBy", "createdAt")
+				.param("sortDirection", "DESCENDING"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data[0].text").value("재밌어요"))
+			.andExpect(jsonPath("$.hasNext").value(false))
+			.andExpect(jsonPath("$.totalCount").value(1));
+	}
+
+	@Test
+	@DisplayName("contentId가 없으면 400 Bad Request를 반환한다")
+	void getReviews_returnBadRequest_whenContentIdIsNull() throws Exception {
+		// when & then
+		mockMvc.perform(get("/api/reviews")
+				.param("limit", "20")
+				.param("sortBy", "createdAt")
+				.param("sortDirection", "DESCENDING"))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("limit이 없으면 400 Bad Request를 반환한다")
+	void getReviews_returnBadRequest_whenLimitIsNull() throws Exception {
+		// when & then
+		mockMvc.perform(get("/api/reviews")
+				.param("contentId", UUID.randomUUID().toString())
+				.param("sortBy", "createdAt")
+				.param("sortDirection", "DESCENDING"))
+			.andExpect(status().isBadRequest());
+	}
 
 	// ========== createReview ==========
 
