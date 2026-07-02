@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationType;
@@ -65,7 +66,7 @@ public class NotificationKafkaEventConsumer {
 
 	// 구독 중인 플레이리스트에 콘텐츠가 추가되면 해당 플레이리스트 구독자에게 알림을 보내는 listener
 	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_CONTENT_ADDED)
-	public void consumePlaylistContentAddEvent(String kafkaEvent) {
+	public void consumePlaylistContentAddedEvent(String kafkaEvent) {
 		PlaylistContentAddedEvent event = deserialize(kafkaEvent, PlaylistContentAddedEvent.class);
 
 		// title
@@ -87,6 +88,27 @@ public class NotificationKafkaEventConsumer {
 			title,
 			content,
 			NotificationType.CONTENT_ADDED,
+			NotificationLevel.INFO
+		);
+	}
+
+	// 특정 사용자를 팔로우 하면 해당 팔로우를 당한 사용자에게 알림을 보내는 listener
+	@KafkaListener(topics = NotificationKafkaTopics.FOLLOW_CREATED)
+	public void consumeFollowCreatedEvent(String kafkaEvent) {
+		FollowCreatedEvent event = deserialize(kafkaEvent, FollowCreatedEvent.class);
+
+		// title
+		String title = "새 팔로우 알림";
+
+		// content
+		String content = String.format("[%s] 님이 팔로우했습니다.", event.followerName());
+
+		// 알림 저장 및 TODO: SSE 전송
+		sendNotification(
+			Set.of(event.followeeId()),
+			title,
+			content,
+			NotificationType.FOLLOW,
 			NotificationLevel.INFO
 		);
 	}
