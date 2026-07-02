@@ -1,4 +1,4 @@
-package com.team04.mopl.notification.controller;
+package com.team04.mopl.sse.controller;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
