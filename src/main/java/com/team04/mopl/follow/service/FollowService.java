@@ -7,7 +7,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
 import com.team04.mopl.follow.entity.Follow;
@@ -37,21 +36,21 @@ public class FollowService {
 	// 팔로우 생성
 	@Transactional
 	@PreAuthorize("#followRequest.followeeId() != #moplUserDetails.userId")
-	public FollowDto createFollow(FollowRequest followRequest, MoplUserDetails moplUserDetails) {
-		// 1. 로그인 정보로부터 요청자 ID 추출
-		UUID requestUserId = moplUserDetails.getUserId();
-
+	public FollowDto createFollow(
+		FollowRequest followRequest,
+		UUID requestUserId
+	) {
 		log.info("[FOLLOW_CREATE] 팔로우 생성 시작: followeeId={}, followerId={}",
 			followRequest.followeeId(), requestUserId);
 
-		// 2. 유효성 검증: 로그인 사용자(팔로워) 및 팔로우 대상 존재 여부
+		// 1. 유효성 검증: 로그인 사용자(팔로워) 및 팔로우 대상 존재 여부
 		User followeeUser = getUserEntityOrThrow(followRequest.followeeId());
 		User followerUser = getUserEntityOrThrow(requestUserId);
 
-		// 3. 유효성 검증: 중복 팔로우 검사
+		// 2. 유효성 검증: 중복 팔로우 검사
 		validateDuplicateFollow(followeeUser.getId(), followerUser.getId());
 
-		// 4. 팔로우 생성 및 저장
+		// 3. 팔로우 생성 및 저장
 		// TODO: 분산 환경에서의 동시성 이슈를 해결하기 위한 Redis 분산 락(Redisson 등) 적용 예정 (심화)
 		// 분산 락 적용 시, DB 제약조건 예외를 잡는 현재의 catch 블록은 제거 후 로직 개선
 		try {
@@ -71,20 +70,22 @@ public class FollowService {
 	}
 
 	// 사용자의 특정 사용자 팔로우 여부 조회
-	public FollowDto getFollowConnection(UUID followeeId, MoplUserDetails moplUserDetails) {
-		// 1. 로그인 정보로부터 요청자 ID 추출
-		UUID requestUserId = moplUserDetails.getUserId();
-
+	public FollowDto getFollowConnection(
+		UUID followeeId,
+		UUID requestUserId
+	) {
 		log.debug("[FOLLOW_FIND_IS_FOLLWING] 특정 사용자 팔로우 여부 조회 시작: followeeId={}, requestUserId={}",
 			followeeId, requestUserId);
 
-		// 2. 유효성 검증: 요청자와 특정 사용자 존재 여부
+		// 1. 유효성 검증: 요청자와 특정 사용자 존재 여부
 		User targetUser = getUserEntityOrThrow(followeeId);          // 특정 사용자
 		User requestedUser = getUserEntityOrThrow(requestUserId);    // 요청자
 
-		// 3. 팔로우 여부 조회
-		Follow followConnection = getFollowEntityByFolloweeIdAndFollowerIdOrThrow(targetUser.getId(),
-			requestedUser.getId());
+		// 2. 팔로우 여부 조회
+		Follow followConnection = getFollowEntityByFolloweeIdAndFollowerIdOrThrow(
+			targetUser.getId(),
+			requestedUser.getId()
+		);
 
 		log.debug("[FOLLOW_FIND_IS_FOLLWING] 특정 사용자 팔로우 여부 조회 완료: followId={}. followeeId={}, requestUserId={}",
 			followConnection.getId(), followeeId, requestUserId);
@@ -109,19 +110,19 @@ public class FollowService {
 
 	// 팔로우 취소
 	@Transactional
-	public void deleteFollow(UUID followId, MoplUserDetails moplUserDetails) {
-		// 1. 로그인 정보로부터 요청자 ID 추출
-		UUID requestUserId = moplUserDetails.getUserId();
-
+	public void deleteFollow(
+		UUID followId,
+		UUID requestUserId
+	) {
 		log.info("[FOLLOW_DELETE] 팔로우 취소 시작: followId={}", followId);
 
-		// 2. 유효성 검증: 팔로우 존재
+		// 1. 유효성 검증: 팔로우 존재
 		Follow targetFollow = getFollowEntityOrThrow(followId);
 
-		// 3. 유효성 검증: 팔로우 소유자
+		// 2. 유효성 검증: 팔로우 소유자
 		validateFollowOwner(targetFollow, requestUserId);
 
-		// 4. 팔로우 삭제 (Hard Delete)
+		// 3. 팔로우 삭제 (Hard Delete)
 		followRepository.delete(targetFollow);
 
 		log.info("[FOLLOW_DELETE] 팔로우 취소 완료: followId={}", followId);
