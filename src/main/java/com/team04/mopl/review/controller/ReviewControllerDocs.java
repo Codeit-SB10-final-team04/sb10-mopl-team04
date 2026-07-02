@@ -20,4 +20,7 @@ public interface ReviewControllerDocs {
 	@Operation(summary = "리뷰 수정")
 	ResponseEntity<ReviewDto> updateReview(UUID reviewId, ReviewUpdateRequest reviewUpdateRequest,
 		MoplUserDetails moplUserDetails);
+
+	@Operation(summary = "리뷰 삭제")
+	ResponseEntity<Void> deleteReview(UUID reviewId, MoplUserDetails moplUserDetails);
 }
