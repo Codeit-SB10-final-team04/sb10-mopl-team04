@@ -15,7 +15,7 @@ import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.entity.PlaylistContent;
-import com.team04.mopl.playlist.event.PlaylistContentAddEvent;
+import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
 import com.team04.mopl.playlist.exception.PlaylistErrorCode;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.repository.PlaylistContentRepository;
@@ -67,7 +67,7 @@ public class PlaylistContentService {
 
 			// 이벤트 발행
 			applicationEventPublisher.publishEvent(
-				PlaylistContentAddEvent.of(
+				PlaylistContentAddedEvent.of(
 					playlist.getId(),
 					playlist.getTitle(),
 					playlist.getOwner().getId(),

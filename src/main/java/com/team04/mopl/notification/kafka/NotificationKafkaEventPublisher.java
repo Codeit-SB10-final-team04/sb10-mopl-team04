@@ -10,7 +10,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.notification.kafka.exception.KafkaEventErrorCode;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
-import com.team04.mopl.playlist.event.PlaylistContentAddEvent;
+import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
 import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
 
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ public class NotificationKafkaEventPublisher {
 
 	@Async("eventTaskExecutor")
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-	public void publishPlaylistContentAddEvent(PlaylistContentAddEvent event) {
+	public void publishPlaylistContentAddEvent(PlaylistContentAddedEvent event) {
 		// PlaylistContentAddEvent를 String으로 변환 후 payload 변수에 할당
 		sendEvent(NotificationKafkaTopics.PLAYLIST_CONTENT_ADD, event);
 	}

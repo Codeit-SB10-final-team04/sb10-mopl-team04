@@ -15,7 +15,7 @@ import com.team04.mopl.notification.enums.NotificationType;
 import com.team04.mopl.notification.kafka.exception.KafkaEventErrorCode;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
 import com.team04.mopl.notification.service.NotificationService;
-import com.team04.mopl.playlist.event.PlaylistContentAddEvent;
+import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
 import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
@@ -66,7 +66,7 @@ public class NotificationKafkaEventConsumer {
 	// 구독 중인 플레이리스트에 콘텐츠가 추가되면 해당 플레이리스트 구독자에게 알림을 보내는 listener
 	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_CONTENT_ADD)
 	public void consumePlaylistContentAddEvent(String kafkaEvent) {
-		PlaylistContentAddEvent event = deserialize(kafkaEvent, PlaylistContentAddEvent.class);
+		PlaylistContentAddedEvent event = deserialize(kafkaEvent, PlaylistContentAddedEvent.class);
 
 		// title
 		String title = "새 콘텐츠가 추가 알림";
