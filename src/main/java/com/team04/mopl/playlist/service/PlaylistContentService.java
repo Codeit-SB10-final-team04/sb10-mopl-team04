@@ -3,6 +3,7 @@ package com.team04.mopl.playlist.service;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.entity.PlaylistContent;
+import com.team04.mopl.playlist.event.PlaylistContentAddEvent;
 import com.team04.mopl.playlist.exception.PlaylistErrorCode;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.repository.PlaylistContentRepository;
@@ -30,6 +32,8 @@ public class PlaylistContentService {
 	private final ContentRepository contentRepository;
 	private final PlaylistRepository playlistRepository;
 	private final PlaylistContentRepository playlistContentRepository;
+
+	private final ApplicationEventPublisher applicationEventPublisher;
 
 	@PreAuthorize("@playlistAuthorizationEvaluator.isOwner(#playlistId, authentication.principal)")
 	@Transactional
@@ -60,6 +64,18 @@ public class PlaylistContentService {
 
 			// 플레이리스트 updatedAt 갱신
 			playlist.touchUpdatedAt(Instant.now());
+
+			// 이벤트 발행
+			applicationEventPublisher.publishEvent(
+				PlaylistContentAddEvent.of(
+					playlist.getId(),
+					playlist.getTitle(),
+					playlist.getOwner().getId(),
+					content.getId(),
+					content.getTitle()
+				)
+			);
+
 		} catch (DataIntegrityViolationException e) {
 			// unique 제약 조건 충돌
 			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_CONTENT_ALREADY_ADD, e)
