@@ -105,7 +105,7 @@ class UserControllerTest {
 		// given
 		given(userService.create(any(UserCreateRequest.class)))
 			.willThrow(new UserException(
-				UserErrorCode.EMAIL_ALREADY_EXISTS,
+				UserErrorCode.USER_EMAIL_ALREADY_EXISTS,
 				Map.of("email", "test@test.com")
 			));
 

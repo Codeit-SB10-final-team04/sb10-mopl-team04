@@ -128,7 +128,7 @@ class UserAdminServiceTest {
 			.isInstanceOfSatisfying(UserException.class, exception ->
 				assertThat(exception)
 					.extracting("errorCode")
-					.isEqualTo(UserErrorCode.ROLE_REQUIRED)
+					.isEqualTo(UserErrorCode.USER_ROLE_REQUIRED)
 			);
 
 		verify(authSessionStore, never()).deleteByUserId(userId);

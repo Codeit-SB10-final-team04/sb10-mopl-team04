@@ -78,7 +78,7 @@ public class AdminAccountInitializer implements ApplicationRunner {
 
 		if (changed) {
 			log.info(
-				"[ADMIN_INIT] 기존 사용자를 어드민 계정으로 보정했습니다: userId={}, email={}",
+				"[ADMIN_INIT] 기존 사용자를 어드민 계정으로 보정: userId={}, email={}",
 				user.getId(),
 				maskEmail(user.getEmail())
 			);
@@ -86,7 +86,7 @@ public class AdminAccountInitializer implements ApplicationRunner {
 			return;
 		}
 
-		log.info("[ADMIN_INIT] 어드민 계정이 이미 존재합니다: email={}", maskEmail(user.getEmail()));
+		log.info("[ADMIN_INIT] 어드민 계정이 이미 존재: email={}", maskEmail(user.getEmail()));
 	}
 
 	private void createAdminAccount() {
@@ -101,7 +101,7 @@ public class AdminAccountInitializer implements ApplicationRunner {
 
 		userRepository.save(admin);
 
-		log.info("[ADMIN_INIT] 어드민 계정을 생성했습니다: email={}", maskEmail(adminEmail));
+		log.info("[ADMIN_INIT] 어드민 계정 생성: email={}", maskEmail(adminEmail));
 	}
 
 	private void validateProperties() {
