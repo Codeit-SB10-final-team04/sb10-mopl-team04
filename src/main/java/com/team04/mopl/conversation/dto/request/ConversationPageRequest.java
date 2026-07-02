@@ -21,6 +21,7 @@ public record ConversationPageRequest(
 	// 페이지 개수
 	@NotNull(message = "조회하고자 하는 대화방 개수를 입력해주세요.")
 	@Positive(message = "조회하고자 하는 대화방 개수는 양수이어야 합니다.")
+	// TODO: 상향선 지정 예정
 	Integer limit,
 
 	// 정렬 방향
@@ -32,5 +33,6 @@ public record ConversationPageRequest(
 	String sortBy
 ) {
 
+	// TODO: 기본값 설정하는 생성자 추가 예정
 	// 기본값 설정을 위한 생성자
 }
