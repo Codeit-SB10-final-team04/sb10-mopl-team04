@@ -1,13 +1,13 @@
 package com.team04.mopl.follow.controller;
 
 import static org.mockito.BDDMockito.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +16,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -33,7 +35,7 @@ import com.team04.mopl.user.exception.UserException;
 
 @WebMvcTest(
 	controllers = FollowController.class,
-	excludeFilters = @ComponentScan.Filter( // 컨트롤러 테스트에서 JWT 인증 필터 제외
+	excludeFilters = @ComponentScan.Filter(
 		type = FilterType.ASSIGNABLE_TYPE,
 		classes = JwtAuthenticationFilter.class
 	)
@@ -50,6 +52,22 @@ class FollowControllerTest {
 	@MockitoBean
 	private FollowService followService;
 
+	// 매 테스트마다 context 삭제
+	@AfterEach
+	void tearDown() {
+		SecurityContextHolder.clearContext();
+	}
+
+	// Security 대신 사용자 정보를 수동으로 context에 담는 헬퍼 메서드
+	private void mockSecurityContext(MoplUserDetails userDetails) {
+		UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+			userDetails,
+			null,
+			userDetails.getAuthorities()
+		);
+		SecurityContextHolder.getContext().setAuthentication(auth);
+	}
+
 	// 인증 객체 정보 생성
 	private MoplUserDetails createMockUser(UUID userId) {
 		return MoplUserDetails.authenticated(
@@ -61,7 +79,7 @@ class FollowControllerTest {
 
 	/*
 	=========================
-		팔로우 생성
+	   팔로우 생성
 	=========================
 	 */
 	@Test
@@ -69,16 +87,17 @@ class FollowControllerTest {
 	void createFollow_Success() throws Exception {
 		// given
 		UUID requesterUserId = UUID.randomUUID();
+		mockSecurityContext(createMockUser(requesterUserId));
+
 		UUID followeeId = UUID.randomUUID();
 
 		FollowRequest request = new FollowRequest(followeeId);
 		FollowDto responseDto = mock(FollowDto.class);
 
-		given(followService.createFollow(any(FollowRequest.class), any(MoplUserDetails.class))).willReturn(responseDto);
+		given(followService.createFollow(any(FollowRequest.class), eq(requesterUserId))).willReturn(responseDto);
 
 		// when & then
 		mockMvc.perform(post("/api/follows")
-				.with(user(createMockUser(requesterUserId)))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(request)))
 			.andDo(print())
@@ -90,12 +109,12 @@ class FollowControllerTest {
 	void createFollow_InvalidBody_Fail() throws Exception {
 		// given
 		UUID requesterUserId = UUID.randomUUID();
-		// 요청 바디 내 FolloweeId 누락
+		mockSecurityContext(createMockUser(requesterUserId));
+
 		FollowRequest invalidRequest = new FollowRequest(null);
 
 		// when & then
 		mockMvc.perform(post("/api/follows")
-				.with(user(createMockUser(requesterUserId)))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(invalidRequest)))
 			.andDo(print())
@@ -104,7 +123,7 @@ class FollowControllerTest {
 
 	/*
 	==============================
-		특정 사용자의 팔로우 여부 조회
+	   특정 사용자의 팔로우 여부 조회
 	==============================
 	 */
 	@Test
@@ -112,15 +131,16 @@ class FollowControllerTest {
 	void getFollowConnection_Success() throws Exception {
 		// given
 		UUID requesterUserId = UUID.randomUUID();
+		mockSecurityContext(createMockUser(requesterUserId));
+
 		UUID followeeId = UUID.randomUUID();
 		FollowDto responseDto = mock(FollowDto.class);
 
-		given(followService.getFollowConnection(eq(followeeId), any(MoplUserDetails.class))).willReturn(responseDto);
+		given(followService.getFollowConnection(eq(followeeId), eq(requesterUserId))).willReturn(responseDto);
 
 		// when & then
 		mockMvc.perform(get("/api/follows/followed-by-me")
 				.param("followeeId", followeeId.toString())
-				.with(user(createMockUser(requesterUserId)))
 				.accept(MediaType.APPLICATION_JSON))
 			.andDo(print())
 			.andExpect(status().isOk());
@@ -131,11 +151,10 @@ class FollowControllerTest {
 	void getFollowConnection_MissingParam_Fail() throws Exception {
 		// given
 		UUID requesterUserId = UUID.randomUUID();
+		mockSecurityContext(createMockUser(requesterUserId));
 
 		// when & then
 		mockMvc.perform(get("/api/follows/followed-by-me")
-				// param("followeeId", ...) 누락
-				.with(user(createMockUser(requesterUserId)))
 				.accept(MediaType.APPLICATION_JSON))
 			.andDo(print())
 			.andExpect(status().isBadRequest());
@@ -146,15 +165,16 @@ class FollowControllerTest {
 	void getFollowConnection_FollowNotFound_Fail() throws Exception {
 		// given
 		UUID requestUserId = UUID.randomUUID();
+		mockSecurityContext(createMockUser(requestUserId));
+
 		UUID followeeId = UUID.randomUUID();
 
-		given(followService.getFollowConnection(any(), any()))
+		given(followService.getFollowConnection(eq(followeeId), eq(requestUserId)))
 			.willThrow(new FollowException(FollowErrorCode.FOLLOW_NOT_FOUND));
 
 		// when & then
 		mockMvc.perform(get("/api/follows/followed-by-me")
 				.param("followeeId", followeeId.toString())
-				.with(user(createMockUser(requestUserId)))
 				.accept(MediaType.APPLICATION_JSON))
 			.andDo(print())
 			.andExpect(status().isNotFound())
@@ -164,7 +184,7 @@ class FollowControllerTest {
 
 	/*
 	==============================
-		특정 사용자의 팔로우 수 조회
+	   특정 사용자의 팔로우 수 조회
 	==============================
 	 */
 	@Test
@@ -172,7 +192,6 @@ class FollowControllerTest {
 	void getFollowerCount_Return200AndCount_Success() throws Exception {
 		// given
 		UUID followeeId = UUID.randomUUID();
-
 		long followerCount = 42L;
 
 		given(followService.getFollowerCount(followeeId)).willReturn(followerCount);
@@ -187,10 +206,7 @@ class FollowControllerTest {
 	@Test
 	@DisplayName("실패: 필수 파라미터(followeeId)가 누락되면 @Valid에 의해 400 Bad Request를 반환한다.")
 	void getFollowerCount_MissingFolloweeId_Return400_Fail() throws Exception {
-		// given
-
 		// when & then
-		// @NotNull 유효성 검사 실패로 인해 BindException 발생 -> 400 에러
 		mockMvc.perform(get("/api/follows/count"))
 			.andExpect(status().isBadRequest());
 	}
@@ -198,7 +214,7 @@ class FollowControllerTest {
 	@Test
 	@DisplayName("실패: 파라미터가 UUID 형식이 아니면 400 Bad Request를 반환한다.")
 	void getFollowerCount_InvalidUuidFormat_Return400_Fail() throws Exception {
-		// given: 잘못된 문자열 전송
+		// given
 		String invalidFolloweeId = "not-a-uuid-string";
 
 		// when & then
@@ -217,7 +233,6 @@ class FollowControllerTest {
 			.willThrow(new UserException(UserErrorCode.USER_NOT_FOUND));
 
 		// when & then
-		// 프로젝트 GlobalExceptionHandler 세팅에 맞게 isNotFound() 등 확인
 		mockMvc.perform(get("/api/follows/count")
 				.param("followeeId", invalidFolloweeId.toString())
 				.contentType(MediaType.APPLICATION_JSON))
@@ -226,42 +241,48 @@ class FollowControllerTest {
 
 	/*
 	=========================
-		팔로우 취소
+	   팔로우 취소
 	=========================
 	 */
 	@Test
 	@DisplayName("성공: 팔로우 삭제 요청 시 204 No Content를 반환한다.")
 	void deleteFollow_Success() throws Exception {
+		// given
 		UUID requestUserId = UUID.randomUUID();
+		mockSecurityContext(createMockUser(requestUserId));
 
-		mockMvc.perform(delete("/api/follows/{followId}", UUID.randomUUID())
-				.with(user(createMockUser(requestUserId))))
+		// when & then
+		mockMvc.perform(delete("/api/follows/{followId}", UUID.randomUUID()))
 			.andExpect(status().isNoContent());
 	}
 
 	@Test
 	@DisplayName("실패: 존재하지 않는 팔로우 삭제 시 404를 반환한다.")
 	void deleteFollow_NotFound_Fail() throws Exception {
+		// given
 		UUID requestUserId = UUID.randomUUID();
+		mockSecurityContext(createMockUser(requestUserId));
 
 		doThrow(new FollowException(FollowErrorCode.FOLLOW_NOT_FOUND))
-			.when(followService).deleteFollow(any(), any());
+			.when(followService).deleteFollow(any(UUID.class), eq(requestUserId));
 
-		mockMvc.perform(delete("/api/follows/{followId}", UUID.randomUUID())
-				.with(user(createMockUser(requestUserId))))
+		// when & then
+		mockMvc.perform(delete("/api/follows/{followId}", UUID.randomUUID()))
 			.andExpect(status().isNotFound());
 	}
 
 	@Test
 	@DisplayName("실패: 권한 없는 사용자의 팔로우 삭제 시 403을 반환한다.")
 	void deleteFollow_AccessDenied_Fail() throws Exception {
+		// given
 		UUID requestUserId = UUID.randomUUID();
+		mockSecurityContext(createMockUser(requestUserId));
 
 		doThrow(new FollowException(FollowErrorCode.FOLLOW_ACCESS_DENIED))
-			.when(followService).deleteFollow(any(), any());
+			.when(followService).deleteFollow(any(UUID.class), eq(requestUserId));
 
-		mockMvc.perform(delete("/api/follows/{followId}", UUID.randomUUID())
-				.with(user(createMockUser(requestUserId))))
+		// when & then
+		mockMvc.perform(delete("/api/follows/{followId}", UUID.randomUUID()))
 			.andExpect(status().isForbidden());
 	}
 }
