@@ -35,14 +35,14 @@ public interface ConversationMapper {
 		String sortBy,
 		String sortDirection
 	) {
-		return new CursorResponseConversationDto(
-			data,
-			nextCursor,
-			nextIdAfter,
-			hasNext,
-			totalCount,
-			sortBy,
-			sortDirection
-		);
+		return CursorResponseConversationDto.builder()
+			.data(data)
+			.nextCursor(nextCursor)
+			.nextIdAfter(nextIdAfter)
+			.hasNext(hasNext)
+			.totalCount(totalCount)
+			.sortBy(sortBy)
+			.sortDirection(sortDirection)
+			.build();
 	}
 }
