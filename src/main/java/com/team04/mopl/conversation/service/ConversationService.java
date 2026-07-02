@@ -181,10 +181,11 @@ public class ConversationService {
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 시작: keyword={}", conversationPageRequest.keywordLike());
 
 		// 1. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
-		List<Conversation> conversations = conversationRepository.searchConversation(conversationPageRequest);
+		List<Conversation> conversations = conversationRepository.searchConversation(conversationPageRequest,
+			requestUserId);
 
 		// 2. 대화 전체 개수 조회
-		Long totalCount = conversationRepository.countConversation(conversationPageRequest);
+		Long totalCount = conversationRepository.countConversation(conversationPageRequest, requestUserId);
 
 		// 3. 다음 페이지 유무 확인 및 limit 만큼 자르기
 		boolean hasNext = conversations.size() > conversationPageRequest.limit();
