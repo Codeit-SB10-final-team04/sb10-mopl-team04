@@ -3,11 +3,12 @@ package com.team04.mopl.user.service.init;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.user.entity.EmailType;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.entity.UserRole;
@@ -24,6 +25,7 @@ public class AdminAccountInitializer implements ApplicationRunner {
 
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final AuthSessionStore authSessionStore;
 
 	@Value("${mopl.admin.enabled:true}")
 	private boolean enabled;
@@ -38,23 +40,28 @@ public class AdminAccountInitializer implements ApplicationRunner {
 	private String adminName;
 
 	@Override
-	@Transactional
 	public void run(ApplicationArguments args) {
+		// ADMIN 초기화 비활성화 시
 		if (!enabled) {
 			log.info("[ADMIN_INIT] 어드민 계정 초기화 비활성화");
 
 			return;
 		}
 
+		// ADMIN 계정 설정값 검증
 		validateProperties();
 
+		// 설정된 ADMIN 이메일의 계정이 이미 존재하는지 확인
 		userRepository.findByEmail(adminEmail)
 			.ifPresentOrElse(
+				// 계정이 있다면 ADMIN 계정으로 사용할 수 있도록 보정
 				this::ensureAdminAccount,
+				// 계정이 없다면 생성
 				this::createAdminAccount
 			);
 	}
 
+	// ADMIN 계정 보정
 	private void ensureAdminAccount(User user) {
 		boolean changed = false;
 
@@ -64,21 +71,24 @@ public class AdminAccountInitializer implements ApplicationRunner {
 			changed = true;
 		}
 
-		// 어드민 계정이 잠겨 있으면 초기화 시점에 잠금 해제
+		// ADMIN 계정이 잠겨 있으면 초기화 시점에 잠금 해제
 		if (user.isLocked()) {
 			user.updateLocked(false);
 			changed = true;
 		}
 
-		// 소셜 계정처럼 비밀번호가 없는 계정이면 설정된 어드민 비밀번호 지정
+		// 소셜 계정처럼 비밀번호가 없는 계정이면 설정된 ADMIN 비밀번호 지정
 		if (!user.isPasswordLoginSupported()) {
 			user.updatePasswordHash(passwordEncoder.encode(adminPassword));
 			changed = true;
 		}
 
+		// 변경 시 DB에 반영 후 기존 인증 세션 삭제
 		if (changed) {
+			userRepository.saveAndFlush(user);
+			authSessionStore.deleteByUserId(user.getId());
 			log.info(
-				"[ADMIN_INIT] 기존 사용자를 어드민 계정으로 보정: userId={}, email={}",
+				"[ADMIN_INIT] 기존 사용자를 어드민 계정으로 보정하고 인증 세션 삭제: userId={}, email={}",
 				user.getId(),
 				maskEmail(user.getEmail())
 			);
@@ -89,6 +99,7 @@ public class AdminAccountInitializer implements ApplicationRunner {
 		log.info("[ADMIN_INIT] 어드민 계정이 이미 존재: email={}", maskEmail(user.getEmail()));
 	}
 
+	// ADMIN 계정 생성
 	private void createAdminAccount() {
 		User admin = User.builder()
 			.name(adminName)
@@ -99,11 +110,39 @@ public class AdminAccountInitializer implements ApplicationRunner {
 			.locked(false)
 			.build();
 
-		userRepository.save(admin);
+		try {
+			// 중복 생성 방지 위해 즉시 flush
+			userRepository.saveAndFlush(admin);
+		} catch (DataIntegrityViolationException exception) {
+			// 같은 이메일의 어드민 계정이 동시 생성되는 경우를 대비해 기존 계정을 조회 후 보정
+			handleConcurrentAdminCreation(exception);
+
+			return;
+		}
 
 		log.info("[ADMIN_INIT] 어드민 계정 생성: email={}", maskEmail(adminEmail));
 	}
 
+	// ADMIN 계정 동시 생성 처리
+	private void handleConcurrentAdminCreation(DataIntegrityViolationException exception) {
+		userRepository.findByEmail(adminEmail)
+			.ifPresentOrElse(
+				user -> {
+					log.info(
+						"[ADMIN_INIT] 어드민 계정 동시 생성 감지 - 기존 계정 사용: userId={}, email={}",
+						user.getId(),
+						maskEmail(user.getEmail())
+					);
+					ensureAdminAccount(user);
+				},
+				() -> {
+					log.warn("[ADMIN_INIT] 어드민 계정 생성 충돌 후 기존 계정 조회 실패: email={}", maskEmail(adminEmail));
+					throw exception;
+				}
+			);
+	}
+
+	// ADMIN 계정 설정값 검증
 	private void validateProperties() {
 		if (!StringUtils.hasText(adminEmail)) {
 			throw new IllegalStateException("어드민 이메일 설정이 없습니다.");

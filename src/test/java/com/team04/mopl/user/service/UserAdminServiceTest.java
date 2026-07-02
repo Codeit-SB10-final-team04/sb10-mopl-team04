@@ -105,9 +105,7 @@ class UserAdminServiceTest {
 		// when, then
 		assertThatThrownBy(() -> userAdminService.updateRole(userId, request))
 			.isInstanceOfSatisfying(UserException.class, exception ->
-				assertThat(exception)
-					.extracting("errorCode")
-					.isEqualTo(UserErrorCode.USER_NOT_FOUND)
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_NOT_FOUND)
 			);
 
 		verify(authSessionStore, never()).deleteByUserId(userId);
@@ -126,9 +124,7 @@ class UserAdminServiceTest {
 		// when, then
 		assertThatThrownBy(() -> userAdminService.updateRole(userId, request))
 			.isInstanceOfSatisfying(UserException.class, exception ->
-				assertThat(exception)
-					.extracting("errorCode")
-					.isEqualTo(UserErrorCode.USER_ROLE_REQUIRED)
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_ROLE_REQUIRED)
 			);
 
 		verify(authSessionStore, never()).deleteByUserId(userId);
