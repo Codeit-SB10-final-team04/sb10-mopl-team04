@@ -70,7 +70,7 @@ public class NotificationKafkaEventConsumer {
 		PlaylistContentAddedEvent event = deserialize(kafkaEvent, PlaylistContentAddedEvent.class);
 
 		// title
-		String title = "새 콘텐츠가 추가 알림";
+		String title = "새 콘텐츠 추가 알림";
 
 		// content
 		String content = String.format("[%s] 플레이리스트에 [%s] 이(가) 추가되었습니다.",
