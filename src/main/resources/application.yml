@@ -52,3 +52,8 @@ mopl:
   mail:
     from: ${MOPL_MAIL_FROM}
     from-name: ${MOPL_MAIL_FROM_NAME}
+  admin:
+    enabled: ${MOPL_ADMIN_ENABLED:true}
+    email: ${MOPL_ADMIN_EMAIL:}
+    password: ${MOPL_ADMIN_PASSWORD:}
+    name: ${MOPL_ADMIN_NAME:ADMIN}

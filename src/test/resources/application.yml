@@ -86,3 +86,5 @@ mopl:
   mail:
     from: no-reply@test.local
     from-name: MOPL_test
+  admin:
+    enabled: false
