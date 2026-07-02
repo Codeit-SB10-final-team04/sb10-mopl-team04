@@ -9,7 +9,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
 import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
@@ -55,22 +54,19 @@ public class ConversationService {
 	@PreAuthorize("#conversationCreateRequest.withUserId() != #moplUserDetails.userId")
 	public ConversationDto createConversation(
 		ConversationCreateRequest conversationCreateRequest,
-		MoplUserDetails moplUserDetails
+		UUID requestUserId
 	) {
-		// 1. 로그인 정보로부터 요청자의 ID 추출
-		UUID requestUserId = moplUserDetails.getUserId();
-
 		log.info("[CONVERSATION_CREATE] 대화 생성 시작: requestUserid={}, withUserId={}",
 			requestUserId, conversationCreateRequest.withUserId());
 
-		// 2. 유효성 검증: 요청자 및 사용자 존재 여부
+		// 1. 유효성 검증: 요청자 및 사용자 존재 여부
 		User requestUser = getUserEntityOrThrow(requestUserId);
 		User withUser = getUserEntityOrThrow(conversationCreateRequest.withUserId());
 
-		// 3. 유효성 검증: 중복 검사
+		// 2. 유효성 검증: 중복 검사
 		validateDuplicateConversation(requestUser.getId(), withUser.getId());
 
-		// 4. 대화 생성 및 저장 (try-catch문으로 동시성 방어)
+		// 3. 대화 생성 및 저장 (try-catch문으로 동시성 방어)
 		// TODO: 분산 환경에서의 동시성 이슈를 해결하기 위한 Redis 분산 락(Redisson 등) 적용 예정 (심화)
 		// 분산 락 적용 시, DB 제약조건 예외를 잡는 현재의 catch 블록은 제거 후 로직 개선
 		try {
@@ -114,20 +110,16 @@ public class ConversationService {
 	// 대화 단건 조회
 	public ConversationDto findConversationById(
 		UUID conversationId,
-		MoplUserDetails moplUserDetails
+		UUID requestUserId
 	) {
 		log.debug("[CONVERSATION_FIND] 대화 단건 조회 시작: conversationId={}", conversationId);
 
-		// 1. 로그인 정보로부터 요청자 ID 추출
-		UUID requestUserId = moplUserDetails.getUserId();
-
-		// 2. 유효성 검증: 대화 존재 여부
+		// 1. 유효성 검증: 대화 존재 여부
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
-		// 3, 유효성 검증: 대화 상대 존재 여부
+		// 2. 유효성 검증: 대화 상대 존재 여부
 		User withUser = getWithUserEntityOrThrow(conversation.getId(), requestUserId);
 
-		// 3. DTO 변환
 		return mapToConversationDto(conversation, withUser, requestUserId);
 	}
 
@@ -136,13 +128,16 @@ public class ConversationService {
 		UUID conversationId,
 		UUID requestUserId
 	) {
+		// 1. 특정 대화의 참여자 목록 조회
 		List<ConversationParticipant> participants =
 			conversationParticipantRepository.findByConversationId(conversationId);
 
+		// 2. 유효성 검증: 요청자의 대화 참여자 소속 여부
 		validateParticipants(participants, requestUserId);
 
 		return participants.stream()
 			.map(ConversationParticipant::getUser)
+			// 요청자가 아닌 대화 상대 필터링
 			.filter(user -> !user.getId().equals(requestUserId))
 			.findFirst()
 			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
@@ -151,20 +146,17 @@ public class ConversationService {
 	// 특정 사용자와의 대화 조회
 	public ConversationDto findConversationByUserId(
 		UUID userId,
-		MoplUserDetails moplUserDetails
+		UUID requestUserId
 	) {
 		log.debug("[CONVERSATION_FIND_BY_USER_ID] 특정 사용자와의 대화 조회 시작: userId={}", userId);
 
-		// 1. 로그인 정보로부터 요청자 ID 추출
-		UUID requestUserId = moplUserDetails.getUserId();
-
-		// 2. 유효성 검증: 대화 상대 존재 여부
+		// 1. 유효성 검증: 대화 상대 존재 여부
 		User withUser = getUserEntityOrThrow(userId);
 
-		// 3. 유효성 검증: 자기 자신 조회
+		// 2. 유효성 검증: 자기 자신 조회
 		validateSelfReadConversation(requestUserId, withUser.getId());
 
-		// 4. 유효성 검증: 대화 존재 유무
+		// 3. 유효성 검증: 대화 존재 유무
 		UUID conversationId = findExistingConversationId(requestUserId, withUser.getId());
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 

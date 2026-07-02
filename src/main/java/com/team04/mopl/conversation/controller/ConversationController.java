@@ -38,8 +38,10 @@ public class ConversationController implements ConversationControllerDocs {
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		ConversationDto conversationDto = conversationService.createConversation(conversationCreateRequest,
-			moplUserDetails);
+		ConversationDto conversationDto = conversationService.createConversation(
+			conversationCreateRequest,
+			moplUserDetails.getUserId()
+		);
 
 		return ResponseEntity.status(HttpStatus.CREATED).body(conversationDto);
 	}
@@ -51,7 +53,10 @@ public class ConversationController implements ConversationControllerDocs {
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		ConversationDto conversationDto = conversationService.findConversationById(conversationId, moplUserDetails);
+		ConversationDto conversationDto = conversationService.findConversationById(
+			conversationId,
+			moplUserDetails.getUserId()
+		);
 
 		return ResponseEntity.status(HttpStatus.OK).body(conversationDto);
 	}
@@ -63,7 +68,10 @@ public class ConversationController implements ConversationControllerDocs {
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		ConversationDto conversationDto = conversationService.findConversationByUserId(userId, moplUserDetails);
+		ConversationDto conversationDto = conversationService.findConversationByUserId(
+			userId,
+			moplUserDetails.getUserId()
+		);
 
 		return ResponseEntity.status(HttpStatus.OK).body(conversationDto);
 	}
@@ -76,7 +84,9 @@ public class ConversationController implements ConversationControllerDocs {
 	) {
 
 		CursorResponseConversationDto cursorResponseConversationDto = conversationService.findAll(
-			conversationPageRequest, moplUserDetails.getUserId());
+			conversationPageRequest,
+			moplUserDetails.getUserId()
+		);
 
 		return ResponseEntity.status(HttpStatus.OK).body(cursorResponseConversationDto);
 	}
