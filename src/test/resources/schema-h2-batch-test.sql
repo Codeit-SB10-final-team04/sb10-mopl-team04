@@ -43,3 +43,18 @@ CREATE TABLE IF NOT EXISTS contents
     updated_at     TIMESTAMP WITH TIME ZONE NOT NULL,
     PRIMARY KEY (id)
 );
+
+CREATE TABLE IF NOT EXISTS content_reviews
+(
+    id         UUID                     NOT NULL,
+    user_id    UUID                     NOT NULL,
+    content_id UUID                     NOT NULL,
+    text       TEXT                     NOT NULL,
+    rating     SMALLINT                 NOT NULL,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_reviews_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_reviews_content FOREIGN KEY (content_id) REFERENCES contents (id)
+);
