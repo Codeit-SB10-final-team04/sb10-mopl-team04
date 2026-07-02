@@ -1,6 +1,7 @@
 package com.team04.mopl.review.entity;
 
 import java.time.Instant;
+import java.util.Objects;
 
 import com.team04.mopl.common.entity.BaseUpdatableEntity;
 import com.team04.mopl.content.entity.Content;
@@ -55,5 +56,11 @@ public class Review extends BaseUpdatableEntity {
 		this.text = text;
 		this.rating = rating;
 		this.deletedAt = null;
+	}
+
+	public void markDeleted(Instant deletedAt) {
+		if (this.deletedAt == null) {
+			this.deletedAt = Objects.requireNonNull(deletedAt);
+		}
 	}
 }

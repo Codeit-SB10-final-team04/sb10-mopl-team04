@@ -107,4 +107,48 @@ class ReviewRatingEventListenerTest {
 
 		verify(contentRepository).refreshRatingAggregate(contentId);
 	}
+
+	// ========== handleReviewDeleted ==========
+
+	@Test
+	@DisplayName("리뷰 삭제 이벤트 수신 시 평점 재집계가 호출된다")
+	void handleReviewDeleted_success_whenDeleted() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		when(contentRepository.refreshRatingAggregate(contentId)).thenReturn(1);
+
+		// when
+		listener.handleReviewDeleted(new ReviewDeletedEvent(contentId));
+
+		// then
+		verify(contentRepository).refreshRatingAggregate(contentId);
+	}
+
+	@Test
+	@DisplayName("리뷰 삭제 이벤트 처리 시 업데이트된 행이 0이면 warn 로그만 남기고 정상 종료된다")
+	void handleReviewDeleted_warn_whenNothingUpdated() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		when(contentRepository.refreshRatingAggregate(contentId)).thenReturn(0);
+
+		// when
+		listener.handleReviewDeleted(new ReviewDeletedEvent(contentId));
+
+		// then
+		verify(contentRepository).refreshRatingAggregate(contentId);
+	}
+
+	@Test
+	@DisplayName("리뷰 삭제 이벤트 처리 시 예외 발생해도 전파하지 않는다")
+	void handleReviewDeleted_doesNotThrow_whenExceptionOccurs() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		when(contentRepository.refreshRatingAggregate(contentId))
+			.thenThrow(new RuntimeException("DB 오류"));
+
+		// when & then
+		listener.handleReviewDeleted(new ReviewDeletedEvent(contentId));
+
+		verify(contentRepository).refreshRatingAggregate(contentId);
+	}
 }

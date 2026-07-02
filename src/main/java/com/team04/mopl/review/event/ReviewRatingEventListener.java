@@ -35,6 +35,13 @@ public class ReviewRatingEventListener {
 		refreshRating(event.contentId());
 	}
 
+	@Async
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	public void handleReviewDeleted(ReviewDeletedEvent event) {
+		refreshRating(event.contentId());
+	}
+
 	private void refreshRating(UUID contentId) {
 		try {
 			int updated = contentRepository.refreshRatingAggregate(contentId);
