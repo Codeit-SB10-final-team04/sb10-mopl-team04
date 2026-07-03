@@ -3,6 +3,7 @@ package com.team04.mopl.common.exception;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.beans.BeanInstantiationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -90,6 +91,30 @@ public class GlobalExceptionHandler {
 			.body(ErrorResponse.of(
 				exception,
 				"요청 데이터 유효성 검사에 실패했습니다.",
+				details
+			));
+	}
+
+	// DTO 객체 생성 시 컴팩트 생성자에서 발생한 예외 처리
+	@ExceptionHandler(BeanInstantiationException.class)
+	public ResponseEntity<ErrorResponse> handleBeanInstantiationException(
+		BeanInstantiationException exception
+	) {
+		Map<String, String> details = new LinkedHashMap<>();
+
+		// 원본 예외 메시지 추출
+		Throwable cause = exception.getCause();
+		String errorMessage = (cause != null && cause.getMessage() != null)
+			? cause.getMessage()
+			: "요청 파라미터가 유효하지 않습니다.";
+
+		details.put("_global", errorMessage);
+
+		return ResponseEntity
+			.badRequest()
+			.body(ErrorResponse.of(
+				exception,
+				"요청 파라미터 유효성 검사에 실패했습니다.",
 				details
 			));
 	}
