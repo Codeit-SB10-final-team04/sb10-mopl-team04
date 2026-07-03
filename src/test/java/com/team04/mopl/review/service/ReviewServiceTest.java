@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,9 +22,14 @@ import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.repository.ContentRepository;
+import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.review.dto.request.ReviewCreateRequest;
+import com.team04.mopl.review.dto.request.ReviewPageRequest;
 import com.team04.mopl.review.dto.request.ReviewUpdateRequest;
+import com.team04.mopl.review.dto.response.CursorResponseReviewDto;
+import com.team04.mopl.review.dto.response.ReviewCursorPage;
 import com.team04.mopl.review.dto.response.ReviewDto;
+import com.team04.mopl.review.enums.ReviewSortBy;
 import com.team04.mopl.review.entity.Review;
 import com.team04.mopl.review.event.ReviewCreatedEvent;
 import com.team04.mopl.review.event.ReviewDeletedEvent;
@@ -55,6 +61,133 @@ class ReviewServiceTest {
 
 	@InjectMocks
 	private ReviewService reviewService;
+
+	// ========== getReviews ==========
+
+	@Test
+	@DisplayName("리뷰 목록 조회에 성공하면 CursorResponseReviewDto를 반환한다")
+	void getReviews_returnCursorResponse_whenValidRequest() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		ReviewPageRequest request = new ReviewPageRequest(
+			contentId, null, null, 20, SortDirection.DESCENDING, ReviewSortBy.createdAt
+		);
+
+		User user = mock(User.class);
+		when(user.getId()).thenReturn(UUID.randomUUID());
+
+		Review review = mock(Review.class);
+		when(review.getUser()).thenReturn(user);
+
+		ReviewCursorPage cursorPage = new ReviewCursorPage(List.of(review), false, 1L);
+		when(reviewRepository.getReviews(request)).thenReturn(cursorPage);
+
+		ReviewDto reviewDto = mock(ReviewDto.class);
+		when(reviewMapper.toDto(any(Review.class), any())).thenReturn(reviewDto);
+
+		// when
+		CursorResponseReviewDto result = reviewService.getReviews(request);
+
+		// then
+		assertThat(result.data()).hasSize(1);
+		assertThat(result.hasNext()).isFalse();
+		assertThat(result.totalCount()).isEqualTo(1L);
+		assertThat(result.nextCursor()).isNull();
+		assertThat(result.nextIdAfter()).isNull();
+	}
+
+	@Test
+	@DisplayName("다음 페이지가 있으면 nextCursor와 nextIdAfter가 설정된다")
+	void getReviews_returnNextCursor_whenHasNext() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		UUID lastReviewId = UUID.randomUUID();
+		Instant lastCreatedAt = Instant.parse("2026-07-01T12:00:00Z");
+
+		ReviewPageRequest request = new ReviewPageRequest(
+			contentId, null, null, 1, SortDirection.DESCENDING, ReviewSortBy.createdAt
+		);
+
+		User user = mock(User.class);
+		when(user.getId()).thenReturn(UUID.randomUUID());
+		when(user.getName()).thenReturn("테스트유저");
+
+		Review review = mock(Review.class);
+		when(review.getUser()).thenReturn(user);
+		when(review.getId()).thenReturn(lastReviewId);
+		when(review.getCreatedAt()).thenReturn(lastCreatedAt);
+
+		ReviewCursorPage cursorPage = new ReviewCursorPage(List.of(review), true, 5L);
+		when(reviewRepository.getReviews(request)).thenReturn(cursorPage);
+
+		ReviewDto reviewDto = mock(ReviewDto.class);
+		when(reviewMapper.toDto(any(Review.class), any())).thenReturn(reviewDto);
+
+		// when
+		CursorResponseReviewDto result = reviewService.getReviews(request);
+
+		// then
+		assertThat(result.hasNext()).isTrue();
+		assertThat(result.nextCursor()).isEqualTo(lastCreatedAt.toString());
+		assertThat(result.nextIdAfter()).isEqualTo(lastReviewId);
+	}
+
+	@Test
+	@DisplayName("rating 기준 정렬 시 nextCursor에 rating 값이 설정된다")
+	void getReviews_returnRatingCursor_whenSortByRating() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		UUID lastReviewId = UUID.randomUUID();
+
+		ReviewPageRequest request = new ReviewPageRequest(
+			contentId, null, null, 1, SortDirection.DESCENDING, ReviewSortBy.rating
+		);
+
+		User user = mock(User.class);
+		when(user.getId()).thenReturn(UUID.randomUUID());
+		when(user.getName()).thenReturn("테스트유저");
+
+		Review review = mock(Review.class);
+		when(review.getUser()).thenReturn(user);
+		when(review.getId()).thenReturn(lastReviewId);
+		when(review.getRating()).thenReturn((short)4);
+
+		ReviewCursorPage cursorPage = new ReviewCursorPage(List.of(review), true, 3L);
+		when(reviewRepository.getReviews(request)).thenReturn(cursorPage);
+
+		ReviewDto reviewDto = mock(ReviewDto.class);
+		when(reviewMapper.toDto(any(Review.class), any())).thenReturn(reviewDto);
+
+		// when
+		CursorResponseReviewDto result = reviewService.getReviews(request);
+
+		// then
+		assertThat(result.nextCursor()).isEqualTo("4");
+		assertThat(result.nextIdAfter()).isEqualTo(lastReviewId);
+	}
+
+	@Test
+	@DisplayName("조회 결과가 없으면 빈 리스트를 반환한다")
+	void getReviews_returnEmptyList_whenNoReviews() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		ReviewPageRequest request = new ReviewPageRequest(
+			contentId, null, null, 20, SortDirection.DESCENDING, ReviewSortBy.createdAt
+		);
+
+		ReviewCursorPage cursorPage = new ReviewCursorPage(List.of(), false, 0L);
+		when(reviewRepository.getReviews(request)).thenReturn(cursorPage);
+
+		// when
+		CursorResponseReviewDto result = reviewService.getReviews(request);
+
+		// then
+		assertThat(result.data()).isEmpty();
+		assertThat(result.hasNext()).isFalse();
+		assertThat(result.totalCount()).isEqualTo(0L);
+		assertThat(result.nextCursor()).isNull();
+		assertThat(result.nextIdAfter()).isNull();
+	}
 
 	// ========== createReview ==========
 
