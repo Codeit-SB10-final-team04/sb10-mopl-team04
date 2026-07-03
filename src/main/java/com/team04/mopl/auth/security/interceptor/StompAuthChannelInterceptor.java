@@ -52,7 +52,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 		Principal principal = createAuthentication(claims);
 		accessor.setUser(principal);
 
-		log.info("WebSocket 연결 인증 성공: userId={}", claims.userId());
+		log.debug("WebSocket 연결 인증 성공: userId={}", claims.userId());
 
 		return message;
 	}
@@ -61,11 +61,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 	private String resolveAccessToken(StompHeaderAccessor accessor) {
 		String authorizationHeader = accessor.getFirstNativeHeader(AUTHORIZATION_HEADER);
 
-		if (authorizationHeader == null || authorizationHeader.isBlank()) {
-			throw new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
-		}
-
-		if (!authorizationHeader.startsWith(BEARER_PREFIX)) {
+		if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
 			throw new AuthException(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN);
 		}
 
