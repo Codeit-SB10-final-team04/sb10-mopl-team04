@@ -8,4 +8,8 @@ public class ReviewException extends MoplException {
 	public ReviewException(ErrorCode errorCode) {
 		super(errorCode);
 	}
+
+	public ReviewException(ErrorCode errorCode, Throwable cause) {
+		super(errorCode, cause);
+	}
 }
