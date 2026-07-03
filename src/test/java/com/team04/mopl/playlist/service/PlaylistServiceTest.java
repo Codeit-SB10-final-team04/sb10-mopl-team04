@@ -17,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.team04.mopl.common.dto.ContentSummary;
@@ -37,6 +38,7 @@ import com.team04.mopl.playlist.dto.row.PlaylistRow;
 import com.team04.mopl.playlist.dto.row.PlaylistSubscriberCountRow;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
+import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
 import com.team04.mopl.playlist.exception.PlaylistErrorCode;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.mapper.PlaylistMapper;
@@ -67,6 +69,9 @@ class PlaylistServiceTest {
 
 	@Mock
 	private PlaylistMapper playlistMapper;
+
+	@Mock
+	private ApplicationEventPublisher applicationEventPublisher;
 
 	@InjectMocks
 	private PlaylistService playlistService;
@@ -112,15 +117,15 @@ class PlaylistServiceTest {
 
 		// then
 		assertEquals(mapperResult, result);
+		verify(userRepository).findById(currentUserId);
+		verify(applicationEventPublisher).publishEvent(any(PlaylistCreatedEvent.class));
 
 		ArgumentCaptor<Playlist> playlistCaptor = ArgumentCaptor.forClass(Playlist.class);
 		ArgumentCaptor<Long> subscriberCountCaptor = ArgumentCaptor.forClass(Long.class);
 		ArgumentCaptor<Boolean> subscribedByMeCaptor = ArgumentCaptor.forClass(Boolean.class);
 		ArgumentCaptor<List<ContentSummary>> contentCaptor = ArgumentCaptor.forClass(List.class);
 
-		verify(userRepository).findById(currentUserId);
 		verify(playlistRepository).save(playlistCaptor.capture());
-
 		verify(playlistMapper).toDto(
 			playlistCaptor.capture(),
 			any(UserSummary.class),
@@ -157,6 +162,7 @@ class PlaylistServiceTest {
 			anyBoolean(),
 			anyList()
 		);
+		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistCreateRequest.class));
 	}
 
 	@Test
