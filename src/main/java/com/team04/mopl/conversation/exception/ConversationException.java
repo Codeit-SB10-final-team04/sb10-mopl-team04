@@ -6,4 +6,8 @@ public class ConversationException extends MoplException {
 	public ConversationException(ConversationErrorCode errorCode) {
 		super(errorCode);
 	}
+
+	public ConversationException(ConversationErrorCode errorCode, Throwable cause) {
+		super(errorCode, cause);
+	}
 }
