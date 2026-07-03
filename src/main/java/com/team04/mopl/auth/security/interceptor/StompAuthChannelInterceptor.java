@@ -1,4 +1,4 @@
-package com.team04.mopl.config;
+package com.team04.mopl.auth.security.interceptor;
 
 import java.security.Principal;
 
