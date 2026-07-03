@@ -52,6 +52,9 @@ public class ReviewService {
 	private final ApplicationEventPublisher applicationEventPublisher;
 
 	public CursorResponseReviewDto getReviews(ReviewPageRequest request) {
+		log.debug("[REVIEW_LIST] 리뷰 목록 조회 시작: contentId={}, sortBy={}, sortDirection={}",
+			request.contentId(), request.sortBy(), request.sortDirection());
+
 		SortDirection sortDirection = request.sortDirection();
 		ReviewSortBy sortBy = request.sortBy();
 
@@ -84,6 +87,9 @@ public class ReviewService {
 			: null;
 
 		// 4. 커서 페이지네이션 응답 조립
+		log.debug("[REVIEW_LIST] 리뷰 목록 조회 완료: size={}, hasNext={}, totalCount={}",
+			reviewDtoList.size(), hasNext, reviewCursorPage.totalCount());
+
 		return new CursorResponseReviewDto(
 			reviewDtoList,
 			nextCursor,

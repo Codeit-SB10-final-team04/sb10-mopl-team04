@@ -196,8 +196,8 @@ public class ReviewQdslRepositoryImpl implements ReviewQdslRepository {
 	private Instant parseStringToInstant(String cursor) {
 		try {
 			return Instant.parse(cursor);
-		} catch (DateTimeParseException e) {
-			throw invalidCursorTypeException(cursor, e);
+		} catch (DateTimeParseException cause) {
+			throw invalidCursorTypeException(cursor, cause);
 		}
 	}
 
@@ -205,13 +205,13 @@ public class ReviewQdslRepositoryImpl implements ReviewQdslRepository {
 	private short parseStringToShort(String cursor) {
 		try {
 			return Short.parseShort(cursor);
-		} catch (NumberFormatException e) {
-			throw invalidCursorTypeException(cursor, e);
+		} catch (NumberFormatException cause) {
+			throw invalidCursorTypeException(cursor, cause);
 		}
 	}
 
-	private MoplException invalidCursorTypeException(Object cursor, Throwable e) {
-		return new ReviewException(ReviewErrorCode.REVIEW_INVALID_INPUT, e)
+	private MoplException invalidCursorTypeException(Object cursor, Throwable cause) {
+		return new ReviewException(ReviewErrorCode.REVIEW_INVALID_INPUT, cause)
 			.addDetail("cursor", cursor)
 			.addDetail("message", "적합하지 않은 cursor 타입입니다.");
 	}
