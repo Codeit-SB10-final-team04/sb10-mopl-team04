@@ -8,6 +8,7 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 import com.team04.mopl.auth.security.interceptor.StompAuthChannelInterceptor;
+import com.team04.mopl.common.stomp.StompErrorHandler;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,6 +36,7 @@ import lombok.RequiredArgsConstructor;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 	private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
+	private final StompErrorHandler stompErrorHandler;
 
 	// 메시지 브로커 경로 설정
 	@Override
@@ -49,12 +51,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 		registry.setApplicationDestinationPrefixes("/pub");
 	}
 
-	// WebSocket 연결 엔드포인트 등록
+	// WebSocket 연결 엔드포인트 및 에러 핸들러 등록
 	@Override
 	public void registerStompEndpoints(StompEndpointRegistry registry) {
 		registry.addEndpoint("/ws")          // 클라이언트가 WebSocket 연결할 URL
-			.setAllowedOriginPatterns("*")   // CORS 허용
+			// TODO: 운영 환경에서는 허용 Origin을 프로퍼티로 주입하여 신뢰 도메인만 허용하도록 제한 필요
+			.setAllowedOriginPatterns("*")
 			.withSockJS();                   // WebSocket 미지원 브라우저를 위한 SockJS 폴백
+
+		// STOMP 메시지 처리 중 예외 발생 시 공통 에러 포맷의 ERROR 프레임으로 변환
+		registry.setErrorHandler(stompErrorHandler);
 	}
 
 	// 클라이언트 → 서버 메시지 채널에 인증 인터셉터 등록
