@@ -343,6 +343,49 @@ class ReviewRepositoryTest {
 		assertThat(result.totalCount()).isEqualTo(0L);
 	}
 
+	@Test
+	@DisplayName("같은 rating을 가진 리뷰가 여러 개일 때 커서 페이지네이션이 중복 없이 동작한다")
+	void getReviews_noDuplicates_whenSameRatingWithCursor() {
+		// given: 동일 rating(5점) 리뷰 3개
+		UUID id1 = UUID.randomUUID();
+		UUID id2 = UUID.randomUUID();
+		UUID id3 = UUID.randomUUID();
+
+		insertReview(id1, userId, content.getId(), "리뷰A", (short)5, null);
+		insertReview(id2, userId, content.getId(), "리뷰B", (short)5, null);
+		insertReview(id3, userId, content.getId(), "리뷰C", (short)5, null);
+
+		// 첫 페이지: limit=2
+		ReviewPageRequest firstRequest = new ReviewPageRequest(
+			content.getId(), null, null, 2, SortDirection.DESCENDING, ReviewSortBy.rating
+		);
+		ReviewCursorPage firstPage = reviewRepository.getReviews(firstRequest);
+
+		assertThat(firstPage.reviewList()).hasSize(2);
+		assertThat(firstPage.hasNext()).isTrue();
+
+		// 두번째 페이지: 첫 페이지 마지막 리뷰의 rating과 id를 커서로 사용
+		Review lastReview = firstPage.reviewList().get(1);
+		ReviewPageRequest secondRequest = new ReviewPageRequest(
+			content.getId(),
+			String.valueOf(lastReview.getRating()),
+			lastReview.getId(),
+			2,
+			SortDirection.DESCENDING,
+			ReviewSortBy.rating
+		);
+		ReviewCursorPage secondPage = reviewRepository.getReviews(secondRequest);
+
+		// then: 두 페이지 합쳐서 3개, 중복 없음
+		assertThat(secondPage.reviewList()).hasSize(1);
+		assertThat(secondPage.hasNext()).isFalse();
+
+		List<UUID> allIds = new java.util.ArrayList<>();
+		firstPage.reviewList().forEach(r -> allIds.add(r.getId()));
+		secondPage.reviewList().forEach(r -> allIds.add(r.getId()));
+		assertThat(allIds).hasSize(3).doesNotHaveDuplicates();
+	}
+
 	private void insertReview(UUID id, UUID userId, UUID contentId, String text, short rating, Instant deletedAt) {
 		jdbcTemplate.update("""
 				INSERT INTO content_reviews (id, user_id, content_id, text, rating, deleted_at, created_at, updated_at)
