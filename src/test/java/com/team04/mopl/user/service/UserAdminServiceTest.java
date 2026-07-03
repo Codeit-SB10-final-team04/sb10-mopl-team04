@@ -6,6 +6,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,9 +20,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.team04.mopl.auth.session.AuthSessionStore;
+import com.team04.mopl.common.enums.SortDirection;
+import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
+import com.team04.mopl.user.dto.response.CursorResponseUserDto;
+import com.team04.mopl.user.dto.response.UserCursorPage;
+import com.team04.mopl.user.dto.response.UserDto;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.enums.UserSortBy;
 import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
@@ -38,6 +46,128 @@ class UserAdminServiceTest {
 
 	@InjectMocks
 	private UserAdminService userAdminService;
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 결과를 커서 응답으로 반환한다")
+	void findUsers_returnCursorResponse_whenUsersExist() {
+		// given
+		UUID userId1 = UUID.randomUUID();
+		UUID userId2 = UUID.randomUUID();
+		Instant createdAt1 = Instant.parse("2026-07-01T00:00:00Z");
+		Instant createdAt2 = Instant.parse("2026-07-02T00:00:00Z");
+		UserPageRequest request = new UserPageRequest(
+			"test",
+			UserRole.USER,
+			false,
+			null,
+			null,
+			2,
+			SortDirection.ASCENDING,
+			UserSortBy.name
+		);
+		UserDto user1 = new UserDto(
+			userId1,
+			createdAt1,
+			"alpha@test.com",
+			"Alpha",
+			null,
+			UserRole.USER,
+			false
+		);
+		UserDto user2 = new UserDto(
+			userId2,
+			createdAt2,
+			"bravo@test.com",
+			"Bravo",
+			null,
+			UserRole.USER,
+			false
+		);
+
+		when(userRepository.findUsers(request))
+			.thenReturn(new UserCursorPage(List.of(user1, user2), true, 3L));
+
+		// when
+		CursorResponseUserDto result = userAdminService.findUsers(request);
+
+		// then
+		assertThat(result.data()).containsExactly(user1, user2);
+		assertThat(result.hasNext()).isTrue();
+		assertThat(result.nextCursor()).isEqualTo("Bravo");
+		assertThat(result.nextIdAfter()).isEqualTo(userId2);
+		assertThat(result.totalCount()).isEqualTo(3L);
+		assertThat(result.sortBy()).isEqualTo("name");
+		assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING);
+		verify(userRepository).findUsers(request);
+	}
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 결과가 마지막 페이지이면 다음 커서를 반환하지 않는다")
+	void findUsers_returnCursorResponseWithoutNextCursor_whenLastPage() {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant createdAt = Instant.parse("2026-07-02T00:00:00Z");
+		UserPageRequest request = new UserPageRequest(
+			null,
+			null,
+			null,
+			null,
+			null,
+			20,
+			SortDirection.DESCENDING,
+			UserSortBy.createdAt
+		);
+		UserDto user = new UserDto(
+			userId,
+			createdAt,
+			"admin@test.com",
+			"관리자",
+			"https://example.com/admin.png",
+			UserRole.ADMIN,
+			true
+		);
+
+		when(userRepository.findUsers(request))
+			.thenReturn(new UserCursorPage(List.of(user), false, 1L));
+
+		// when
+		CursorResponseUserDto result = userAdminService.findUsers(request);
+
+		// then
+		assertThat(result.data()).containsExactly(user);
+		assertThat(result.hasNext()).isFalse();
+		assertThat(result.nextCursor()).isNull();
+		assertThat(result.nextIdAfter()).isNull();
+		assertThat(result.totalCount()).isEqualTo(1L);
+		assertThat(result.sortBy()).isEqualTo("createdAt");
+		assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING);
+		verify(userRepository).findUsers(request);
+	}
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 중 저장소 예외가 발생하면 예외를 그대로 전달한다")
+	void findUsers_throwUserException_whenRepositoryThrowsException() {
+		// given
+		UserPageRequest request = new UserPageRequest(
+			null,
+			null,
+			null,
+			"invalid-cursor",
+			UUID.randomUUID(),
+			20,
+			SortDirection.ASCENDING,
+			UserSortBy.createdAt
+		);
+		UserException exception = new UserException(UserErrorCode.USER_INVALID_CURSOR);
+
+		when(userRepository.findUsers(request)).thenThrow(exception);
+
+		// when, then
+		assertThatThrownBy(() -> userAdminService.findUsers(request))
+			.isSameAs(exception);
+
+		verify(userRepository).findUsers(request);
+	}
 
 	@Test
 	@DisplayName("사용자 권한을 USER에서 ADMIN으로 변경하면 인증 세션을 삭제한다")
