@@ -407,7 +407,10 @@ public class ConversationService {
 			.collect(
 				Collectors.toMap(
 					latestMessage -> latestMessage.getConversation().getId(),
-					latestMessage -> latestMessage)
+					latestMessage -> latestMessage,
+					// 두 개 이상의 메시시의 생성 시간이 같은 경우, 기존값을 유지하여 DuplicationKeyException 방지
+					(existing, replacement) -> existing
+				)
 			);
 	}
 

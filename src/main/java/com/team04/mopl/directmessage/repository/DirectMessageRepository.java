@@ -21,11 +21,11 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
 
 	// 최근 메시지 다건 조회: 대화 ID 목록에 해당하는 대화방의 마지막 메시지 조회
 	@Query("SELECT dm FROM DirectMessage dm "
-		+ "WHERE dm.id IN ("
-		+ "    SELECT MAX(dm2.id) FROM DirectMessage dm2 "
-		+ "    WHERE dm2.conversation.id IN :conversationIds "
-		+ "    GROUP BY dm2.conversation.id"
-		+ ")")
+		+ "WHERE dm.createdAt = ("
+		+ "    SELECT MAX(dm2.createdAt) FROM DirectMessage dm2 "
+		+ "    WHERE dm2.conversation.id = dm.conversation.id"
+		+ ") "
+		+ "AND dm.conversation.id IN :conversationIds")
 	List<DirectMessage> findLatestMessagesByConversationIds(@Param("conversationIds") List<UUID> conversationIds);
 
 	// 안 읽음 여부 다건 조회: 대화 ID 목록에 대당하는 대화방의 안 읽음 여부 조회
