@@ -33,13 +33,7 @@ public class UserAdminService {
 
 		log.info("[USER_ROLE_UPDATE] 사용자 권한 수정 시작: userId={}, newRole={}", userId, newRole);
 
-		// 권한을 변경할 대상 사용자 조회
-		User user = userRepository.findById(userId)
-			.orElseThrow(() -> new UserException(
-				UserErrorCode.USER_NOT_FOUND,
-				Map.of("userId", userId)
-			));
-
+		User user = getUserOrThrow(userId);
 		UserRole previousRole = user.getRole();
 
 		// 같은 권한으로 요청한 경우 DB 변경 및 세션 삭제 없이 종료
@@ -61,5 +55,14 @@ public class UserAdminService {
 			previousRole,
 			newRole
 		);
+	}
+
+	// 관리자 기능에서 사용할 사용자 조회
+	private User getUserOrThrow(UUID userId) {
+		return userRepository.findById(userId)
+			.orElseThrow(() -> new UserException(
+				UserErrorCode.USER_NOT_FOUND,
+				Map.of("userId", userId)
+			));
 	}
 }
