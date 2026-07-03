@@ -6,6 +6,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.util.StringUtils;
 
 import com.team04.mopl.auth.session.AuthSessionStore;
@@ -26,6 +27,7 @@ public class AdminAccountInitializer implements ApplicationRunner {
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final AuthSessionStore authSessionStore;
+	private final TransactionOperations transactionOperations;
 
 	@Value("${mopl.admin.enabled:true}")
 	private boolean enabled;
@@ -51,6 +53,17 @@ public class AdminAccountInitializer implements ApplicationRunner {
 		// ADMIN 계정 설정값 검증
 		validateProperties();
 
+		try {
+			// ADMIN 계정 생성/보정 작업을 하나의 트랜잭션으로 처리
+			transactionOperations.executeWithoutResult(status -> initializeAdminAccount());
+		} catch (DataIntegrityViolationException exception) {
+			// 동시 생성 충돌 시 별도 트랜잭션에서 기존 ADMIN 계정을 다시 조회해 보정
+			transactionOperations.executeWithoutResult(status -> handleConcurrentAdminCreation(exception));
+		}
+	}
+
+	// ADMIN 계정 초기화
+	private void initializeAdminAccount() {
 		// 설정된 ADMIN 이메일의 계정이 이미 존재하는지 확인
 		userRepository.findByEmail(adminEmail)
 			.ifPresentOrElse(
@@ -110,21 +123,15 @@ public class AdminAccountInitializer implements ApplicationRunner {
 			.locked(false)
 			.build();
 
-		try {
-			// 중복 생성 방지 위해 즉시 flush
-			userRepository.saveAndFlush(admin);
-		} catch (DataIntegrityViolationException exception) {
-			// 같은 이메일의 어드민 계정이 동시 생성되는 경우를 대비해 기존 계정을 조회 후 보정
-			handleConcurrentAdminCreation(exception);
-
-			return;
-		}
+		// 중복 생성 방지 위해 즉시 flush
+		userRepository.saveAndFlush(admin);
 
 		log.info("[ADMIN_INIT] 어드민 계정 생성: email={}", maskEmail(adminEmail));
 	}
 
 	// ADMIN 계정 동시 생성 처리
 	private void handleConcurrentAdminCreation(DataIntegrityViolationException exception) {
+		// 생성된 ADMIN 계정 조회 후 만들어져있는 계정 사용
 		userRepository.findByEmail(adminEmail)
 			.ifPresentOrElse(
 				user -> {

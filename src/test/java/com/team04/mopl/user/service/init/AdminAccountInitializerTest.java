@@ -3,6 +3,8 @@ package com.team04.mopl.user.service.init;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -11,7 +13,9 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +27,8 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionOperations;
 
 import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.user.entity.User;
@@ -47,10 +53,23 @@ class AdminAccountInitializerTest {
 	private AuthSessionStore authSessionStore;
 
 	@Mock
+	private TransactionOperations transactionOperations;
+
+	@Mock
 	private ApplicationArguments applicationArguments;
 
 	@InjectMocks
 	private AdminAccountInitializer adminAccountInitializer;
+
+	@BeforeEach
+	void setUp() {
+		lenient().doAnswer(invocation -> {
+			Consumer<TransactionStatus> action = invocation.getArgument(0);
+			action.accept(null);
+
+			return null;
+		}).when(transactionOperations).executeWithoutResult(any());
+	}
 
 	@Test
 	@DisplayName("어드민 초기화가 비활성화되어 있으면 아무 작업도 하지 않는다")
@@ -65,6 +84,7 @@ class AdminAccountInitializerTest {
 		verifyNoInteractions(userRepository);
 		verifyNoInteractions(passwordEncoder);
 		verifyNoInteractions(authSessionStore);
+		verifyNoInteractions(transactionOperations);
 	}
 
 	@Test
