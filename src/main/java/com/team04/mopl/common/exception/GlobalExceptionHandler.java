@@ -108,7 +108,7 @@ public class GlobalExceptionHandler {
 			cause != null ? cause.getClass().getSimpleName() : "unknown", exception);
 
 		// 검증 목적으로 던진 예외인 경우에만 상세 정보 추가
-		if (cause instanceof IllegalArgumentException) {
+		if (cause instanceof IllegalArgumentException || cause instanceof MoplException) {
 			mergeDetail(
 				details,
 				"_global",
