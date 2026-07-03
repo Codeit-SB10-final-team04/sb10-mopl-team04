@@ -6,6 +6,7 @@ import static com.team04.mopl.conversation.entity.QConversationParticipant.*;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.util.StringUtils;
@@ -61,7 +62,7 @@ public class ConversationQdslRepositoryImpl implements ConversationQdslRepositor
 		ConversationPageRequest request,
 		UUID requestUserId
 	) {
-		return queryFactory
+		Long count = queryFactory
 			.select(conversation.count())
 			.from(conversationParticipant)
 			.join(conversationParticipant.conversation, conversation)
@@ -72,11 +73,17 @@ public class ConversationQdslRepositoryImpl implements ConversationQdslRepositor
 				containsKeyword(request.keywordLike(), requestUserId)
 			)
 			.fetchOne();
+
+		// NPE 방지를 위해 기본값으로 0 반환
+		return Optional.ofNullable(count).orElse(0L);
 	}
 
 	// 필터링: 대화 상대 닉네임 or 메시지 내용 내 검색어 (keyword) 포함 여부
-	private BooleanExpression containsKeyword(String keyword, UUID requestUserId) {
-		// 1. 키워드가 공백인 경우, 빈 객체 반환
+	private BooleanExpression containsKeyword(
+		String keyword,
+		UUID requestUserId
+	) {
+		// 키워드가 공백인 경우, 빈 객체 반환
 		if (!StringUtils.hasText(keyword)) {
 			return null;
 		}
@@ -113,7 +120,11 @@ public class ConversationQdslRepositoryImpl implements ConversationQdslRepositor
 	}
 
 	// 커서 페이지네이션
-	private BooleanExpression cursorCondition(String cursor, UUID idAfter, SortDirection sortDirection) {
+	private BooleanExpression cursorCondition(
+		String cursor,
+		UUID idAfter,
+		SortDirection sortDirection
+	) {
 		// 첫 페이지 요청이거나 커서값이 공백인 경우, 빈 객체 반환
 		if (!StringUtils.hasText(cursor) || idAfter == null) {
 			return null;
@@ -146,6 +157,9 @@ public class ConversationQdslRepositoryImpl implements ConversationQdslRepositor
 
 	// 정렬
 	private OrderSpecifier<?>[] createOrderSpecifier(ConversationPageRequest request) {
+		// 유효성 검증: 정렬 기준 일치 여부
+		validateSortBy(request.sortBy());
+
 		// 기본값 (내림차순)
 		Order direction = request.sortDirection() == SortDirection.DESCENDING
 			? Order.DESC
@@ -157,5 +171,13 @@ public class ConversationQdslRepositoryImpl implements ConversationQdslRepositor
 			// 2순위 정렬: 생성 시간이 똑같을 경우, ID 기준 정렬
 			new OrderSpecifier<>(direction, conversation.id)
 		};
+	}
+
+	// 유효성 검증: 정렬 기준 일치 여부
+	private void validateSortBy(String sortBy) {
+		if (!"createdAt".equals(sortBy)) {
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT)
+				.addDetail("sortBy", sortBy);
+		}
 	}
 }
