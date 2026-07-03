@@ -4,6 +4,7 @@ import static com.team04.mopl.conversation.entity.QConversation.*;
 import static com.team04.mopl.conversation.entity.QConversationParticipant.*;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,6 +19,8 @@ import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.entity.Conversation;
 import com.team04.mopl.conversation.entity.QConversationParticipant;
+import com.team04.mopl.conversation.exception.ConversationErrorCode;
+import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.directmessage.entity.QDirectMessage;
 
 import lombok.RequiredArgsConstructor;
@@ -117,7 +120,7 @@ public class ConversationQdslRepositoryImpl implements ConversationQdslRepositor
 		}
 
 		// 마지막 요소의 커서값 (생성 시간)
-		Instant cursorTime = Instant.parse(cursor);
+		Instant cursorTime = parseCursorToInstant(cursor);
 
 		if (sortDirection == SortDirection.DESCENDING) {
 			// 내림차순 정렬: 마지막 요소보다 생성 시간이 과거이거나, 생성 시간은 같고 ID 값이 작은 대화
@@ -127,6 +130,17 @@ public class ConversationQdslRepositoryImpl implements ConversationQdslRepositor
 			// 오름차순 정렬: 마지막 요소보다 생성 시간이 미래이거나, 생성 시간은 같고 ID 값이 큰 대화
 			return conversation.createdAt.gt(cursorTime)
 				.or(conversation.createdAt.eq(cursorTime).and(conversation.id.gt(idAfter)));
+		}
+	}
+
+	// 커서 변환
+	private Instant parseCursorToInstant(String cursor) {
+		try {
+			return Instant.parse(cursor);
+		} catch (DateTimeParseException e) {
+			// 커서 값이 잘못된 형태인 경우, 예외 발생
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT)
+				.addDetail("invalidCursor", cursor);
 		}
 	}
 
