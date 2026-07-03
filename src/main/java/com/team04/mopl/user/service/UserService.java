@@ -38,7 +38,7 @@ public class UserService {
 			log.warn("[USER_CREATE] 회원가입 실패 - 이미 사용 중인 이메일: email={}", maskedEmail);
 
 			throw new UserException(
-				UserErrorCode.EMAIL_ALREADY_EXISTS,
+				UserErrorCode.USER_EMAIL_ALREADY_EXISTS,
 				Map.of("email", request.email())
 			);
 		}
@@ -62,7 +62,7 @@ public class UserService {
 
 			// 이미 사용 중인 이메일 예외
 			throw new UserException(
-				UserErrorCode.EMAIL_ALREADY_EXISTS,
+				UserErrorCode.USER_EMAIL_ALREADY_EXISTS,
 				Map.of("email", request.email())
 			);
 		}

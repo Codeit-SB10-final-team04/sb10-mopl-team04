@@ -74,19 +74,19 @@ public class SocialAccount extends BaseEntity {
 
 	private static void validateUser(User user) {
 		if (user == null) {
-			throw new UserException(UserErrorCode.SOCIAL_ACCOUNT_USER_REQUIRED);
+			throw new UserException(UserErrorCode.USER_SOCIAL_ACCOUNT_USER_REQUIRED);
 		}
 	}
 
 	private static void validateProvider(SocialProvider provider) {
 		if (provider == null) {
-			throw new UserException(UserErrorCode.SOCIAL_PROVIDER_REQUIRED);
+			throw new UserException(UserErrorCode.USER_SOCIAL_PROVIDER_REQUIRED);
 		}
 	}
 
 	private static void validateProviderUserId(String providerUserId) {
 		if (providerUserId == null || providerUserId.isBlank()) {
-			throw new UserException(UserErrorCode.SOCIAL_PROVIDER_USER_ID_REQUIRED);
+			throw new UserException(UserErrorCode.USER_SOCIAL_PROVIDER_USER_ID_REQUIRED);
 		}
 	}
 }

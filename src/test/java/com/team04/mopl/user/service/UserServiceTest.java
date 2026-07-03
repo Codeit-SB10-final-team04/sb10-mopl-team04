@@ -122,7 +122,7 @@ class UserServiceTest {
 		// then
 		assertThatThrownBy(action)
 			.isInstanceOfSatisfying(UserException.class, exception -> {
-				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.EMAIL_ALREADY_EXISTS);
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_EMAIL_ALREADY_EXISTS);
 				assertThat(exception.getDetails()).containsEntry("email", request.email());
 			});
 
@@ -157,7 +157,7 @@ class UserServiceTest {
 		// then
 		assertThatThrownBy(action)
 			.isInstanceOfSatisfying(UserException.class, exception -> {
-				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.EMAIL_ALREADY_EXISTS);
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_EMAIL_ALREADY_EXISTS);
 				assertThat(exception.getDetails()).containsEntry("email", request.email());
 			});
 

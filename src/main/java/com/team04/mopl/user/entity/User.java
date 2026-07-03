@@ -125,25 +125,25 @@ public class User extends BaseUpdatableEntity {
 
 	private static void validateName(String name) {
 		if (name == null || name.isBlank()) {
-			throw new UserException(UserErrorCode.NAME_REQUIRED);
+			throw new UserException(UserErrorCode.USER_NAME_REQUIRED);
 		}
 	}
 
 	private static void validateEmail(String email) {
 		if (email == null || email.isBlank()) {
-			throw new UserException(UserErrorCode.EMAIL_REQUIRED);
+			throw new UserException(UserErrorCode.USER_EMAIL_REQUIRED);
 		}
 	}
 
 	private static void validatePasswordHash(String passwordHash) {
 		if (passwordHash == null || passwordHash.isBlank()) {
-			throw new UserException(UserErrorCode.PASSWORD_REQUIRED);
+			throw new UserException(UserErrorCode.USER_PASSWORD_REQUIRED);
 		}
 	}
 
 	private static void validateRole(UserRole role) {
 		if (role == null) {
-			throw new UserException(UserErrorCode.ROLE_REQUIRED);
+			throw new UserException(UserErrorCode.USER_ROLE_REQUIRED);
 		}
 	}
 }
