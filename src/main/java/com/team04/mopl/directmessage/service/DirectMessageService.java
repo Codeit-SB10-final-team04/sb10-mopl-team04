@@ -10,6 +10,8 @@ import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
+import com.team04.mopl.directmessage.dto.request.DirectMessagePagedRequest;
+import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
@@ -28,6 +30,7 @@ public class DirectMessageService {
 	private final ConversationRepository conversationRepository;
 	private final ConversationParticipantRepository conversationParticipantRepository;
 
+	// DM 읽음 상태 생성
 	@Transactional
 	public void markAsRead(UUID conversationId, UUID directMessageId, UUID requestUserId) {
 		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 시작: conversationId={}, directMessageId={}", conversationId,
@@ -53,6 +56,15 @@ public class DirectMessageService {
 
 		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}",
 			conversationId, directMessageId);
+	}
+
+	// DM 목록 조회
+	public CursorResponseDirectMessageDto findAll(
+		UUID conversationId,
+		DirectMessagePagedRequest directMessagePagedRequest,
+		UUID userId
+	) {
+
 	}
 
 	// 유효성 검증: 해당 대화 내 DM 존재 유무
