@@ -151,6 +151,64 @@ class ConversationQdslRepositoryImplTest {
 	}
 
 	@Test
+	@DisplayName("성공: 커서 값만 전달되고 idAfter가 null이면 첫 페이지 조회처럼 동작한다.")
+	void searchConversation_OnlyCursorProvided_Success() {
+		// given
+		User requestUser = createUser("requestUser");
+		Conversation conv1 = em.persist(Conversation.create());
+		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
+
+		em.flush();
+		em.clear();
+
+		// cursor는 있지만 idAfter가 null인 경우
+		ConversationPageRequest request = new ConversationPageRequest(
+			null,
+			conv1.getCreatedAt().toString(),
+			null,
+			10,
+			SortDirection.DESCENDING,
+			"createdAt"
+		);
+
+		// when
+		List<Conversation> result = conversationRepository.searchConversation(request, requestUser.getId());
+
+		// then
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getId()).isEqualTo(conv1.getId());
+	}
+
+	@Test
+	@DisplayName("성공: idAfter만 전달되고 커서 값이 null이면 첫 페이지 조회처럼 동작한다.")
+	void searchConversation_OnlyIdAfterProvided_Success() {
+		// given
+		User requestUser = createUser("requestUser");
+		Conversation conv1 = em.persist(Conversation.create());
+		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
+
+		em.flush();
+		em.clear();
+
+		// idAfter는 있지만 cursor가 null인 경우
+		ConversationPageRequest request = new ConversationPageRequest(
+			null,
+			null,
+			conv1.getId(),
+			10,
+			SortDirection.DESCENDING,
+			"createdAt"
+		);
+
+		// when
+		List<Conversation> result = conversationRepository.searchConversation(request, requestUser.getId());
+
+		// then
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getId()).isEqualTo(conv1.getId());
+	}
+
+	@Test
 	@DisplayName("성공: 대화 상대의 닉네임에 검색어가 포함되어 있으면 해당 대화를 반환한다.")
 	void searchConversation_SearchByOpponentName_Success() {
 		// given
