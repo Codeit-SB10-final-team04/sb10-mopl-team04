@@ -3,6 +3,7 @@ package com.team04.mopl.user.service;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,6 +11,7 @@ import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.event.UserRoleChangedEvent;
 import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
@@ -25,6 +27,8 @@ public class UserAdminService {
 
 	private final UserRepository userRepository;
 	private final AuthSessionStore authSessionStore;
+
+	private final ApplicationEventPublisher applicationEventPublisher;
 
 	// 관리자 권한 수정
 	@Transactional
@@ -43,11 +47,14 @@ public class UserAdminService {
 			return;
 		}
 
-		// TODO: 알림 이벤트 발행
 		user.updateRole(newRole);
 
 		// 권한이 바뀐 사용자의 기존 인증 세션 삭제
 		authSessionStore.deleteByUserId(userId);
+
+		applicationEventPublisher.publishEvent(
+			UserRoleChangedEvent.of(userId, previousRole, newRole)
+		);
 
 		log.info(
 			"[USER_ROLE_UPDATE] 사용자 권한 수정 및 인증 세션 삭제 완료: userId={}, previousRole={}, newRole={}",
