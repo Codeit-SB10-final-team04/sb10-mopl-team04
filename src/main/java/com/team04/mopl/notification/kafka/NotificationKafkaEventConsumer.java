@@ -21,13 +21,13 @@ import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
 import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
 import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
+import com.team04.mopl.sse.service.SseService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 // Kafka topic을 구독해서 알림 저장/전송하는 listener
-// TODO: SSE를 이용해 서버에서 실시간 알림 전송 구현 예정
-// TODO: 지금은 DB에 저장까지만
+// SSE를 이용해 서버에서 실시간 알림 전송
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -37,6 +37,7 @@ public class NotificationKafkaEventConsumer {
 	private final FollowRepository followRepository;
 
 	private final NotificationService notificationService;
+	private final SseService sseService;
 
 	private final ObjectMapper objectMapper;
 
@@ -54,7 +55,7 @@ public class NotificationKafkaEventConsumer {
 			event.playlistTitle()
 		);
 
-		// 알림 저장 및 TODO: SSE 전송
+		// 알림 저장 및 SSE 전송
 		sendNotification(
 			Set.of(event.playlistOwnerId()),
 			title,
@@ -82,7 +83,7 @@ public class NotificationKafkaEventConsumer {
 		Set<UUID> subscriberIds = playlistSubscriptionRepository
 			.findSubscriberIdsByPlaylistId(event.playlistId());
 
-		// 알림 저장 및 TODO: SSE 전송
+		// 알림 저장 및 SSE 전송
 		sendNotification(
 			subscriberIds,
 			title,
@@ -103,7 +104,7 @@ public class NotificationKafkaEventConsumer {
 		// content
 		String content = String.format("[%s] 님이 팔로우했습니다.", event.followerName());
 
-		// 알림 저장 및 TODO: SSE 전송
+		// 알림 저장 및 SSE 전송
 		sendNotification(
 			Set.of(event.followeeId()),
 			title,
@@ -131,6 +132,7 @@ public class NotificationKafkaEventConsumer {
 		Set<UUID> followerIds = followRepository
 			.findFollowerIdsByFolloweeId(event.playlistOwnerId());
 
+		// 알림 저장 및 SSE 전송
 		sendNotification(
 			followerIds,
 			title,
@@ -166,6 +168,14 @@ public class NotificationKafkaEventConsumer {
 			level
 		);
 
-		// TODO: SSE로 알림 전송
+		// SSE로 알림 전송
+		for (NotificationDto notificationDto : notificationDtoList) {
+			sseService.sendToReceiver(
+				notificationDto.receiverId(),
+				notificationDto.id(),
+				"notifications",
+				notificationDto
+			);
+		}
 	}
 }
