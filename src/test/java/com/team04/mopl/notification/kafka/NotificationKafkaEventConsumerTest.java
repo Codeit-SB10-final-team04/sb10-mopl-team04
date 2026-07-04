@@ -26,6 +26,8 @@ import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
 import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
 import com.team04.mopl.sse.service.SseService;
+import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.event.UserRoleChangedEvent;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationKafkaEventConsumerTest {
@@ -226,6 +228,46 @@ class NotificationKafkaEventConsumerTest {
 		verify(followRepository).findFollowerIdsByFolloweeId(followeeId);
 		verify(sseService).sendToReceiver(followerId1, notificationDto1.id(), "notifications", notificationDto1);
 		verify(sseService).sendToReceiver(followerId2, notificationDto2.id(), "notifications", notificationDto2);
+	}
+
+	@Test
+	@DisplayName("사용자 권한 변경 이벤트를 소비하면 해당 사용자에게 알림을 저장하고 SSE 전송한다.")
+	void consumeUserRoleChangedEvent_saveNotificationAndSendSSE_whenValidRequest() throws Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID userId = UUID.randomUUID();
+		String content = "[일반 사용자] 권한에서 [관리자] 권한으로 변경되었습니다.";
+
+		UserRoleChangedEvent event = UserRoleChangedEvent.of(
+			userId,
+			UserRole.USER,
+			UserRole.ADMIN
+		);
+
+		NotificationDto notificationDto = createNotificationDto(userId);
+
+		when(objectMapper.readValue(kafkaEvent, UserRoleChangedEvent.class))
+			.thenReturn(event);
+		when(notificationService.saveNotificationList(
+			Set.of(userId),
+			"권한 변경 알림",
+			content,
+			NotificationType.ROLE_CHANGE,
+			NotificationLevel.INFO
+		)).thenReturn(List.of(notificationDto));
+
+		// when
+		notificationKafkaEventConsumer.consumeUserRoleChangedEvent(kafkaEvent);
+
+		// then
+		verify(notificationService).saveNotificationList(
+			Set.of(userId),
+			"권한 변경 알림",
+			content,
+			NotificationType.ROLE_CHANGE,
+			NotificationLevel.INFO
+		);
+		verify(sseService).sendToReceiver(userId, notificationDto.id(), "notifications", notificationDto);
 	}
 
 	private NotificationDto createNotificationDto(UUID receiverId) {

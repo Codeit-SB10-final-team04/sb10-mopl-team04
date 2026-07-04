@@ -22,6 +22,8 @@ import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
 import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
 import com.team04.mopl.sse.service.SseService;
+import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.event.UserRoleChangedEvent;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -142,6 +144,30 @@ public class NotificationKafkaEventConsumer {
 		);
 	}
 
+	// 사용자 권한 변경 시 해당 사용자에게 알림을 보내는 listener
+	@KafkaListener(topics = NotificationKafkaTopics.USER_ROLE_CHANGED)
+	public void consumeUserRoleChangedEvent(String kafkaEvent) {
+		UserRoleChangedEvent event = deserialize(kafkaEvent, UserRoleChangedEvent.class);
+
+		// title
+		String title = "권한 변경 알림";
+
+		// content
+		String content = String.format("[%s] 권한에서 [%s] 권한으로 변경되었습니다.",
+			roleToDisplayName(event.previousRole()),
+			roleToDisplayName(event.newRole())
+		);
+
+		// 알림 저장 및 SSE 전송
+		sendNotification(
+			Set.of(event.userId()),
+			title,
+			content,
+			NotificationType.ROLE_CHANGE,
+			NotificationLevel.INFO
+		);
+	}
+
 	// KafkaEvent 역직렬화
 	private <T> T deserialize(String kafkaEvent, Class<T> eventClass) {
 		try {
@@ -177,5 +203,12 @@ public class NotificationKafkaEventConsumer {
 				notificationDto
 			);
 		}
+	}
+
+	private String roleToDisplayName(UserRole role) {
+		return switch (role) {
+			case USER -> "일반 사용자";
+			case ADMIN -> "관리자";
+		};
 	}
 }
