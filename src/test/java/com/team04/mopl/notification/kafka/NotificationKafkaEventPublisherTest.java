@@ -22,6 +22,8 @@ import com.team04.mopl.notification.kafka.exception.KafkaEventException;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
 import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
 import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
+import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.event.UserRoleChangedEvent;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationKafkaEventPublisherTest {
@@ -127,6 +129,28 @@ class NotificationKafkaEventPublisherTest {
 
 		// then
 		verify(kafkaTemplate).send(NotificationKafkaTopics.PLAYLIST_CREATED, payload);
+	}
+
+	@Test
+	@DisplayName("사용자 권한 변경 이벤트를 받으면 사용자 권한 변경 topic으로 Kafka 이벤트를 발행한다.")
+	void publishUserRoleChangedEvent_sendKafkaEvent_whenValidEvent() throws Exception {
+		// given
+		UserRoleChangedEvent event = UserRoleChangedEvent.of(
+			UUID.randomUUID(),
+			UserRole.USER,
+			UserRole.ADMIN
+		);
+		String payload = "{\"event\":\"userRoleUpdated\"}";
+
+		when(objectMapper.writeValueAsString(event))
+			.thenReturn(payload);
+		stubKafkaSend(NotificationKafkaTopics.USER_ROLE_CHANGED, payload);
+
+		// when
+		notificationKafkaEventPublisher.publishUserRoleChangedEvent(event);
+
+		// then
+		verify(kafkaTemplate).send(NotificationKafkaTopics.USER_ROLE_CHANGED, payload);
 	}
 
 	@Test

@@ -14,6 +14,7 @@ import com.team04.mopl.notification.kafka.exception.KafkaEventException;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
 import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
 import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
+import com.team04.mopl.user.event.UserRoleChangedEvent;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +54,13 @@ public class NotificationKafkaEventPublisher {
 	public void publishPlaylistCreatedEvent(PlaylistCreatedEvent event) {
 		// PlaylistCreatedEvent를 String으로 변환 후 payload 변수에 할당
 		sendEvent(NotificationKafkaTopics.PLAYLIST_CREATED, event);
+	}
+
+	@Async("eventTaskExecutor")
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	public void publishUserRoleChangedEvent(UserRoleChangedEvent event) {
+		// UserRoleUpdatedEvent를 String으로 변환 후 payload 변수에 할당
+		sendEvent(NotificationKafkaTopics.USER_ROLE_CHANGED, event);
 	}
 
 	private void sendEvent(String topic, Object event) {
