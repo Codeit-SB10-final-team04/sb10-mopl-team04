@@ -68,7 +68,7 @@ class SocialAccountTest {
 			.build();
 
 		// then
-		assertUserException(action, UserErrorCode.SOCIAL_ACCOUNT_USER_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_SOCIAL_ACCOUNT_USER_REQUIRED);
 	}
 
 	@Test
@@ -86,7 +86,7 @@ class SocialAccountTest {
 			.build();
 
 		// then
-		assertUserException(action, UserErrorCode.SOCIAL_PROVIDER_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_SOCIAL_PROVIDER_REQUIRED);
 	}
 
 	@Test
@@ -104,7 +104,7 @@ class SocialAccountTest {
 			.build();
 
 		// then
-		assertUserException(action, UserErrorCode.SOCIAL_PROVIDER_USER_ID_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_SOCIAL_PROVIDER_USER_ID_REQUIRED);
 	}
 
 	@Test
@@ -122,7 +122,7 @@ class SocialAccountTest {
 			.build();
 
 		// then
-		assertUserException(action, UserErrorCode.SOCIAL_PROVIDER_USER_ID_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_SOCIAL_PROVIDER_USER_ID_REQUIRED);
 	}
 
 	private static void assertUserException(

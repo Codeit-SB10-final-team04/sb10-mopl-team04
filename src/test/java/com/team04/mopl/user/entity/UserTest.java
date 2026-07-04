@@ -70,7 +70,7 @@ class UserTest {
 			.build();
 
 		// then
-		assertUserException(action, UserErrorCode.NAME_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_NAME_REQUIRED);
 	}
 
 	@Test
@@ -86,7 +86,7 @@ class UserTest {
 			.build();
 
 		// then
-		assertUserException(action, UserErrorCode.NAME_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_NAME_REQUIRED);
 	}
 
 	@Test
@@ -102,7 +102,7 @@ class UserTest {
 			.build();
 
 		// then
-		assertUserException(action, UserErrorCode.EMAIL_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_EMAIL_REQUIRED);
 	}
 
 	@Test
@@ -118,7 +118,7 @@ class UserTest {
 			.build();
 
 		// then
-		assertUserException(action, UserErrorCode.EMAIL_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_EMAIL_REQUIRED);
 	}
 
 	@Test
@@ -144,7 +144,7 @@ class UserTest {
 		ThrowingCallable action = () -> user.updateName("   ");
 
 		// then
-		assertUserException(action, UserErrorCode.NAME_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_NAME_REQUIRED);
 	}
 
 	@Test
@@ -184,7 +184,7 @@ class UserTest {
 		ThrowingCallable action = () -> user.updatePasswordHash("   ");
 
 		// then
-		assertUserException(action, UserErrorCode.PASSWORD_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_PASSWORD_REQUIRED);
 	}
 
 	@Test
@@ -210,7 +210,7 @@ class UserTest {
 		ThrowingCallable action = () -> user.updateRole(null);
 
 		// then
-		assertUserException(action, UserErrorCode.ROLE_REQUIRED);
+		assertUserException(action, UserErrorCode.USER_ROLE_REQUIRED);
 	}
 
 	@Test

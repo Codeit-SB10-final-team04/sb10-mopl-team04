@@ -40,6 +40,11 @@ services:
       MOPL_MAIL_FROM: ${MOPL_MAIL_FROM}
       MOPL_MAIL_FROM_NAME: ${MOPL_MAIL_FROM_NAME}
 
+      MOPL_ADMIN_ENABLED: ${MOPL_ADMIN_ENABLED}
+      MOPL_ADMIN_EMAIL: ${MOPL_ADMIN_EMAIL}
+      MOPL_ADMIN_PASSWORD: ${MOPL_ADMIN_PASSWORD}
+      MOPL_ADMIN_NAME: ${MOPL_ADMIN_NAME}
+
     ports: # 포트 매핑(로컬:컨테이너)
       - "8080:8080"
     volumes: # 애플리케이션 볼륨 구성

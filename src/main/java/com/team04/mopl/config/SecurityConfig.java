@@ -59,6 +59,7 @@ public class SecurityConfig {
 		return http
 			// CSRF 토큰 발급
 			.csrf(csrf -> csrf
+				.ignoringRequestMatchers("/ws/**")
 				.csrfTokenRepository(csrfTokenRepository())
 				.csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
 
@@ -105,6 +106,7 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll() // CSRF 토큰 조회
 				.requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll() // 비밀번호 초기화
 				.requestMatchers(
+					"/ws/**",
 					"/swagger-ui/**",
 					"/v3/api-docs/**",
 					"/actuator/health",

@@ -15,7 +15,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
-import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
@@ -32,7 +31,6 @@ import com.team04.mopl.directmessage.entity.DirectMessage;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
 import com.team04.mopl.directmessage.repository.DirectMessageRepository;
 import com.team04.mopl.user.entity.User;
-import com.team04.mopl.user.entity.UserRole;
 import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
@@ -66,7 +64,7 @@ class ConversationServiceTest {
 
 	/*
 	=========================
-		대화 생성
+	   대화 생성
 	=========================
 	 */
 	@Test
@@ -74,10 +72,6 @@ class ConversationServiceTest {
 	void createConversation_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER);
 		User requestUser = mock(User.class);
 		given(requestUser.getId()).willReturn(requestUserId);
 
@@ -102,7 +96,7 @@ class ConversationServiceTest {
 			.willReturn(expectedDto);
 
 		// when
-		ConversationDto result = conversationService.createConversation(request, userDetails);
+		ConversationDto result = conversationService.createConversation(request, requestUserId);
 
 		// then
 		assertThat(result).isNotNull();
@@ -115,11 +109,6 @@ class ConversationServiceTest {
 	void createConversation_UserNotFound_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		User requestUser = mock(User.class);
 
 		UUID withUserId = UUID.randomUUID();
@@ -130,7 +119,7 @@ class ConversationServiceTest {
 		given(userRepository.findById(withUserId)).willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> conversationService.createConversation(request, userDetails))
+		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
 			.isInstanceOf(UserException.class)
 			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
 	}
@@ -140,11 +129,6 @@ class ConversationServiceTest {
 	void createConversation_DuplicateConversation_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		User requestUser = mock(User.class);
 		given(requestUser.getId()).willReturn(requestUserId);
 
@@ -163,7 +147,7 @@ class ConversationServiceTest {
 			.willReturn(Optional.of(existingConversationId));
 
 		// when & then
-		assertThatThrownBy(() -> conversationService.createConversation(request, userDetails))
+		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
 			.isInstanceOf(ConversationException.class)
 			.hasMessage(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS.getMessage());
 	}
@@ -173,11 +157,6 @@ class ConversationServiceTest {
 	void createConversation_ConcurrencyIssue_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		User requestUser = mock(User.class);
 		given(requestUser.getId()).willReturn(requestUserId);
 
@@ -197,14 +176,14 @@ class ConversationServiceTest {
 			.given(conversationRepository).save(any(Conversation.class));
 
 		// when & then
-		assertThatThrownBy(() -> conversationService.createConversation(request, userDetails))
+		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
 			.isInstanceOf(ConversationException.class)
 			.hasMessage(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS.getMessage());
 	}
 
 	/*
 	=========================
-		대화 단건 조회
+	   대화 단건 조회
 	=========================
 	 */
 	@Test
@@ -214,9 +193,6 @@ class ConversationServiceTest {
 		UUID requestUserId = UUID.randomUUID();
 		User requestUser = mock(User.class);
 		given(requestUser.getId()).willReturn(requestUserId);
-
-		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
-		given(moplUserDetails.getUserId()).willReturn(requestUserId);
 
 		UUID withUserId = UUID.randomUUID();
 		User withUser = mock(User.class);
@@ -247,7 +223,7 @@ class ConversationServiceTest {
 			.willReturn(expectedDto);
 
 		// when
-		ConversationDto result = conversationService.findConversationById(conversationId, moplUserDetails);
+		ConversationDto result = conversationService.findConversationById(conversationId, requestUserId);
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
@@ -261,9 +237,6 @@ class ConversationServiceTest {
 		UUID requestUserId = UUID.randomUUID();
 		User requestUser = mock(User.class);
 		given(requestUser.getId()).willReturn(requestUserId);
-
-		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
-		given(moplUserDetails.getUserId()).willReturn(requestUserId);
 
 		UUID withUserId = UUID.randomUUID();
 		User withUser = mock(User.class);
@@ -291,7 +264,7 @@ class ConversationServiceTest {
 			.willReturn(expectedDto);
 
 		// when
-		ConversationDto result = conversationService.findConversationById(conversationId, moplUserDetails);
+		ConversationDto result = conversationService.findConversationById(conversationId, requestUserId);
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
@@ -303,15 +276,12 @@ class ConversationServiceTest {
 	void findConversationById_ConversationNotFound_ThrowException() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
-		given(moplUserDetails.getUserId()).willReturn(requestUserId);
-
 		UUID conversationId = UUID.randomUUID();
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> conversationService.findConversationById(conversationId, moplUserDetails))
+		assertThatThrownBy(() -> conversationService.findConversationById(conversationId, requestUserId))
 			.isInstanceOf(ConversationException.class);
 	}
 
@@ -322,9 +292,6 @@ class ConversationServiceTest {
 		UUID requestUserId = UUID.randomUUID();
 		User requestUser = mock(User.class);
 		given(requestUser.getId()).willReturn(requestUserId);
-
-		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
-		given(moplUserDetails.getUserId()).willReturn(requestUserId);
 
 		UUID conversationId = UUID.randomUUID();
 		Conversation conversation = mock(Conversation.class);
@@ -338,13 +305,13 @@ class ConversationServiceTest {
 		given(participant1.getUser()).willReturn(requestUser);
 
 		// when & then
-		assertThatThrownBy(() -> conversationService.findConversationById(conversationId, moplUserDetails))
+		assertThatThrownBy(() -> conversationService.findConversationById(conversationId, requestUserId))
 			.isInstanceOf(UserException.class);
 	}
 
 	/*
 	=========================
-		특정 사용자와의 대화 조회
+	   특정 사용자와의 대화 조회
 	=========================
 	 */
 	@Test
@@ -352,8 +319,6 @@ class ConversationServiceTest {
 	void findConversationByUserId_Success_Existing() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
-		given(moplUserDetails.getUserId()).willReturn(requestUserId);
 
 		UUID withUserId = UUID.randomUUID();
 		User withUser = mock(User.class);
@@ -372,7 +337,7 @@ class ConversationServiceTest {
 		given(conversationMapper.toDto(any(), any(), any(), anyBoolean())).willReturn(mockDto);
 
 		// when
-		ConversationDto result = conversationService.findConversationByUserId(withUserId, moplUserDetails);
+		ConversationDto result = conversationService.findConversationByUserId(withUserId, requestUserId);
 
 		// then
 		assertThat(result).isNotNull();
@@ -385,13 +350,13 @@ class ConversationServiceTest {
 	@DisplayName("실패: 존재하지 않는 userId로 조회 시 UserException 발생")
 	void findConversationByUserId_Fail_UserNotFound() {
 		// given
+		UUID requestUserId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
-		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
 
 		given(userRepository.findById(userId)).willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> conversationService.findConversationByUserId(userId, moplUserDetails))
+		assertThatThrownBy(() -> conversationService.findConversationByUserId(userId, requestUserId))
 			.isInstanceOf(UserException.class);
 	}
 
@@ -400,8 +365,6 @@ class ConversationServiceTest {
 	void findConversationByUserId_Fail_ConversationNotFound() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails moplUserDetails = mock(MoplUserDetails.class);
-		given(moplUserDetails.getUserId()).willReturn(requestUserId);
 
 		UUID withUserId = UUID.randomUUID();
 		User withUser = mock(User.class);
@@ -413,7 +376,7 @@ class ConversationServiceTest {
 			.willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> conversationService.findConversationByUserId(withUserId, moplUserDetails))
+		assertThatThrownBy(() -> conversationService.findConversationByUserId(withUserId, requestUserId))
 			.isInstanceOf(ConversationException.class)
 			.hasFieldOrPropertyWithValue("errorCode", ConversationErrorCode.CONVERSATION_NOT_FOUND);
 	}

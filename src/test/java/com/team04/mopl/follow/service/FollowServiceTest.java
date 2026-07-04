@@ -16,7 +16,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
 import com.team04.mopl.follow.entity.Follow;
@@ -26,7 +25,6 @@ import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.user.entity.User;
-import com.team04.mopl.user.entity.UserRole;
 import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
@@ -59,11 +57,6 @@ class FollowServiceTest {
 	void createFollow_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		User follower = mock(User.class);
 		given(follower.getId()).willReturn(requestUserId);
 
@@ -87,7 +80,7 @@ class FollowServiceTest {
 		given(followMapper.toDto(mockFollow)).willReturn(mockDto);
 
 		// when
-		FollowDto result = followService.createFollow(request, userDetails);
+		FollowDto result = followService.createFollow(request, requestUserId);
 
 		// then
 		assertThat(result).isNotNull();
@@ -100,18 +93,13 @@ class FollowServiceTest {
 	void createFollow_FolloweeNotFound_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		UUID followeeId = UUID.randomUUID();
 		FollowRequest request = new FollowRequest(followeeId);
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> followService.createFollow(request, userDetails))
+		assertThatThrownBy(() -> followService.createFollow(request, requestUserId))
 			.isInstanceOf(UserException.class)
 			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
 	}
@@ -121,11 +109,6 @@ class FollowServiceTest {
 	void createFollow_DuplicateFollow_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		User follower = mock(User.class);
 		given(follower.getId()).willReturn(requestUserId);
 
@@ -141,7 +124,7 @@ class FollowServiceTest {
 		given(followRepository.existsByFolloweeIdAndFollowerId(followeeId, requestUserId)).willReturn(true);
 
 		// when & then
-		assertThatThrownBy(() -> followService.createFollow(request, userDetails))
+		assertThatThrownBy(() -> followService.createFollow(request, requestUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_ALREADY.getMessage());
 	}
@@ -151,11 +134,6 @@ class FollowServiceTest {
 	void createFollow_ConcurrentRequest_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		User follower = mock(User.class);
 		given(follower.getId()).willReturn(requestUserId);
 
@@ -177,7 +155,7 @@ class FollowServiceTest {
 			.willThrow(new DataIntegrityViolationException("Duplicate entry"));
 
 		// when & then
-		assertThatThrownBy(() -> followService.createFollow(request, userDetails))
+		assertThatThrownBy(() -> followService.createFollow(request, requestUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_ALREADY_CONCURRENT.getMessage());
 
@@ -195,11 +173,6 @@ class FollowServiceTest {
 	void getFollowConnection_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		User requestedUser = mock(User.class);
 		given(requestedUser.getId()).willReturn(requestUserId);
 
@@ -219,7 +192,7 @@ class FollowServiceTest {
 		given(followMapper.toDto(mockFollow)).willReturn(mockDto);
 
 		// when
-		FollowDto result = followService.getFollowConnection(followeeId, userDetails);
+		FollowDto result = followService.getFollowConnection(followeeId, requestUserId);
 
 		// then
 		assertThat(result).isNotNull();
@@ -232,18 +205,13 @@ class FollowServiceTest {
 	void isFollowing_UserNotFound_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		UUID followeeId = UUID.randomUUID();
 
 		// 타겟 유저 조회 시 Optional.empty() 반환
 		given(userRepository.findById(followeeId)).willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, userDetails))
+		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, requestUserId))
 			.isInstanceOf(UserException.class)
 			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
 
@@ -255,7 +223,6 @@ class FollowServiceTest {
 	void getFollowConnection_FollowNotFound_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(requestUserId, "test@test.com", UserRole.USER);
 		User requestedUser = mock(User.class);
 		given(requestedUser.getId()).willReturn(requestUserId);
 
@@ -271,7 +238,7 @@ class FollowServiceTest {
 			.willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, userDetails))
+		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, requestUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
 	}
@@ -332,11 +299,6 @@ class FollowServiceTest {
 	void deleteFollow_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		User follower = mock(User.class);
 		given(follower.getId()).willReturn(requestUserId);
 
@@ -347,7 +309,7 @@ class FollowServiceTest {
 		given(followRepository.findById(followId)).willReturn(Optional.of(targetFollow));
 
 		// when
-		followService.deleteFollow(followId, userDetails);
+		followService.deleteFollow(followId, requestUserId);
 
 		// then
 		verify(followRepository, times(1)).delete(targetFollow);
@@ -358,15 +320,10 @@ class FollowServiceTest {
 	void deleteFollow_FollowNotFound_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 		given(followRepository.findById(any())).willReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), userDetails))
+		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), requestUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
 	}
@@ -376,11 +333,6 @@ class FollowServiceTest {
 	void deleteFollow_AccessDenied_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		MoplUserDetails userDetails = MoplUserDetails.authenticated(
-			requestUserId,
-			"test@test.com",
-			UserRole.USER
-		);
 
 		UUID wrongOwnerId = UUID.randomUUID();
 		User otherUser = mock(User.class);
@@ -393,7 +345,7 @@ class FollowServiceTest {
 		given(followRepository.findById(any())).willReturn(Optional.of(targetFollow));
 
 		// when & then
-		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), userDetails))
+		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), requestUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_ACCESS_DENIED.getMessage());
 	}

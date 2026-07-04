@@ -36,7 +36,7 @@ public class FollowController implements FollowControllerDocs {
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		FollowDto followDto = followService.createFollow(followRequest, moplUserDetails);
+		FollowDto followDto = followService.createFollow(followRequest, moplUserDetails.getUserId());
 
 		return ResponseEntity.status(HttpStatus.CREATED).body(followDto);
 	}
@@ -48,7 +48,7 @@ public class FollowController implements FollowControllerDocs {
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		FollowDto followDto = followService.getFollowConnection(followeeId, moplUserDetails);
+		FollowDto followDto = followService.getFollowConnection(followeeId, moplUserDetails.getUserId());
 
 		return ResponseEntity.status(HttpStatus.OK).body(followDto);
 	}
@@ -69,7 +69,7 @@ public class FollowController implements FollowControllerDocs {
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
-		followService.deleteFollow(followId, moplUserDetails);
+		followService.deleteFollow(followId, moplUserDetails.getUserId());
 
 		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 	}

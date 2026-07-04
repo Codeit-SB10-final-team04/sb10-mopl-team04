@@ -9,10 +9,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
+import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
+import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 import com.team04.mopl.conversation.entity.Conversation;
 import com.team04.mopl.conversation.entity.ConversationParticipant;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
@@ -50,25 +51,22 @@ public class ConversationService {
 
 	// 대화 생성
 	@Transactional
-	@PreAuthorize("#conversationCreateRequest.withUserId() != #moplUserDetails.userId")
+	@PreAuthorize("#conversationCreateRequest.withUserId() != #requestUserId")
 	public ConversationDto createConversation(
 		ConversationCreateRequest conversationCreateRequest,
-		MoplUserDetails moplUserDetails
+		UUID requestUserId
 	) {
-		// 1. 로그인 정보로부터 요청자의 ID 추출
-		UUID requestUserId = moplUserDetails.getUserId();
-
 		log.info("[CONVERSATION_CREATE] 대화 생성 시작: requestUserid={}, withUserId={}",
 			requestUserId, conversationCreateRequest.withUserId());
 
-		// 2. 유효성 검증: 요청자 및 사용자 존재 여부
+		// 1. 유효성 검증: 요청자 및 사용자 존재 여부
 		User requestUser = getUserEntityOrThrow(requestUserId);
 		User withUser = getUserEntityOrThrow(conversationCreateRequest.withUserId());
 
-		// 3. 유효성 검증: 중복 검사
+		// 2. 유효성 검증: 중복 검사
 		validateDuplicateConversation(requestUser.getId(), withUser.getId());
 
-		// 4. 대화 생성 및 저장 (try-catch문으로 동시성 방어)
+		// 3. 대화 생성 및 저장 (try-catch문으로 동시성 방어)
 		// TODO: 분산 환경에서의 동시성 이슈를 해결하기 위한 Redis 분산 락(Redisson 등) 적용 예정 (심화)
 		// 분산 락 적용 시, DB 제약조건 예외를 잡는 현재의 catch 블록은 제거 후 로직 개선
 		try {
@@ -110,50 +108,55 @@ public class ConversationService {
 	}
 
 	// 대화 단건 조회
-	public ConversationDto findConversationById(UUID conversationId, MoplUserDetails moplUserDetails) {
+	public ConversationDto findConversationById(
+		UUID conversationId,
+		UUID requestUserId
+	) {
 		log.debug("[CONVERSATION_FIND] 대화 단건 조회 시작: conversationId={}", conversationId);
 
-		// 1. 로그인 정보로부터 요청자 ID 추출
-		UUID requestUserId = moplUserDetails.getUserId();
-
-		// 2. 유효성 검증: 대화 존재 여부
+		// 1. 유효성 검증: 대화 존재 여부
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
-		// 3, 유효성 검증: 대화 상대 존재 여부
+		// 2. 유효성 검증: 대화 상대 존재 여부
 		User withUser = getWithUserEntityOrThrow(conversation.getId(), requestUserId);
 
-		// 3. DTO 변환
 		return mapToConversationDto(conversation, withUser, requestUserId);
 	}
 
 	// 대화 상대 정보 조회
-	private User getWithUserEntityOrThrow(UUID conversationId, UUID requestUserId) {
+	private User getWithUserEntityOrThrow(
+		UUID conversationId,
+		UUID requestUserId
+	) {
+		// 1. 특정 대화의 참여자 목록 조회
 		List<ConversationParticipant> participants =
 			conversationParticipantRepository.findByConversationId(conversationId);
 
+		// 2. 유효성 검증: 요청자의 대화 참여자 소속 여부
 		validateParticipants(participants, requestUserId);
 
 		return participants.stream()
 			.map(ConversationParticipant::getUser)
+			// 요청자가 아닌 대화 상대 필터링
 			.filter(user -> !user.getId().equals(requestUserId))
 			.findFirst()
 			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 	}
 
 	// 특정 사용자와의 대화 조회
-	public ConversationDto findConversationByUserId(UUID userId, MoplUserDetails moplUserDetails) {
+	public ConversationDto findConversationByUserId(
+		UUID userId,
+		UUID requestUserId
+	) {
 		log.debug("[CONVERSATION_FIND_BY_USER_ID] 특정 사용자와의 대화 조회 시작: userId={}", userId);
 
-		// 1. 로그인 정보로부터 요청자 ID 추출
-		UUID requestUserId = moplUserDetails.getUserId();
-
-		// 2. 유효성 검증: 대화 상대 존재 여부
+		// 1. 유효성 검증: 대화 상대 존재 여부
 		User withUser = getUserEntityOrThrow(userId);
 
-		// 3. 유효성 검증: 자기 자신 조회
+		// 2. 유효성 검증: 자기 자신 조회
 		validateSelfReadConversation(requestUserId, withUser.getId());
 
-		// 4. 유효성 검증: 대화 존재 유무
+		// 3. 유효성 검증: 대화 존재 유무
 		UUID conversationId = findExistingConversationId(requestUserId, withUser.getId());
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
@@ -162,9 +165,67 @@ public class ConversationService {
 	}
 
 	// 대화 ID 반환
-	private UUID findExistingConversationId(UUID requestUserId, UUID withUserId) {
+	private UUID findExistingConversationId(
+		UUID requestUserId,
+		UUID withUserId
+	) {
 		return conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
 			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
+	}
+
+	// 대화 목록 조회 (정렬 + 필터링 + 커서 페이지네이션)
+	public CursorResponseConversationDto findAll(
+		ConversationPageRequest conversationPageRequest,
+		UUID requestUserId
+	) {
+		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 시작: keyword={}", conversationPageRequest.keywordLike());
+
+		// 1. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
+		List<Conversation> conversations = conversationRepository.searchConversation(conversationPageRequest,
+			requestUserId);
+
+		// 2. 대화 전체 개수 조회
+		Long totalCount = conversationRepository.countConversation(conversationPageRequest, requestUserId);
+
+		// 3. 다음 페이지 유무 확인 및 limit 만큼 자르기
+		boolean hasNext = conversations.size() > conversationPageRequest.limit();
+		List<Conversation> pagedConversations = hasNext
+			? conversations.subList(0, conversationPageRequest.limit())
+			: conversations;
+
+		// 4. 다음 커서 값 계산 (메인 커서, 보조 커서)
+		String nextCursor = null;
+		UUID nextIdAfter = null;
+
+		if (!pagedConversations.isEmpty() && hasNext) {
+			Conversation lastConversation = pagedConversations.get(pagedConversations.size() - 1);
+
+			nextCursor = lastConversation.getCreatedAt().toString();
+			nextIdAfter = lastConversation.getId();
+		}
+
+		// TODO: N+3 문제 해결 필요
+		// 5. Conversation -> ConversationDto (내부 메서드 활용)
+		List<ConversationDto> data = pagedConversations.stream()
+			.map(conversation -> {
+				// 기존 메서드를 활용하여 현재 대화방의 상대방 유저 조회
+				User withUser = getWithUserEntityOrThrow(conversation.getId(), requestUserId);
+				return mapToConversationDto(conversation, withUser, requestUserId);
+			})
+			.toList();
+
+		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 완료: keyword={}", conversationPageRequest.keywordLike());
+
+		// 6. CursorResponseConversationDto 전환 (Mapper 활용)
+		return conversationMapper.toCursorPageResponse(
+			data,
+			nextCursor,
+			nextIdAfter,
+			hasNext,
+			totalCount,
+			conversationPageRequest.sortBy(),
+			conversationPageRequest.sortDirection().name()
+		);
 	}
 
 	// 유효성 검증: 대화 중복 검사
@@ -217,7 +278,11 @@ public class ConversationService {
 	}
 
 	// DTO 변환 로직
-	private ConversationDto mapToConversationDto(Conversation conversation, User withUser, UUID requestUserId) {
+	private ConversationDto mapToConversationDto(
+		Conversation conversation,
+		User withUser,
+		UUID requestUserId
+	) {
 		// 1. 대화 상대방 정보 조회
 		UserSummary with = getUserSummary(withUser);
 

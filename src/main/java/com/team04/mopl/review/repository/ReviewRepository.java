@@ -8,8 +8,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.team04.mopl.review.entity.Review;
+import com.team04.mopl.review.repository.qdsl.ReviewQdslRepository;
 
-public interface ReviewRepository extends JpaRepository<Review, UUID> {
+public interface ReviewRepository extends JpaRepository<Review, UUID>, ReviewQdslRepository {
 
 	@Query(value = """
 		SELECT EXISTS(
