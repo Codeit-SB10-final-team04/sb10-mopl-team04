@@ -46,6 +46,9 @@ public class NotificationKafkaEventConsumer {
 	// 특정 사용자가 플레이리스트를 구독 완료 후 플레이리스트 소유주에게 알림을 보내는 listener
 	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_SUBSCRIBED)
 	public void consumePlaylistSubscribedEvent(String kafkaEvent) {
+		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
+			NotificationKafkaTopics.PLAYLIST_SUBSCRIBED, PlaylistSubscribedEvent.class.getSimpleName());
+
 		PlaylistSubscribedEvent event = deserialize(kafkaEvent, PlaylistSubscribedEvent.class);
 
 		// title
@@ -70,6 +73,9 @@ public class NotificationKafkaEventConsumer {
 	// 구독 중인 플레이리스트에 콘텐츠가 추가되면 해당 플레이리스트 구독자에게 알림을 보내는 listener
 	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_CONTENT_ADDED)
 	public void consumePlaylistContentAddedEvent(String kafkaEvent) {
+		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
+			NotificationKafkaTopics.PLAYLIST_CONTENT_ADDED, PlaylistContentAddedEvent.class.getSimpleName());
+
 		PlaylistContentAddedEvent event = deserialize(kafkaEvent, PlaylistContentAddedEvent.class);
 
 		// title
@@ -98,6 +104,9 @@ public class NotificationKafkaEventConsumer {
 	// 특정 사용자를 팔로우 하면 해당 팔로우를 당한 사용자에게 알림을 보내는 listener
 	@KafkaListener(topics = NotificationKafkaTopics.FOLLOW_CREATED)
 	public void consumeFollowCreatedEvent(String kafkaEvent) {
+		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
+			NotificationKafkaTopics.FOLLOW_CREATED, FollowCreatedEvent.class.getSimpleName());
+
 		FollowCreatedEvent event = deserialize(kafkaEvent, FollowCreatedEvent.class);
 
 		// title
@@ -119,6 +128,9 @@ public class NotificationKafkaEventConsumer {
 	// 특정 사용자가 플레이리스트를 생성하면 해당 사용자의 팔로워에게 알림을 보내는 listener
 	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_CREATED)
 	public void consumePlaylistCreatedEvent(String kafkaEvent) {
+		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
+			NotificationKafkaTopics.PLAYLIST_CREATED, PlaylistCreatedEvent.class.getSimpleName());
+
 		PlaylistCreatedEvent event = deserialize(kafkaEvent, PlaylistCreatedEvent.class);
 
 		// title
@@ -147,6 +159,9 @@ public class NotificationKafkaEventConsumer {
 	// 사용자 권한 변경 시 해당 사용자에게 알림을 보내는 listener
 	@KafkaListener(topics = NotificationKafkaTopics.USER_ROLE_CHANGED)
 	public void consumeUserRoleChangedEvent(String kafkaEvent) {
+		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
+			NotificationKafkaTopics.USER_ROLE_CHANGED, UserRoleChangedEvent.class.getSimpleName());
+
 		UserRoleChangedEvent event = deserialize(kafkaEvent, UserRoleChangedEvent.class);
 
 		// title
@@ -186,6 +201,9 @@ public class NotificationKafkaEventConsumer {
 		NotificationType type,
 		NotificationLevel level
 	) {
+		log.info("[NOTIFICATION_DELIVERY_START] 알림 저장 및 SSE 전송 시작: receiverCount={}, type={}",
+			receiverIds.size(), type);
+
 		List<NotificationDto> notificationDtoList = notificationService.saveNotificationList(
 			receiverIds,
 			title,
@@ -203,6 +221,9 @@ public class NotificationKafkaEventConsumer {
 				notificationDto
 			);
 		}
+
+		log.info("[NOTIFICATION_DELIVERY_COMPLETE] 알림 저장 및 SSE 전송 완료: receiverCount={}, notificationCount={}, type={}",
+			receiverIds.size(), notificationDtoList.size(), type);
 	}
 
 	private String roleToDisplayName(UserRole role) {
