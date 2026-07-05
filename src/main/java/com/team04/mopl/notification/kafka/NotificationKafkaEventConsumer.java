@@ -201,7 +201,7 @@ public class NotificationKafkaEventConsumer {
 		NotificationType type,
 		NotificationLevel level
 	) {
-		log.info("[NOTIFICATION_DELIVERY_START] 알림 저장 및 SSE 전송 시작: receiverCount={}, type={}",
+		log.info("[NOTIFICATION_SSE_DELIVERY_START] 알림 저장 및 SSE 전송 시작: receiverCount={}, type={}",
 			receiverIds.size(), type);
 
 		List<NotificationDto> notificationDtoList = notificationService.saveNotificationList(
@@ -212,18 +212,28 @@ public class NotificationKafkaEventConsumer {
 			level
 		);
 
+		// 실패 count
+		int failureCount = 0;
+
 		// SSE로 알림 전송
 		for (NotificationDto notificationDto : notificationDtoList) {
-			sseService.sendToReceiver(
-				notificationDto.receiverId(),
-				notificationDto.id(),
-				"notifications",
-				notificationDto
-			);
+			try {
+				sseService.sendToReceiver(
+					notificationDto.receiverId(),
+					notificationDto.id(),
+					"notifications",
+					notificationDto
+				);
+			} catch (Exception e) {
+				failureCount++;
+				log.warn("[NOTIFICATION_SSE_DELIVERY_FAILED] SSE 전송 실패: receiverId={}, notificationId={}",
+					notificationDto.receiverId(), notificationDto.id(), e);
+			}
 		}
 
-		log.info("[NOTIFICATION_DELIVERY_COMPLETE] 알림 저장 및 SSE 전송 완료: receiverCount={}, notificationCount={}, type={}",
-			receiverIds.size(), notificationDtoList.size(), type);
+		log.info(
+			"[NOTIFICATION_SSE_DELIVERY_COMPLETE] 알림 저장 및 SSE 전송 완료: receiverCount={}, notificationCount={}, failureCount={}, type={}",
+			receiverIds.size(), notificationDtoList.size(), failureCount, type);
 	}
 
 	private String roleToDisplayName(UserRole role) {
