@@ -135,6 +135,136 @@ class UserQdslRepositoryImplTest {
 	}
 
 	@Test
+	@DisplayName("이메일 오름차순으로 사용자 목록을 조회한다")
+	void findUsers_returnCursorPage_whenSortByEmailAsc() {
+		// given
+		UserPageRequest request = new UserPageRequest(
+			null,
+			null,
+			null,
+			null,
+			null,
+			4,
+			SortDirection.ASCENDING,
+			UserSortBy.email
+		);
+
+		// when
+		UserCursorPage result = userRepository.findUsers(request);
+
+		// then
+		assertThat(result.users())
+			.extracting(UserDto::id)
+			.containsExactly(alphaUser, bravoUser, charlieUser, deltaUser);
+		assertThat(result.hasNext()).isFalse();
+		assertThat(result.totalCount()).isEqualTo(4L);
+	}
+
+	@Test
+	@DisplayName("잠금 상태 오름차순 커서가 있으면 false 이후 true 사용자 목록을 조회한다")
+	void findUsers_returnCursorPage_whenAfterLockedFalseCursorAsc() {
+		// given
+		UserPageRequest request = new UserPageRequest(
+			null,
+			null,
+			null,
+			"false",
+			charlieUser,
+			5,
+			SortDirection.ASCENDING,
+			UserSortBy.isLocked
+		);
+
+		// when
+		UserCursorPage result = userRepository.findUsers(request);
+
+		// then
+		assertThat(result.users())
+			.extracting(UserDto::id)
+			.containsExactly(deltaUser);
+		assertThat(result.hasNext()).isFalse();
+		assertThat(result.totalCount()).isEqualTo(4L);
+	}
+
+	@Test
+	@DisplayName("잠금 상태 내림차순 커서가 있으면 true 이후 false 사용자 목록을 조회한다")
+	void findUsers_returnCursorPage_whenAfterLockedTrueCursorDesc() {
+		// given
+		UserPageRequest request = new UserPageRequest(
+			null,
+			null,
+			null,
+			"true",
+			deltaUser,
+			5,
+			SortDirection.DESCENDING,
+			UserSortBy.isLocked
+		);
+
+		// when
+		UserCursorPage result = userRepository.findUsers(request);
+
+		// then
+		assertThat(result.users())
+			.extracting(UserDto::id)
+			.containsExactly(charlieUser, bravoUser, alphaUser);
+		assertThat(result.hasNext()).isFalse();
+		assertThat(result.totalCount()).isEqualTo(4L);
+	}
+
+	@Test
+	@DisplayName("권한 오름차순 커서가 있으면 ADMIN 이후 USER 사용자 목록을 조회한다")
+	void findUsers_returnCursorPage_whenAfterRoleAdminCursorAsc() {
+		// given
+		UserPageRequest request = new UserPageRequest(
+			null,
+			null,
+			null,
+			"ADMIN",
+			charlieUser,
+			5,
+			SortDirection.ASCENDING,
+			UserSortBy.role
+		);
+
+		// when
+		UserCursorPage result = userRepository.findUsers(request);
+
+		// then
+		assertThat(result.users())
+			.extracting(UserDto::id)
+			.containsExactly(alphaUser, bravoUser, deltaUser);
+		assertThat(result.hasNext()).isFalse();
+		assertThat(result.totalCount()).isEqualTo(4L);
+	}
+
+	@Test
+	@DisplayName("권한 내림차순 커서가 있으면 USER 이후 ADMIN 사용자 목록을 조회한다")
+	void findUsers_returnCursorPage_whenAfterRoleUserCursorDesc() {
+		// given
+		UserPageRequest request = new UserPageRequest(
+			null,
+			null,
+			null,
+			"USER",
+			alphaUser,
+			5,
+			SortDirection.DESCENDING,
+			UserSortBy.role
+		);
+
+		// when
+		UserCursorPage result = userRepository.findUsers(request);
+
+		// then
+		assertThat(result.users())
+			.extracting(UserDto::id)
+			.containsExactly(charlieUser);
+		assertThat(result.hasNext()).isFalse();
+		assertThat(result.totalCount()).isEqualTo(4L);
+	}
+
+	@Test
 	@DisplayName("생성일 커서 형식이 올바르지 않으면 UserException을 던진다")
 	void findUsers_throwUserException_whenCreatedAtCursorIsInvalid() {
 		// given

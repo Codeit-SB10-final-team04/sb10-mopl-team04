@@ -14,6 +14,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -169,6 +171,45 @@ class UserAdminServiceTest {
 		verify(userRepository).findUsers(request);
 	}
 
+	@ParameterizedTest
+	@EnumSource(UserSortBy.class)
+	@DisplayName("관리자 사용자 목록 조회 결과의 정렬 기준별 다음 커서를 반환한다")
+	void findUsers_returnNextCursor_bySortBy(UserSortBy sortBy) {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant createdAt = Instant.parse("2026-07-02T00:00:00Z");
+		UserPageRequest request = new UserPageRequest(
+			null,
+			null,
+			null,
+			null,
+			null,
+			1,
+			SortDirection.ASCENDING,
+			sortBy
+		);
+		UserDto user = new UserDto(
+			userId,
+			createdAt,
+			"cursor@test.com",
+			"커서사용자",
+			null,
+			UserRole.ADMIN,
+			true
+		);
+
+		when(userRepository.findUsers(request))
+			.thenReturn(new UserCursorPage(List.of(user), true, 2L));
+
+		// when
+		CursorResponseUserDto result = userAdminService.findUsers(request);
+
+		// then
+		assertThat(result.nextCursor()).isEqualTo(expectedNextCursor(sortBy, user));
+		assertThat(result.nextIdAfter()).isEqualTo(userId);
+		verify(userRepository).findUsers(request);
+	}
+
 	@Test
 	@DisplayName("사용자 권한을 USER에서 ADMIN으로 변경하면 인증 세션을 삭제한다")
 	void updateRole_changeRoleAndDeleteSession_whenRoleChangedToAdmin() {
@@ -258,6 +299,16 @@ class UserAdminServiceTest {
 			);
 
 		verify(authSessionStore, never()).deleteByUserId(userId);
+	}
+
+	private String expectedNextCursor(UserSortBy sortBy, UserDto user) {
+		return switch (sortBy) {
+			case name -> user.name();
+			case email -> user.email();
+			case createdAt -> user.createdAt().toString();
+			case isLocked -> user.locked().toString();
+			case role -> user.role().toString();
+		};
 	}
 
 	private User createUser(UUID userId, UserRole role) {

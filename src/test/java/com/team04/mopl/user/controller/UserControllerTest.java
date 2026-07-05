@@ -399,6 +399,23 @@ class UserControllerTest {
 	}
 
 	@Test
+	@DisplayName("관리자 사용자 목록 조회 요청에서 보조 커서만 있으면 400을 반환한다")
+	void findUsers_returnBadRequest_whenOnlyIdAfterExists() throws Exception {
+		// given
+		UUID idAfter = UUID.randomUUID();
+
+		// when & then
+		mockMvc.perform(get("/api/users")
+				.param("idAfter", idAfter.toString())
+				.param("limit", "20")
+				.param("sortDirection", "ASCENDING")
+				.param("sortBy", "name"))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userAdminService);
+	}
+
+	@Test
 	@DisplayName("관리자 사용자 목록 조회 요청에서 limit이 범위를 벗어나면 400을 반환한다")
 	void findUsers_returnBadRequest_whenLimitOutOfRange() throws Exception {
 		// given
@@ -406,6 +423,21 @@ class UserControllerTest {
 		// when & then
 		mockMvc.perform(get("/api/users")
 				.param("limit", "101")
+				.param("sortDirection", "ASCENDING")
+				.param("sortBy", "name"))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userAdminService);
+	}
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 요청에서 limit이 1보다 작으면 400을 반환한다")
+	void findUsers_returnBadRequest_whenLimitIsLessThanOne() throws Exception {
+		// given
+
+		// when & then
+		mockMvc.perform(get("/api/users")
+				.param("limit", "0")
 				.param("sortDirection", "ASCENDING")
 				.param("sortBy", "name"))
 			.andExpect(status().isBadRequest());
