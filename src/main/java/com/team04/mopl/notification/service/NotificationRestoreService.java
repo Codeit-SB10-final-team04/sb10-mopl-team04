@@ -30,6 +30,9 @@ public class NotificationRestoreService {
 		UUID receiverId,
 		UUID lastEventId
 	) {
+		log.debug("[NOTIFICATION_RESTORE_FIND_UNREAD_AFTER] 미읽음 알림 복구 조회 시작: receiverId={}, lastEventId={}, limit={}",
+			receiverId, lastEventId, RECOVERY_LIMIT);
+
 		// lastEventId가 receiverId 소유인지 확인
 		Notification lastNotification =
 			notificationRepository.findByIdAndReceiverId(lastEventId, receiverId)
@@ -39,6 +42,10 @@ public class NotificationRestoreService {
 		if (lastNotification == null) {
 			log.warn("[SSE_LAST_EVENT_NOT_FOUND] lastEventId 기준 알림을 찾을 수 없음: receiverId={}, lastEventId={}",
 				receiverId, lastEventId);
+
+			log.debug(
+				"[NOTIFICATION_RESTORE_FIND_UNREAD_AFTER] 미읽음 알림 복구 조회 완료: receiverId={}, lastEventId={}, restoredCount={}",
+				receiverId, lastEventId, 0);
 
 			return List.of();
 		}
@@ -52,9 +59,15 @@ public class NotificationRestoreService {
 				PageRequest.of(0, RECOVERY_LIMIT)
 			);
 
-		// notificationDto로 변환 후 반환
-		return afterNotificationList.stream()
+		// notificationDto로 변환
+		List<NotificationDto> restoredNotifications = afterNotificationList.stream()
 			.map(notification -> notificationMapper.toDto(notification))
 			.toList();
+
+		log.debug(
+			"[NOTIFICATION_RESTORE_FIND_UNREAD_AFTER] 미읽음 알림 복구 조회 완료: receiverId={}, lastEventId={}, restoredCount={}",
+			receiverId, lastEventId, restoredNotifications.size());
+
+		return restoredNotifications;
 	}
 }
