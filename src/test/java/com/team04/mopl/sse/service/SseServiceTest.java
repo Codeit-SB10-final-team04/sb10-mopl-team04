@@ -68,7 +68,7 @@ class SseServiceTest {
 
 	@Test
 	@DisplayName("특정 수신자에게 SSE 이벤트를 전송한다.")
-	void sendToReceiver_sendEvent_whenSseEmitterIsExists() {
+	void sendToReceiver_sendEvent_whenSseEmitterIsExists() throws Exception {
 		// given
 		UUID receiverId = UUID.randomUUID();
 		UUID eventId = UUID.randomUUID();
@@ -85,6 +85,7 @@ class SseServiceTest {
 
 		// then
 		verify(sseEmitterRepository).findAllByReceiverId(receiverId);
+		verify(sseEmitter).send(any(SseEmitter.SseEventBuilder.class));
 		verify(sseEmitterRepository, never()).remove(any(UUID.class), any(SseEmitter.class));
 	}
 
