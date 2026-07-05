@@ -107,7 +107,7 @@ public class NotificationKafkaEventPublisher {
 		} catch (JsonProcessingException e) {
 			log.error("[NOTIFICATION_KAFKA_SERIALIZATION_FAILED] Kafka 이벤트 직렬화 실패: topic={}, eventType={}",
 				topic, event.getClass().getSimpleName(), e);
-			throw new KafkaEventException(KafkaEventErrorCode.KAFKA_EVENT_SERIALIZATION_FAILED)
+			throw new KafkaEventException(KafkaEventErrorCode.KAFKA_EVENT_SERIALIZATION_FAILED, e)
 				.addDetail("topic", topic)
 				.addDetail("event", event.getClass().getSimpleName());
 		}
