@@ -162,7 +162,7 @@ class PlaylistServiceTest {
 			anyBoolean(),
 			anyList()
 		);
-		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistCreateRequest.class));
+		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistCreatedEvent.class));
 	}
 
 	@Test
