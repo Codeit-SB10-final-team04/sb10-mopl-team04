@@ -33,15 +33,19 @@ public class UserAdminService {
 
 	// 관리자 사용자 목록 조회
 	public CursorResponseUserDto findUsers(UserPageRequest request) {
+		// 이메일 검색어 정규화
+		String normalizedEmailLike = request.normalizedEmailLike();
+
 		// 사용자 목록 조회 요청 로그
 		log.debug(
-			"[USER_FIND_ALL] 사용자 목록 조회 시작: emailLike={}, roleEqual={}, isLocked={}, "
-				+ "cursor={}, idAfter={}, limit={}, sortDirection={}, sortBy={}",
-			request.normalizedEmailLike(),
+			"[USER_FIND_ALL] 사용자 목록 조회 시작: emailLikePresent={}, emailLikeLength={}, roleEqual={}, "
+				+ "isLocked={}, cursorPresent={}, idAfterPresent={}, limit={}, sortDirection={}, sortBy={}",
+			normalizedEmailLike != null,
+			normalizedEmailLike == null ? 0 : normalizedEmailLike.length(),
 			request.roleEqual(),
 			request.isLocked(),
-			request.cursor(),
-			request.idAfter(),
+			request.cursor() != null,
+			request.idAfter() != null,
 			request.limit(),
 			request.sortDirection(),
 			request.sortBy()
@@ -66,10 +70,10 @@ public class UserAdminService {
 			: null;
 
 		log.debug(
-			"[USER_FIND_ALL] 사용자 목록 조회 완료: size={}, nextCursor={}, nextIdAfter={}, hasNext={}",
+			"[USER_FIND_ALL] 사용자 목록 조회 완료: size={}, nextCursorPresent={}, nextIdAfterPresent={}, hasNext={}",
 			userCursorPage.users().size(),
-			nextCursor,
-			nextIdAfter,
+			nextCursor != null,
+			nextIdAfter != null,
 			userCursorPage.hasNext()
 		);
 
@@ -120,8 +124,8 @@ public class UserAdminService {
 		return userRepository.findById(userId)
 			.orElseThrow(() -> new UserException(
 				UserErrorCode.USER_NOT_FOUND,
-			Map.of("userId", userId)
-		));
+				Map.of("userId", userId)
+			));
 	}
 
 	// 정렬 기준별 다음 커서 값 추출
