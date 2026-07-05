@@ -26,6 +26,22 @@ CREATE TABLE users (
                        CONSTRAINT uq_users_email UNIQUE (email)
 );
 
+-- 사용자 목록 커서 페이지네이션 정렬 인덱스
+CREATE INDEX idx_users_name_id
+    ON users (name, id);
+
+CREATE INDEX idx_users_email_id
+    ON users (email, id);
+
+CREATE INDEX idx_users_created_at_id
+    ON users (created_at, id);
+
+CREATE INDEX idx_users_is_locked_id
+    ON users (is_locked, id);
+
+CREATE INDEX idx_users_role_id
+    ON users (role, id);
+
 CREATE TABLE tags (
                       id          UUID            NOT NULL,
                       name        VARCHAR(100)    NOT NULL,
