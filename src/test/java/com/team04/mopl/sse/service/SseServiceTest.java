@@ -11,15 +11,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import com.team04.mopl.sse.dto.SseMessage;
+import com.team04.mopl.notification.service.NotificationRestoreService;
 import com.team04.mopl.sse.repository.SseEmitterRepository;
-import com.team04.mopl.sse.repository.SseMessageRepository;
 
 @ExtendWith(MockitoExtension.class)
 class SseServiceTest {
@@ -28,7 +26,7 @@ class SseServiceTest {
 	private SseEmitterRepository sseEmitterRepository;
 
 	@Mock
-	private SseMessageRepository sseMessageRepository;
+	private NotificationRestoreService notificationRestoreService;
 
 	@InjectMocks
 	private SseService sseService;
@@ -46,7 +44,6 @@ class SseServiceTest {
 		assertNotNull(result);
 
 		verify(sseEmitterRepository).add(eq(receiverId), any(SseEmitter.class));
-		verify(sseMessageRepository, never()).findAllAfterLastEventId(eq(receiverId), any(UUID.class));
 	}
 
 	@Test
@@ -56,7 +53,7 @@ class SseServiceTest {
 		UUID receiverId = UUID.randomUUID();
 		UUID lastEventId = UUID.randomUUID();
 
-		when(sseMessageRepository.findAllAfterLastEventId(receiverId, lastEventId))
+		when(notificationRestoreService.findUnreadNotificationsAfter(receiverId, lastEventId))
 			.thenReturn(List.of());
 
 		// when
@@ -66,19 +63,18 @@ class SseServiceTest {
 		assertNotNull(result);
 
 		verify(sseEmitterRepository).add(eq(receiverId), any(SseEmitter.class));
-		verify(sseMessageRepository).findAllAfterLastEventId(receiverId, lastEventId);
+		verify(notificationRestoreService).findUnreadNotificationsAfter(receiverId, lastEventId);
 	}
 
 	@Test
-	@DisplayName("특정 수신자에게 SSE 이벤트를 전송하고 메시지를 저장한다.")
-	void sendToReceiver_saveSseMessageAndSendEvent_whenSseEmitterIsExists() {
+	@DisplayName("특정 수신자에게 SSE 이벤트를 전송한다.")
+	void sendToReceiver_sendEvent_whenSseEmitterIsExists() {
 		// given
 		UUID receiverId = UUID.randomUUID();
 		UUID eventId = UUID.randomUUID();
 		String eventName = "notifications";
 		String data = "data";
 
-		SseMessage expectedSseMessage = new SseMessage(eventId, receiverId, eventName, data);
 		SseEmitter sseEmitter = mock(SseEmitter.class);
 
 		when(sseEmitterRepository.findAllByReceiverId(receiverId))
@@ -88,25 +84,18 @@ class SseServiceTest {
 		sseService.sendToReceiver(receiverId, eventId, eventName, data);
 
 		// then
-		ArgumentCaptor<SseMessage> sseMessageCaptor = ArgumentCaptor.forClass(SseMessage.class);
-		verify(sseMessageRepository).save(sseMessageCaptor.capture());
-
-		assertEquals(expectedSseMessage, sseMessageCaptor.getValue());
-
 		verify(sseEmitterRepository).findAllByReceiverId(receiverId);
 		verify(sseEmitterRepository, never()).remove(any(UUID.class), any(SseEmitter.class));
 	}
 
 	@Test
-	@DisplayName("연결된 SseEmitter가 없어도 메시지를 저장한다.")
-	void sendToReceiver_saveSseMessage_whenSseEmitterIsNotExists() {
+	@DisplayName("연결된 SseEmitter가 없으면 아무것도 하지 않는다.")
+	void sendToReceiver_doNothing_whenSseEmitterIsNotExists() {
 		// given
 		UUID receiverId = UUID.randomUUID();
 		UUID eventId = UUID.randomUUID();
 		String eventName = "notifications";
 		String data = "data";
-
-		SseMessage expectedSseMessage = new SseMessage(eventId, receiverId, eventName, data);
 
 		when(sseEmitterRepository.findAllByReceiverId(receiverId))
 			.thenReturn(List.of());
@@ -115,11 +104,6 @@ class SseServiceTest {
 		sseService.sendToReceiver(receiverId, eventId, eventName, data);
 
 		// then
-		ArgumentCaptor<SseMessage> sseMessageCaptor = ArgumentCaptor.forClass(SseMessage.class);
-		verify(sseMessageRepository).save(sseMessageCaptor.capture());
-
-		assertEquals(expectedSseMessage, sseMessageCaptor.getValue());
-
 		verify(sseEmitterRepository).findAllByReceiverId(receiverId);
 		verify(sseEmitterRepository, never()).remove(any(UUID.class), any(SseEmitter.class));
 	}
@@ -133,7 +117,6 @@ class SseServiceTest {
 		String eventName = "notifications";
 		String data = "data";
 
-		SseMessage expectedSseMessage = new SseMessage(eventId, receiverId, eventName, data);
 		SseEmitter sseEmitter = mock(SseEmitter.class);
 		IOException exception = new IOException("SSE Send Failed");
 
@@ -147,11 +130,6 @@ class SseServiceTest {
 		sseService.sendToReceiver(receiverId, eventId, eventName, data);
 
 		// then
-		ArgumentCaptor<SseMessage> sseMessageCaptor = ArgumentCaptor.forClass(SseMessage.class);
-		verify(sseMessageRepository).save(sseMessageCaptor.capture());
-
-		assertEquals(expectedSseMessage, sseMessageCaptor.getValue());
-
 		verify(sseEmitterRepository).findAllByReceiverId(receiverId);
 		verify(sseEmitterRepository).remove(receiverId, sseEmitter);
 	}

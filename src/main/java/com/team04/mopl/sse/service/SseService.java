@@ -8,9 +8,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import com.team04.mopl.sse.dto.SseMessage;
+import com.team04.mopl.notification.dto.response.NotificationDto;
+import com.team04.mopl.notification.service.NotificationRestoreService;
 import com.team04.mopl.sse.repository.SseEmitterRepository;
-import com.team04.mopl.sse.repository.SseMessageRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 public class SseService {
 
 	private final SseEmitterRepository sseEmitterRepository;
-	private final SseMessageRepository sseMessageRepository;
+	private final NotificationRestoreService notificationRestoreService;
 
 	// SSE 연결 유지 시간 (현재: 1시간)
 	private static final long TIMEOUT = 60L * 60L * 1000L;
@@ -68,15 +68,6 @@ public class SseService {
 
 	// 특정 클라이언트에게 이벤트 전송
 	public void sendToReceiver(UUID receiverId, UUID eventId, String eventName, Object data) {
-		SseMessage sseMessage = new SseMessage(
-			eventId,
-			receiverId,
-			eventName,
-			data
-		);
-
-		sseMessageRepository.save(sseMessage);
-
 		for (SseEmitter sseEmitter : sseEmitterRepository.findAllByReceiverId(receiverId)) {
 			try {
 				sendEvent(sseEmitter, eventId, eventName, data);
@@ -122,19 +113,20 @@ public class SseService {
 
 	private void restoreLostEvents(UUID receiverId, UUID lastEventId, SseEmitter sseEmitter) {
 		// lastEventId 이후의 이벤트 가져오기
-		List<SseMessage> afterSseMessageList = sseMessageRepository.findAllAfterLastEventId(receiverId, lastEventId);
+		List<NotificationDto> afterNotificationDtoList =
+			notificationRestoreService.findUnreadNotificationsAfter(receiverId, lastEventId);
 
-		for (SseMessage sseMessage : afterSseMessageList) {
+		for (NotificationDto notificationDto : afterNotificationDtoList) {
 			try {
 				sendEvent(
 					sseEmitter,
-					sseMessage.id(),
-					sseMessage.eventName(),
-					sseMessage.data()
+					notificationDto.id(),
+					"notifications",
+					notificationDto
 				);
 			} catch (Exception e) {
 				log.warn("[SSE_SEND_FAILED] SSE 전송 실패: receiverId={}, eventId={}",
-					receiverId, sseMessage.id(), e);
+					receiverId, notificationDto.id(), e);
 				sseEmitter.completeWithError(e);
 				sseEmitterRepository.remove(receiverId, sseEmitter);
 				return;
