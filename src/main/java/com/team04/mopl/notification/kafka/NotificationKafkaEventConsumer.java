@@ -174,7 +174,7 @@ public class NotificationKafkaEventConsumer {
 			return objectMapper.readValue(kafkaEvent, eventClass);
 		} catch (JsonProcessingException e) {
 			log.error("[EVENT_DESERIALIZATION_FAILED] 이벤트 역직렬화 실패", e);
-			throw new KafkaEventException(KafkaEventErrorCode.KAFKA_EVENT_DESERIALIZATION_FAILED)
+			throw new KafkaEventException(KafkaEventErrorCode.KAFKA_EVENT_DESERIALIZATION_FAILED, e)
 				.addDetail("event", eventClass.getSimpleName());
 		}
 	}
