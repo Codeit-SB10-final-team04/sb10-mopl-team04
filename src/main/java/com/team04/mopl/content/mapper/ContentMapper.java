@@ -11,5 +11,5 @@ import com.team04.mopl.content.entity.Content;
 @Mapper(config = MapStructConfig.class)
 public interface ContentMapper {
 
-	ContentDto toDto(Content content, List<String> tags);
+	ContentDto toDto(Content content, List<String> tags, Long watcherCount);
 }
