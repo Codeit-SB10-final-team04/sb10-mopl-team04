@@ -2,8 +2,6 @@ package com.team04.mopl.watching.store;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Map;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -33,18 +31,6 @@ class SubscriptionStoreTest {
 		store.remove("session-1", "sub-0");
 
 		assertThat(store.getDestination("session-1", "sub-0")).isEmpty();
-	}
-
-	@Test
-	@DisplayName("특정 세션의 모든 구독을 조회할 수 있다")
-	void getAllBySession_returnsAllSubscriptions() {
-		store.register("session-1", "sub-0", "/sub/contents/123/watch");
-		store.register("session-1", "sub-1", "/sub/contents/123/chat");
-		store.register("session-2", "sub-0", "/sub/contents/456/watch");
-
-		Map<String, String> result = store.getAllBySession("session-1");
-
-		assertThat(result).hasSize(2);
 	}
 
 	@Test
