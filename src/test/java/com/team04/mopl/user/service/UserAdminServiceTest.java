@@ -22,6 +22,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.common.enums.SortDirection;
+import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
 import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
 import com.team04.mopl.user.dto.response.CursorResponseUserDto;
@@ -309,6 +310,115 @@ class UserAdminServiceTest {
 		verify(applicationEventPublisher, never()).publishEvent(any(UserRoleChangedEvent.class));
 	}
 
+	@Test
+	@DisplayName("사용자 계정을 잠그면 잠금 상태를 변경하고 인증 세션을 삭제한다")
+	void updateLocked_lockUserAndDeleteSession_whenLockedChangedToTrue() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, UserRole.USER);
+		UserLockUpdateRequest request = new UserLockUpdateRequest(true);
+
+		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+		// when
+		userAdminService.updateLocked(userId, request);
+
+		// then
+		assertThat(user.isLocked()).isTrue();
+		verify(authSessionStore).deleteByUserId(userId);
+	}
+
+	@Test
+	@DisplayName("사용자 계정 잠금을 해제하면 잠금 상태만 변경하고 인증 세션을 삭제하지 않는다")
+	void updateLocked_unlockUserWithoutDeletingSession_whenLockedChangedToFalse() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, UserRole.USER, true);
+		UserLockUpdateRequest request = new UserLockUpdateRequest(false);
+
+		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+		// when
+		userAdminService.updateLocked(userId, request);
+
+		// then
+		assertThat(user.isLocked()).isFalse();
+		verify(authSessionStore, never()).deleteByUserId(userId);
+	}
+
+	@Test
+	@DisplayName("이미 잠긴 사용자 계정을 다시 잠그면 인증 세션을 삭제한다")
+	void updateLocked_deleteSession_whenAlreadyLockedAndLockRequested() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, UserRole.USER, true);
+		UserLockUpdateRequest request = new UserLockUpdateRequest(true);
+
+		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+		// when
+		userAdminService.updateLocked(userId, request);
+
+		// then
+		assertThat(user.isLocked()).isTrue();
+		verify(authSessionStore).deleteByUserId(userId);
+	}
+
+	@Test
+	@DisplayName("이미 잠금 해제된 사용자 계정을 다시 해제하면 인증 세션을 삭제하지 않는다")
+	void updateLocked_doNothing_whenAlreadyUnlockedAndUnlockRequested() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, UserRole.USER);
+		UserLockUpdateRequest request = new UserLockUpdateRequest(false);
+
+		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+		// when
+		userAdminService.updateLocked(userId, request);
+
+		// then
+		assertThat(user.isLocked()).isFalse();
+		verify(authSessionStore, never()).deleteByUserId(userId);
+	}
+
+	@Test
+	@DisplayName("잠금 상태 변경 대상 사용자가 존재하지 않으면 UserException을 던지고 인증 세션을 삭제하지 않는다")
+	void updateLocked_throwUserException_whenUserNotFound() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UserLockUpdateRequest request = new UserLockUpdateRequest(true);
+
+		when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+		// when, then
+		assertThatThrownBy(() -> userAdminService.updateLocked(userId, request))
+			.isInstanceOfSatisfying(UserException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_NOT_FOUND)
+			);
+
+		verify(authSessionStore, never()).deleteByUserId(userId);
+	}
+
+	@Test
+	@DisplayName("잠금 상태가 null이면 UserException을 던지고 인증 세션을 삭제하지 않는다")
+	void updateLocked_throwUserException_whenLockedIsNull() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, UserRole.USER);
+		UserLockUpdateRequest request = new UserLockUpdateRequest(null);
+
+		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+		// when, then
+		assertThatThrownBy(() -> userAdminService.updateLocked(userId, request))
+			.isInstanceOfSatisfying(UserException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_LOCKED_REQUIRED)
+			);
+
+		verify(authSessionStore, never()).deleteByUserId(userId);
+	}
+
 	private String expectedNextCursor(UserSortBy sortBy, UserDto user) {
 		return switch (sortBy) {
 			case name -> user.name();
@@ -320,12 +430,16 @@ class UserAdminServiceTest {
 	}
 
 	private User createUser(UUID userId, UserRole role) {
+		return createUser(userId, role, false);
+	}
+
+	private User createUser(UUID userId, UserRole role, boolean locked) {
 		User user = User.builder()
 			.name("사용자")
 			.email(EMAIL)
 			.passwordHash("encoded-password")
 			.role(role)
-			.locked(false)
+			.locked(locked)
 			.build();
 
 		ReflectionTestUtils.setField(user, "id", userId);
