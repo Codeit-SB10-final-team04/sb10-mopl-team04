@@ -15,12 +15,18 @@ public class SseEmitterRepository {
 	private final ConcurrentHashMap<UUID, List<SseEmitter>> data = new ConcurrentHashMap<>();
 
 	public void add(UUID receiverId, SseEmitter sseEmitter) {
-		// 기존 receiverId가 없다면 새로 생성 후 sseEmitter 저장하고, 이미 있다면 가져옴
-		data.computeIfAbsent(
-				receiverId,
-				id -> new CopyOnWriteArrayList<>()
-			)
-			.add(sseEmitter);
+		// 기존 receiverId에 해당하는 List<SseEmitter>가 없다면 새로 생성 후 sseEmitter를 추가하고, 이미 있다면 가져와서 추가
+		data.compute(
+			receiverId,
+			(id, sseEmitterList) -> {
+				if (sseEmitterList == null) {
+					sseEmitterList = new CopyOnWriteArrayList<>();
+				}
+
+				sseEmitterList.add(sseEmitter);
+				return sseEmitterList;
+			}
+		);
 	}
 
 	public void remove(UUID receiverId, SseEmitter sseEmitter) {
