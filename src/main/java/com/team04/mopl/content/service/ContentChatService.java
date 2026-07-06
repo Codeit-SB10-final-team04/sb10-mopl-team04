@@ -17,7 +17,9 @@ import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -27,6 +29,8 @@ public class ContentChatService {
 
 	public ContentChatDto createChatMessage(Principal principal, ContentChatSendRequest request) {
 		UUID userId = getUserId(principal);
+
+		log.debug("[CONTENT_CHAT_CREATE] 채팅 메시지 생성 시작: userId={}", userId);
 
 		User user = userRepository.findByIdAndLockedFalse(userId)
 			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)

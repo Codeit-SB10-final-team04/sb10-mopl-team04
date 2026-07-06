@@ -2,6 +2,7 @@ package com.team04.mopl.watching.controller;
 
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -32,14 +33,16 @@ public class WatchingSessionController implements WatchingSessionControllerDocs 
 	) {
 		CursorResponse<WatchingSessionDto> response = watchingSessionService.findByContentId(contentId, request);
 
-		return ResponseEntity.ok(response);
+		return ResponseEntity.status(HttpStatus.OK).body(response);
 	}
 
 	@Override
 	@GetMapping("/users/{watcherId}/watching-sessions")
 	public ResponseEntity<WatchingSessionDto> findByWatcher(@PathVariable UUID watcherId) {
-		return watchingSessionService.findByWatcherId(watcherId)
-			.map(ResponseEntity::ok)
-			.orElse(ResponseEntity.ok().build());
+		// 시청 중이 아니면 200 OK + empty body (nullable 응답 명세)
+		WatchingSessionDto response = watchingSessionService.findByWatcherId(watcherId)
+			.orElse(null);
+
+		return ResponseEntity.status(HttpStatus.OK).body(response);
 	}
 }
