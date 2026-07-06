@@ -84,6 +84,12 @@ class WatchingSessionServiceTest {
 		UUID contentId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
 
+		// 검증이 먼저 수행되므로 user/content 조회는 통과시킴
+		User user = mockUser(userId);
+		when(userRepository.findByIdAndLockedFalse(userId)).thenReturn(Optional.of(user));
+		Content content = mockContent(contentId);
+		when(contentRepository.findById(contentId)).thenReturn(Optional.of(content));
+
 		when(watchingSessionStore.addWatcher(contentId, userId)).thenReturn(Optional.empty());
 
 		// when
@@ -91,7 +97,6 @@ class WatchingSessionServiceTest {
 
 		// then
 		assertThat(result).isEmpty();
-		verifyNoInteractions(userRepository, contentRepository);
 	}
 
 	@Test
@@ -125,6 +130,12 @@ class WatchingSessionServiceTest {
 		UUID contentId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
 
+		// 검증이 먼저 수행되므로 user/content 조회는 통과시킴
+		User user = mockUser(userId);
+		when(userRepository.findByIdAndLockedFalse(userId)).thenReturn(Optional.of(user));
+		Content content = mockContent(contentId);
+		when(contentRepository.findById(contentId)).thenReturn(Optional.of(content));
+
 		when(watchingSessionStore.removeWatcher(contentId, userId)).thenReturn(Optional.empty());
 
 		// when
@@ -132,23 +143,23 @@ class WatchingSessionServiceTest {
 
 		// then
 		assertThat(result).isEmpty();
-		verifyNoInteractions(userRepository, contentRepository);
 	}
 
 	@Test
-	@DisplayName("존재하지 않는 유저로 입장하면 UserException을 던진다")
+	@DisplayName("존재하지 않는 유저로 입장하면 UserException을 던지고 Store는 변경되지 않는다")
 	void join_throwsException_whenUserNotFound() {
 		// given
 		UUID contentId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
-		WatchingSessionInfo info = new WatchingSessionInfo(UUID.randomUUID(), Instant.now());
 
-		when(watchingSessionStore.addWatcher(contentId, userId)).thenReturn(Optional.of(info));
 		when(userRepository.findByIdAndLockedFalse(userId)).thenReturn(Optional.empty());
 
 		// when & then
 		assertThatThrownBy(() -> watchingSessionService.join(contentId, userId))
 			.isInstanceOf(UserException.class);
+
+		// 검증 실패 시 Store에 좀비 시청자가 추가되지 않아야 함
+		verify(watchingSessionStore, never()).addWatcher(any(), any());
 	}
 
 	@Test
@@ -295,7 +306,7 @@ class WatchingSessionServiceTest {
 
 	private User mockUser(UUID userId) {
 		User user = mock(User.class);
-		when(user.getId()).thenReturn(userId);
+		lenient().when(user.getId()).thenReturn(userId);
 		lenient().when(user.getName()).thenReturn("테스트유저");
 		lenient().when(user.getProfileImageUrl()).thenReturn(null);
 		return user;

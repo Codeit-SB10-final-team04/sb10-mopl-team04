@@ -88,7 +88,7 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 		UUID userId = getUserId(accessor);
 
 		if (userId == null) {
-			return;
+			throw new MessageDeliveryException(message, "인증 정보가 없습니다.");
 		}
 
 		if ("watch".equals(type)) {

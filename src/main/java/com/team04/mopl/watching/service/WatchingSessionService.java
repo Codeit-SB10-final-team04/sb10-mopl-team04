@@ -53,6 +53,10 @@ public class WatchingSessionService {
 	public Optional<WatchingSessionChange> join(UUID contentId, UUID userId) {
 		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 시작: contentId={}, userId={}", contentId, userId);
 
+		// 검증을 먼저 수행 - 실패 시 Store에 좀비 시청자가 남는 것을 방지
+		User user = getUserOrThrow(userId);
+		Content content = getContentOrThrow(contentId);
+
 		Optional<WatchingSessionInfo> added = watchingSessionStore.addWatcher(contentId, userId);
 
 		if (added.isEmpty()) {
@@ -60,7 +64,7 @@ public class WatchingSessionService {
 			return Optional.empty();
 		}
 
-		WatchingSessionChange change = createChange(ChangeType.JOIN, contentId, userId, added.get());
+		WatchingSessionChange change = createChange(ChangeType.JOIN, user, content, added.get());
 
 		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 완료: contentId={}, userId={}, watcherCount={}",
 			contentId, userId, change.watcherCount());
@@ -72,6 +76,10 @@ public class WatchingSessionService {
 	public Optional<WatchingSessionChange> leave(UUID contentId, UUID userId) {
 		log.info("[WATCHING_SESSION_LEAVE] 시청 세션 퇴장 시작: contentId={}, userId={}", contentId, userId);
 
+		// 검증을 먼저 수행 - 실패 시에도 Store 상태가 변경되지 않도록 보장
+		User user = getUserOrThrow(userId);
+		Content content = getContentOrThrow(contentId);
+
 		Optional<WatchingSessionInfo> removed = watchingSessionStore.removeWatcher(contentId, userId);
 
 		if (removed.isEmpty()) {
@@ -79,7 +87,7 @@ public class WatchingSessionService {
 			return Optional.empty();
 		}
 
-		WatchingSessionChange change = createChange(ChangeType.LEAVE, contentId, userId, removed.get());
+		WatchingSessionChange change = createChange(ChangeType.LEAVE, user, content, removed.get());
 
 		log.info("[WATCHING_SESSION_LEAVE] 시청 세션 퇴장 완료: contentId={}, userId={}, watcherCount={}",
 			contentId, userId, change.watcherCount());
@@ -179,10 +187,7 @@ public class WatchingSessionService {
 		UUID contentId = latest.getKey();
 		WatchingSessionInfo info = latest.getValue();
 
-		User user = userRepository.findByIdAndLockedFalse(watcherId)
-			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
-				.addDetail("userId", watcherId));
-
+		User user = getUserOrThrow(watcherId);
 		Content content = getContentOrThrow(contentId);
 
 		return Optional.of(new WatchingSessionDto(
@@ -221,23 +226,17 @@ public class WatchingSessionService {
 			.toList();
 	}
 
-	// WatchingSessionChange 생성 (Store에 저장된 세션 정보 사용)
+	// WatchingSessionChange 생성 (join/leave에서 이미 검증된 엔티티와 Store 세션 정보 사용)
 	private WatchingSessionChange createChange(
 		ChangeType type,
-		UUID contentId,
-		UUID userId,
+		User user,
+		Content content,
 		WatchingSessionInfo info
 	) {
-		User user = userRepository.findByIdAndLockedFalse(userId)
-			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
-				.addDetail("userId", userId));
-
-		Content content = getContentOrThrow(contentId);
-
 		UserSummary watcher = new UserSummary(user.getId(), user.getName(), user.getProfileImageUrl());
 
 		// 시청자 수는 인메모리 Store에서 집계
-		long watcherCount = watchingSessionStore.getWatcherCount(contentId);
+		long watcherCount = watchingSessionStore.getWatcherCount(content.getId());
 
 		WatchingSessionDto sessionDto = new WatchingSessionDto(
 			info.id(),
@@ -247,6 +246,12 @@ public class WatchingSessionService {
 		);
 
 		return new WatchingSessionChange(type, sessionDto, watcherCount);
+	}
+
+	private User getUserOrThrow(UUID userId) {
+		return userRepository.findByIdAndLockedFalse(userId)
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
+				.addDetail("userId", userId));
 	}
 
 	private Content getContentOrThrow(UUID contentId) {
