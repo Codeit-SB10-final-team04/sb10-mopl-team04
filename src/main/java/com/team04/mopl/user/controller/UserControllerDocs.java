@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 import com.team04.mopl.user.dto.request.UserCreateRequest;
+import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
 import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
 import com.team04.mopl.user.dto.response.CursorResponseUserDto;
@@ -30,5 +31,11 @@ public interface UserControllerDocs {
 	ResponseEntity<Void> updateRole(
 		UUID userId,
 		UserRoleUpdateRequest userRoleUpdateRequest
+	);
+
+	@Operation(summary = "[어드민] 계정 잠금 상태 변경", description = "[어드민 기능] 계정 잠금 상태를 변경합니다.")
+	ResponseEntity<Void> updateLocked(
+		UUID userId,
+		UserLockUpdateRequest userLockUpdateRequest
 	);
 }

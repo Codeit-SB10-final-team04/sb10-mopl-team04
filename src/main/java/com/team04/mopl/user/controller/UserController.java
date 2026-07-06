@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.team04.mopl.user.dto.request.UserCreateRequest;
+import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
 import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
 import com.team04.mopl.user.dto.response.CursorResponseUserDto;
@@ -65,6 +66,19 @@ public class UserController implements UserControllerDocs {
 		@Valid @RequestBody UserRoleUpdateRequest userRoleUpdateRequest
 	) {
 		userAdminService.updateRole(userId, userRoleUpdateRequest);
+
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+	}
+
+	// 관리자 계정 잠금 상태 변경
+	@Override
+	@PreAuthorize("hasRole('ADMIN')")
+	@PatchMapping("/{userId}/locked")
+	public ResponseEntity<Void> updateLocked(
+		@PathVariable UUID userId,
+		@Valid @RequestBody UserLockUpdateRequest userLockUpdateRequest
+	) {
+		userAdminService.updateLocked(userId, userLockUpdateRequest);
 
 		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 	}

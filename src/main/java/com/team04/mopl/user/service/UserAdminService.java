@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.auth.session.AuthSessionStore;
+import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
 import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
 import com.team04.mopl.user.dto.response.CursorResponseUserDto;
@@ -125,6 +126,48 @@ public class UserAdminService {
 		);
 	}
 
+	// 관리자 계정 잠금 상태 변경
+	@Transactional
+	public void updateLocked(UUID userId, UserLockUpdateRequest request) {
+		Boolean newLocked = request.locked();
+
+		log.info("[USER_LOCK_UPDATE] 계정 잠금 상태 변경 시작: userId={}, newLocked={}", userId, newLocked);
+
+		User user = getUserOrThrow(userId);
+
+		// 잠금 상태 필수값 검증
+		validateLocked(newLocked);
+
+		boolean previousLocked = user.isLocked();
+
+		// 같은 상태로 요청한 경우 DB 변경 없이 세션 정리만 수행
+		if (previousLocked == newLocked) {
+			if (newLocked) {
+				authSessionStore.deleteByUserId(userId);
+				log.info("[USER_LOCK_UPDATE] 이미 잠긴 계정의 인증 세션 삭제 완료: userId={}", userId);
+
+				return;
+			}
+
+			log.info("[USER_LOCK_UPDATE] 계정 잠금 상태 변경 없음: userId={}, locked={}", userId, newLocked);
+
+			return;
+		}
+
+		// 계정 잠금 상태 변경
+		user.updateLocked(newLocked);
+
+		if (newLocked) {
+			// 잠긴 계정의 기존 인증 세션 삭제
+			authSessionStore.deleteByUserId(userId);
+			log.info("[USER_LOCK_UPDATE] 계정 잠금 및 인증 세션 삭제 완료: userId={}", userId);
+
+			return;
+		}
+
+		log.info("[USER_LOCK_UPDATE] 계정 잠금 해제 완료: userId={}", userId);
+	}
+
 	// 관리자 기능에서 사용할 사용자 조회
 	private User getUserOrThrow(UUID userId) {
 		return userRepository.findById(userId)
@@ -132,6 +175,13 @@ public class UserAdminService {
 				UserErrorCode.USER_NOT_FOUND,
 				Map.of("userId", userId)
 			));
+	}
+
+	// 잠금 상태 필수값 검증
+	private void validateLocked(Boolean locked) {
+		if (locked == null) {
+			throw new UserException(UserErrorCode.USER_LOCKED_REQUIRED);
+		}
 	}
 
 	// 정렬 기준별 다음 커서 값 추출
