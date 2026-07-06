@@ -201,6 +201,11 @@ public class NotificationKafkaEventConsumer {
 		NotificationType type,
 		NotificationLevel level
 	) {
+		if (receiverIds.isEmpty()) {
+			log.info("[NOTIFICATION_SSE_SEND_SKIP] 알림 수신자가 없어 알림 저장 및 SSE 전송 생략: type={}", type);
+			return;
+		}
+
 		log.info("[NOTIFICATION_SSE_SEND_START] 알림 저장 및 SSE 전송 시작: receiverCount={}, type={}",
 			receiverIds.size(), type);
 
