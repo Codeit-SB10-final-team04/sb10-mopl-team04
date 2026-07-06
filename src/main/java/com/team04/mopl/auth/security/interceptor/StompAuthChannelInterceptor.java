@@ -17,6 +17,7 @@ import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.jwt.JwtAuthenticationClaims;
 import com.team04.mopl.auth.security.jwt.JwtTokenProvider;
 import com.team04.mopl.auth.session.AuthSessionStore;
+import com.team04.mopl.watching.store.WebSocketSessionStore;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,13 +32,12 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
 	private final JwtTokenProvider jwtTokenProvider;
 	private final AuthSessionStore authSessionStore;
+	private final WebSocketSessionStore webSocketSessionStore;
 
-	// 클라이언트 → 서버로 메시지가 전달되기 전에 실행
 	@Override
 	public Message<?> preSend(Message<?> message, MessageChannel channel) {
 		StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-		// CONNECT 프레임이 아닌 경우 (SEND, SUBSCRIBE 등) 인증 검사 없이 통과
 		if (accessor == null || !StompCommand.CONNECT.equals(accessor.getCommand())) {
 			return message;
 		}
@@ -48,9 +48,14 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 		validateAuthSession(claims);
 
 		// 인증된 사용자 정보를 WebSocket 세션에 바인딩
-		// 이후 @MessageMapping 핸들러에서 Principal로 접근 가능
 		Principal principal = createAuthentication(claims);
 		accessor.setUser(principal);
+
+		// 세션 스토어에 등록
+		String sessionId = accessor.getSessionId();
+		if (sessionId != null) {
+			webSocketSessionStore.register(sessionId, claims.userId());
+		}
 
 		log.debug("WebSocket 연결 인증 성공: userId={}", claims.userId());
 
