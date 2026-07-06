@@ -136,6 +136,38 @@ class SseServiceTest {
 	}
 
 	@Test
+	@DisplayName("여러 SseEmitter 중 하나가 전송에 실패해도 나머지 SseEmitter에는 전송이 계속된다.")
+	void sendToReceiver_continueSendSSE_whenOneSseEmitterSendFailed() throws Exception {
+		// given
+		UUID receiverId = UUID.randomUUID();
+		UUID eventId = UUID.randomUUID();
+		String eventName = "notifications";
+		String data = "data";
+
+		SseEmitter sseEmitter1 = mock(SseEmitter.class);
+		SseEmitter sseEmitter2 = mock(SseEmitter.class);
+		IOException exception = new IOException("SSE Send Failed");
+
+		when(sseEmitterRepository.findAllByReceiverId(receiverId))
+			.thenReturn(List.of(sseEmitter1, sseEmitter2));
+		doThrow(exception)
+			.when(sseEmitter1)
+			.send(any(SseEmitter.SseEventBuilder.class));
+
+		// when
+		sseService.sendToReceiver(receiverId, eventId, eventName, data);
+
+		// then
+		verify(sseEmitterRepository).findAllByReceiverId(receiverId);
+
+		verify(sseEmitter1).send(any(SseEmitter.SseEventBuilder.class));
+		verify(sseEmitterRepository).remove(receiverId, sseEmitter1);
+
+		verify(sseEmitter2).send(any(SseEmitter.SseEventBuilder.class));
+		verify(sseEmitterRepository, never()).remove(receiverId, sseEmitter2);
+	}
+
+	@Test
 	@DisplayName("정리 작업 중 ping 전송에 실패한 SseEmitter를 제거한다.")
 	void cleanUp_removeSseEmitter_whenPingFailed() throws Exception {
 		// given

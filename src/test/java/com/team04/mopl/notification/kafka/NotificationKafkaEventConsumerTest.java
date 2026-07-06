@@ -1,5 +1,6 @@
 package com.team04.mopl.notification.kafka;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.time.Instant;
@@ -14,12 +15,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationType;
+import com.team04.mopl.notification.kafka.exception.KafkaEventException;
 import com.team04.mopl.notification.service.NotificationService;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
 import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
@@ -268,6 +271,87 @@ class NotificationKafkaEventConsumerTest {
 			NotificationLevel.INFO
 		);
 		verify(sseService).sendToReceiver(userId, notificationDto.id(), "notifications", notificationDto);
+	}
+
+	@Test
+	@DisplayName("수신자 중 한 명의 SSE 전송에 실패해도 나머지 수신자에게 SSE 전송이 계속된다.")
+	void consumeKafkaEvent_continueSendSSE_whenOneReceiverSSESendFailed() throws Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID playlistId = UUID.randomUUID();
+		UUID subscriberId1 = UUID.randomUUID();
+		UUID subscriberId2 = UUID.randomUUID();
+		String content = "[플레이리스트 제목] 플레이리스트에 [콘텐츠 제목] 이(가) 추가되었습니다.";
+
+		PlaylistContentAddedEvent event = PlaylistContentAddedEvent.of(
+			playlistId,
+			"플레이리스트 제목",
+			UUID.randomUUID(),
+			UUID.randomUUID(),
+			"콘텐츠 제목"
+		);
+
+		NotificationDto notificationDto1 = createNotificationDto(subscriberId1);
+		NotificationDto notificationDto2 = createNotificationDto(subscriberId2);
+
+		when(objectMapper.readValue(kafkaEvent, PlaylistContentAddedEvent.class))
+			.thenReturn(event);
+		when(playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId))
+			.thenReturn(Set.of(subscriberId1, subscriberId2));
+		when(notificationService.saveNotificationList(
+			Set.of(subscriberId1, subscriberId2),
+			"새 콘텐츠 추가 알림",
+			content,
+			NotificationType.CONTENT_ADD,
+			NotificationLevel.INFO
+		)).thenReturn(List.of(notificationDto1, notificationDto2));
+
+		doThrow(new RuntimeException("SSE Send Failed"))
+			.when(sseService)
+			.sendToReceiver(subscriberId1, notificationDto1.id(), "notifications", notificationDto1);
+
+		// when, then
+		assertDoesNotThrow(() -> notificationKafkaEventConsumer.consumePlaylistContentAddedEvent(kafkaEvent));
+
+		verify(notificationService).saveNotificationList(
+			Set.of(subscriberId1, subscriberId2),
+			"새 콘텐츠 추가 알림",
+			content,
+			NotificationType.CONTENT_ADD,
+			NotificationLevel.INFO
+		);
+		verify(playlistSubscriptionRepository).findSubscriberIdsByPlaylistId(playlistId);
+		verify(sseService).sendToReceiver(subscriberId1, notificationDto1.id(), "notifications", notificationDto1);
+		verify(sseService).sendToReceiver(subscriberId2, notificationDto2.id(), "notifications", notificationDto2);
+	}
+
+	@Test
+	@DisplayName("Kafka 이벤트 역직렬화에 실패하면 알림 저장과 SSE 전송을 하지 않는다.")
+	void consumeKafkaEvent_doNotSaveAndSend_whenDeserializationFailed() throws Exception {
+		// given
+		String kafkaEvent = "invalid-kafka-event";
+
+		when(objectMapper.readValue(kafkaEvent, PlaylistSubscribedEvent.class))
+			.thenThrow(new JsonProcessingException("Invalid Kafka Event") {
+			});
+
+		// when, then
+		assertThrows(KafkaEventException.class,
+			() -> notificationKafkaEventConsumer.consumePlaylistSubscribedEvent(kafkaEvent));
+
+		verify(notificationService, never()).saveNotificationList(
+			anySet(),
+			anyString(),
+			anyString(),
+			any(NotificationType.class),
+			any(NotificationLevel.class)
+		);
+		verify(sseService, never()).sendToReceiver(
+			any(UUID.class),
+			any(UUID.class),
+			anyString(),
+			any(PlaylistSubscribedEvent.class)
+		);
 	}
 
 	private NotificationDto createNotificationDto(UUID receiverId) {
