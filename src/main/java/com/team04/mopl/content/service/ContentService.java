@@ -29,6 +29,7 @@ import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
 import com.team04.mopl.content.storage.ThumbnailStorage;
+import com.team04.mopl.watching.service.WatchingSessionService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,13 +45,14 @@ public class ContentService {
 	private final TagRepository tagRepository;
 	private final ThumbnailStorage thumbnailStorage;
 	private final ContentMapper contentMapper;
+	private final WatchingSessionService watchingSessionService;
 
 	public ContentDto getContent(UUID contentId) {
 		Content content = getNotDeletedContentEntityOrThrow(contentId);
 
 		List<String> tags = contentTagRepository.findTagNamesByContentId(contentId);
 
-		return contentMapper.toDto(content, tags);
+		return contentMapper.toDto(content, tags, watchingSessionService.getWatcherCount(content.getId()));
 	}
 
 	// 파일 저장, DB 저장은 한 트랜잭션에 묶일 수 없음
@@ -86,7 +88,7 @@ public class ContentService {
 				tagNames = tags.stream().map(Tag::getName).toList();
 			}
 
-			return contentMapper.toDto(content, tagNames);
+			return contentMapper.toDto(content, tagNames, watchingSessionService.getWatcherCount(content.getId()));
 
 		} catch (Exception e) { // DB 저장 실패 시 파일을 삭제
 			try {
@@ -114,7 +116,11 @@ public class ContentService {
 		Map<UUID, List<String>> tagMap = buildTagMap(contentIds);
 
 		List<ContentDto> data = page.stream()
-			.map(c -> contentMapper.toDto(c, tagMap.getOrDefault(c.getId(), List.of())))
+			.map(c -> contentMapper.toDto(
+				c,
+				tagMap.getOrDefault(c.getId(), List.of()),
+				watchingSessionService.getWatcherCount(c.getId())
+			))
 			.toList();
 
 		// 다음 커서 추출
@@ -188,7 +194,7 @@ public class ContentService {
 
 			log.info("[콘텐츠 수정 완료] contentId={}", contentId);
 
-			return contentMapper.toDto(content, tagNames);
+			return contentMapper.toDto(content, tagNames, watchingSessionService.getWatcherCount(content.getId()));
 
 		} catch (Exception e) {
 			// DB 저장 실패 시 새로 저장한 썸네일 롤백

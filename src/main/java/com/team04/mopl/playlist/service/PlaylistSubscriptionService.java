@@ -2,12 +2,14 @@ package com.team04.mopl.playlist.service;
 
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.entity.PlaylistSubscription;
+import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
 import com.team04.mopl.playlist.exception.PlaylistErrorCode;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
@@ -28,6 +30,8 @@ public class PlaylistSubscriptionService {
 	private final UserRepository userRepository;
 	private final PlaylistRepository playlistRepository;
 	private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
+
+	private final ApplicationEventPublisher applicationEventPublisher;
 
 	@Transactional
 	public void subscribePlaylist(UUID playlistId, UUID currentUserId) {
@@ -60,6 +64,17 @@ public class PlaylistSubscriptionService {
 
 			// 구독
 			playlistSubscriptionRepository.saveAndFlush(playlistSubscription);
+
+			// 이벤트 발행
+			applicationEventPublisher.publishEvent(
+				PlaylistSubscribedEvent.of(
+					playlist.getId(),
+					playlist.getTitle(),
+					playlist.getOwner().getId(),
+					user.getId(),
+					user.getName()
+				)
+			);
 		} catch (DataIntegrityViolationException e) {
 			// unique 제약 조건 충돌
 			throw new PlaylistException(PlaylistErrorCode.PLAYLIST_ALREADY_SUBSCRIBED, e)

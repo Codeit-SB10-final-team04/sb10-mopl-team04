@@ -1,10 +1,8 @@
 package com.team04.mopl.user.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import java.time.Instant;
 import java.util.List;
@@ -19,6 +17,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.team04.mopl.auth.session.AuthSessionStore;
@@ -31,6 +30,7 @@ import com.team04.mopl.user.dto.response.UserDto;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.entity.UserRole;
 import com.team04.mopl.user.enums.UserSortBy;
+import com.team04.mopl.user.event.UserRoleChangedEvent;
 import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
@@ -45,6 +45,9 @@ class UserAdminServiceTest {
 
 	@Mock
 	private AuthSessionStore authSessionStore;
+
+	@Mock
+	private ApplicationEventPublisher applicationEventPublisher;
 
 	@InjectMocks
 	private UserAdminService userAdminService;
@@ -226,6 +229,7 @@ class UserAdminServiceTest {
 		// then
 		assertThat(user.getRole()).isEqualTo(UserRole.ADMIN);
 		verify(authSessionStore).deleteByUserId(userId);
+		verify(applicationEventPublisher).publishEvent(any(UserRoleChangedEvent.class));
 	}
 
 	@Test
@@ -244,6 +248,7 @@ class UserAdminServiceTest {
 		// then
 		assertThat(user.getRole()).isEqualTo(UserRole.USER);
 		verify(authSessionStore).deleteByUserId(userId);
+		verify(applicationEventPublisher).publishEvent(any(UserRoleChangedEvent.class));
 	}
 
 	@Test
@@ -262,6 +267,7 @@ class UserAdminServiceTest {
 		// then
 		assertThat(user.getRole()).isEqualTo(UserRole.USER);
 		verify(authSessionStore, never()).deleteByUserId(userId);
+		verify(applicationEventPublisher, never()).publishEvent(any(UserRoleChangedEvent.class));
 	}
 
 	@Test
@@ -280,6 +286,7 @@ class UserAdminServiceTest {
 			);
 
 		verify(authSessionStore, never()).deleteByUserId(userId);
+		verify(applicationEventPublisher, never()).publishEvent(any(UserRoleChangedEvent.class));
 	}
 
 	@Test
@@ -299,6 +306,7 @@ class UserAdminServiceTest {
 			);
 
 		verify(authSessionStore, never()).deleteByUserId(userId);
+		verify(applicationEventPublisher, never()).publishEvent(any(UserRoleChangedEvent.class));
 	}
 
 	private String expectedNextCursor(UserSortBy sortBy, UserDto user) {
