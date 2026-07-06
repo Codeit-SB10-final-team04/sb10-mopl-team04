@@ -29,7 +29,7 @@ import com.team04.mopl.content.mapper.ContentMapper;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
-import com.team04.mopl.content.storage.ThumbnailStorage;
+import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.watching.service.WatchingSessionService;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,7 +45,7 @@ class ContentServiceTest {
 	private TagRepository tagRepository;
 
 	@Mock
-	private ThumbnailStorage thumbnailStorage;
+	private FileStorage fileStorage;
 
 	@Mock
 	private ContentMapper contentMapper;
@@ -111,7 +111,7 @@ class ContentServiceTest {
 		);
 		ContentDto expectedDto = mock(ContentDto.class);
 
-		when(thumbnailStorage.store(thumbnail)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
+		when(fileStorage.store(thumbnail, "thumbnails")).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
 		when(contentMapper.toDto(any(Content.class), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
@@ -120,7 +120,7 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(thumbnailStorage).store(thumbnail);
+		verify(fileStorage).store(thumbnail, "thumbnails");
 		verify(contentRepository).save(any(Content.class));
 		verify(tagRepository, never()).findAllByNameIn(any());
 		verify(contentTagRepository, never()).saveAll(any());
@@ -140,7 +140,7 @@ class ContentServiceTest {
 		Tag tag2 = Tag.builder().name("SF").build();
 		ContentDto expectedDto = mock(ContentDto.class);
 
-		when(thumbnailStorage.store(thumbnail)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
+		when(fileStorage.store(thumbnail, "thumbnails")).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
 		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(tag1)); // 액션만 기존 존재
 		when(tagRepository.save(any(Tag.class))).thenReturn(tag2);
@@ -167,7 +167,7 @@ class ContentServiceTest {
 			"thumbnail", "thumb.png", "image/png", "image-data".getBytes()
 		);
 
-		when(thumbnailStorage.store(thumbnail)).thenThrow(new RuntimeException("썸네일 저장 실패"));
+		when(fileStorage.store(thumbnail, "thumbnails")).thenThrow(new RuntimeException("썸네일 저장 실패"));
 
 		// when & then
 		assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
@@ -189,14 +189,14 @@ class ContentServiceTest {
 		);
 		String storedUrl = "http://localhost:8080/thumbnails/thumb.png";
 
-		when(thumbnailStorage.store(thumbnail)).thenReturn(storedUrl);
+		when(fileStorage.store(thumbnail, "thumbnails")).thenReturn(storedUrl);
 		when(contentRepository.save(any(Content.class))).thenThrow(new RuntimeException("DB 저장 실패"));
 
 		// when & then
 		assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
 			.isInstanceOf(RuntimeException.class);
 
-		verify(thumbnailStorage).delete(storedUrl);
+		verify(fileStorage).delete(storedUrl);
 	}
 
 	// ========== getContents ==========
@@ -326,7 +326,7 @@ class ContentServiceTest {
 		);
 		String storedUrl = "http://localhost:8080/thumbnails/thumb.png";
 
-		when(thumbnailStorage.store(thumbnail)).thenReturn(storedUrl);
+		when(fileStorage.store(thumbnail, "thumbnails")).thenReturn(storedUrl);
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
 		when(tagRepository.findAllByNameIn(any())).thenThrow(new RuntimeException("태그 저장 실패"));
 
@@ -334,7 +334,7 @@ class ContentServiceTest {
 		assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
 			.isInstanceOf(RuntimeException.class);
 
-		verify(thumbnailStorage).delete(storedUrl);
+		verify(fileStorage).delete(storedUrl);
 	}
 
 	// ========== updateContent ==========
@@ -352,7 +352,7 @@ class ContentServiceTest {
 		assertThatThrownBy(() -> contentService.updateContent(contentId, request, null))
 			.isInstanceOf(ContentException.class);
 
-		verify(thumbnailStorage, never()).store(any());
+		verify(fileStorage, never()).store(any(), any());
 	}
 
 	@Test
@@ -377,8 +377,8 @@ class ContentServiceTest {
 		verify(content).updateTitle("새 제목");
 		verify(content).updateDescription("새 설명");
 		verify(content, never()).updateThumbnailUrl(any());
-		verify(thumbnailStorage, never()).store(any());
-		verify(thumbnailStorage, never()).delete(any());
+		verify(fileStorage, never()).store(any(), any());
+		verify(fileStorage, never()).delete(any());
 	}
 
 	@Test
@@ -397,7 +397,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(content.getThumbnailUrl()).thenReturn(oldUrl);
-		when(thumbnailStorage.store(newThumbnail)).thenReturn(newUrl);
+		when(fileStorage.store(newThumbnail, "thumbnails")).thenReturn(newUrl);
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(List.of());
 		when(contentMapper.toDto(eq(content), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
@@ -406,9 +406,9 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(thumbnailStorage).store(newThumbnail);
+		verify(fileStorage).store(newThumbnail, "thumbnails");
 		verify(content).updateThumbnailUrl(newUrl);
-		verify(thumbnailStorage).delete(oldUrl);
+		verify(fileStorage).delete(oldUrl);
 	}
 
 	@Test
@@ -499,15 +499,15 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(content.getThumbnailUrl()).thenReturn(oldUrl);
-		when(thumbnailStorage.store(newThumbnail)).thenReturn(newUrl);
+		when(fileStorage.store(newThumbnail, "thumbnails")).thenReturn(newUrl);
 		doThrow(new RuntimeException("DB 저장 실패")).when(content).updateTitle("새 제목"); // DB 저장 예외 실패 떤지기
 
 		// when & then
 		assertThatThrownBy(() -> contentService.updateContent(contentId, request, newThumbnail))
 			.isInstanceOf(RuntimeException.class);
 
-		verify(thumbnailStorage).delete(newUrl);
-		verify(thumbnailStorage, never()).delete(oldUrl);
+		verify(fileStorage).delete(newUrl);
+		verify(fileStorage, never()).delete(oldUrl);
 	}
 
 	// ========== deleteContent ==========
