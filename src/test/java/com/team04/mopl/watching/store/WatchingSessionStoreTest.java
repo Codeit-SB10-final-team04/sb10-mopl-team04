@@ -2,6 +2,8 @@ package com.team04.mopl.watching.store;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -13,43 +15,61 @@ class WatchingSessionStoreTest {
 	private final WatchingSessionStore store = new WatchingSessionStore();
 
 	@Test
-	@DisplayName("시청자 추가 시 true를 반환한다")
-	void addWatcher_returnsTrue_whenNewWatcher() {
+	@DisplayName("시청자 추가 시 생성된 세션 정보를 반환한다")
+	void addWatcher_returnsInfo_whenNewWatcher() {
 		UUID contentId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
 
-		assertThat(store.addWatcher(contentId, userId)).isTrue();
+		Optional<WatchingSessionInfo> result = store.addWatcher(contentId, userId);
+
+		assertThat(result).isPresent();
+		assertThat(result.get().id()).isNotNull();
+		assertThat(result.get().joinedAt()).isNotNull();
 	}
 
 	@Test
-	@DisplayName("이미 시청 중인 유저를 추가하면 false를 반환한다")
-	void addWatcher_returnsFalse_whenAlreadyWatching() {
+	@DisplayName("이미 시청 중인 유저를 추가하면 empty를 반환한다")
+	void addWatcher_returnsEmpty_whenAlreadyWatching() {
 		UUID contentId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
 
 		store.addWatcher(contentId, userId);
 
-		assertThat(store.addWatcher(contentId, userId)).isFalse();
+		assertThat(store.addWatcher(contentId, userId)).isEmpty();
 	}
 
 	@Test
-	@DisplayName("시청자 제거 시 true를 반환한다")
-	void removeWatcher_returnsTrue_whenWatching() {
+	@DisplayName("시청자의 세션 정보는 조회할 때마다 동일하게 유지된다")
+	void addWatcher_infoIsStable_acrossReads() {
 		UUID contentId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
 
-		store.addWatcher(contentId, userId);
+		WatchingSessionInfo created = store.addWatcher(contentId, userId).orElseThrow();
 
-		assertThat(store.removeWatcher(contentId, userId)).isTrue();
+		WatchingSessionInfo first = store.getWatchers(contentId).get(userId);
+		WatchingSessionInfo second = store.getWatchers(contentId).get(userId);
+
+		assertThat(first).isEqualTo(created);
+		assertThat(second).isEqualTo(created);
 	}
 
 	@Test
-	@DisplayName("시청 중이 아닌 유저를 제거하면 false를 반환한다")
-	void removeWatcher_returnsFalse_whenNotWatching() {
+	@DisplayName("시청자 제거 시 제거된 세션 정보를 반환한다")
+	void removeWatcher_returnsInfo_whenWatching() {
 		UUID contentId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
 
-		assertThat(store.removeWatcher(contentId, userId)).isFalse();
+		WatchingSessionInfo created = store.addWatcher(contentId, userId).orElseThrow();
+
+		Optional<WatchingSessionInfo> removed = store.removeWatcher(contentId, userId);
+
+		assertThat(removed).contains(created);
+	}
+
+	@Test
+	@DisplayName("시청 중이 아닌 유저를 제거하면 empty를 반환한다")
+	void removeWatcher_returnsEmpty_whenNotWatching() {
+		assertThat(store.removeWatcher(UUID.randomUUID(), UUID.randomUUID())).isEmpty();
 	}
 
 	@Test
@@ -114,8 +134,8 @@ class WatchingSessionStoreTest {
 	}
 
 	@Test
-	@DisplayName("시청자 목록을 조회할 수 있다")
-	void getWatchers_returnsWatcherSet() {
+	@DisplayName("시청자 목록을 세션 정보와 함께 조회할 수 있다")
+	void getWatchers_returnsWatcherInfoMap() {
 		UUID contentId = UUID.randomUUID();
 		UUID userId1 = UUID.randomUUID();
 		UUID userId2 = UUID.randomUUID();
@@ -123,14 +143,29 @@ class WatchingSessionStoreTest {
 		store.addWatcher(contentId, userId1);
 		store.addWatcher(contentId, userId2);
 
-		Set<UUID> result = store.getWatchers(contentId);
+		Map<UUID, WatchingSessionInfo> result = store.getWatchers(contentId);
 
-		assertThat(result).containsExactlyInAnyOrder(userId1, userId2);
+		assertThat(result).containsOnlyKeys(userId1, userId2);
 	}
 
 	@Test
-	@DisplayName("시청자가 없는 콘텐츠의 시청자 목록은 빈 Set을 반환한다")
-	void getWatchers_returnsEmptySet_whenNoWatchers() {
+	@DisplayName("시청자가 없는 콘텐츠의 시청자 목록은 빈 Map을 반환한다")
+	void getWatchers_returnsEmptyMap_whenNoWatchers() {
 		assertThat(store.getWatchers(UUID.randomUUID())).isEmpty();
+	}
+
+	@Test
+	@DisplayName("특정 유저의 시청 세션 전체를 contentId와 함께 조회할 수 있다")
+	void getWatchingSessions_returnsContentInfoMap() {
+		UUID userId = UUID.randomUUID();
+		UUID contentId1 = UUID.randomUUID();
+		UUID contentId2 = UUID.randomUUID();
+
+		store.addWatcher(contentId1, userId);
+		store.addWatcher(contentId2, userId);
+
+		Map<UUID, WatchingSessionInfo> result = store.getWatchingSessions(userId);
+
+		assertThat(result).containsOnlyKeys(contentId1, contentId2);
 	}
 }
