@@ -28,7 +28,7 @@ import com.team04.mopl.content.mapper.ContentMapper;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
-import com.team04.mopl.content.storage.ThumbnailStorage;
+import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.watching.service.WatchingSessionService;
 
 import lombok.RequiredArgsConstructor;
@@ -43,7 +43,10 @@ public class ContentService {
 	private final ContentRepository contentRepository;
 	private final ContentTagRepository contentTagRepository;
 	private final TagRepository tagRepository;
-	private final ThumbnailStorage thumbnailStorage;
+	// 썸네일이 저장될 디렉토리 (FileStorage는 도메인 공용이므로 용도별 디렉토리로 구분)
+	private static final String THUMBNAIL_DIRECTORY = "thumbnails";
+
+	private final FileStorage fileStorage;
 	private final ContentMapper contentMapper;
 	private final WatchingSessionService watchingSessionService;
 
@@ -59,7 +62,7 @@ public class ContentService {
 	@Transactional
 	public ContentDto createContent(ContentCreateRequest contentCreateRequest, MultipartFile thumbnail) {
 		// 로컬에 썸네일 저장 후 Url 리턴
-		String thumbnailUrl = thumbnailStorage.store(thumbnail);
+		String thumbnailUrl = fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY);
 
 		// 콘텐츠 생성
 		Content content = Content.builder()
@@ -92,7 +95,7 @@ public class ContentService {
 
 		} catch (Exception e) { // DB 저장 실패 시 파일을 삭제
 			try {
-				thumbnailStorage.delete(thumbnailUrl);
+				fileStorage.delete(thumbnailUrl);
 			} catch (Exception deleteEx) { // 파일 마저 삭제 실패 시 로그로 기록
 				log.error("파일 삭제 실패, 배치 정리 필요. url={}", thumbnailUrl, deleteEx);
 			}
@@ -150,7 +153,7 @@ public class ContentService {
 		String oldThumbnailUrl = content.getThumbnailUrl();
 
 		if (thumbnail != null) {
-			newThumbnailUrl = thumbnailStorage.store(thumbnail);
+			newThumbnailUrl = fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY);
 		}
 
 		try {
@@ -186,7 +189,7 @@ public class ContentService {
 			// 썸네일 교체 성공 후 기존 파일 삭제
 			if (newThumbnailUrl != null) {
 				try {
-					thumbnailStorage.delete(oldThumbnailUrl);
+					fileStorage.delete(oldThumbnailUrl);
 				} catch (Exception e) {
 					log.error("기존 썸네일 삭제 실패, 배치 정리 필요. url={}", oldThumbnailUrl, e);
 				}
@@ -200,7 +203,7 @@ public class ContentService {
 			// DB 저장 실패 시 새로 저장한 썸네일 롤백
 			if (newThumbnailUrl != null) {
 				try {
-					thumbnailStorage.delete(newThumbnailUrl);
+					fileStorage.delete(newThumbnailUrl);
 				} catch (Exception deleteEx) {
 					log.error("파일 삭제 실패, 배치 정리 필요. url={}", newThumbnailUrl, deleteEx);
 				}
