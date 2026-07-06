@@ -187,8 +187,46 @@ class StompWatchingInterceptorTest {
 	}
 
 	@Test
-	@DisplayName("SEND 프레임은 처리하지 않는다")
-	void preSend_doesNothing_whenSendCommand() {
+	@DisplayName("SEND /pub/.../chat 시 시청 중이면 통과한다")
+	void handleSend_passes_whenWatching() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+
+		StompHeaderAccessor accessor = createAccessor(StompCommand.SEND, userId);
+		accessor.setDestination("/pub/contents/" + contentId + "/chat");
+		Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+		when(watchingSessionService.isWatching(contentId, userId)).thenReturn(true);
+
+		// when
+		interceptor.preSend(message, channel);
+
+		// then
+		verify(watchingSessionService).isWatching(contentId, userId);
+	}
+
+	@Test
+	@DisplayName("SEND /pub/.../chat 시 시청 중이 아니면 예외를 던진다 (구독 없이 발송 차단)")
+	void handleSend_throwsException_whenNotWatching() {
+		// given
+		UUID contentId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+
+		StompHeaderAccessor accessor = createAccessor(StompCommand.SEND, userId);
+		accessor.setDestination("/pub/contents/" + contentId + "/chat");
+		Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+		when(watchingSessionService.isWatching(contentId, userId)).thenReturn(false);
+
+		// when & then
+		assertThatThrownBy(() -> interceptor.preSend(message, channel))
+			.isInstanceOf(MessageDeliveryException.class);
+	}
+
+	@Test
+	@DisplayName("채팅 이외 경로의 SEND 프레임은 처리하지 않는다")
+	void preSend_doesNothing_whenSendToOtherDestination() {
 		// given
 		StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
 		accessor.setLeaveMutable(true);

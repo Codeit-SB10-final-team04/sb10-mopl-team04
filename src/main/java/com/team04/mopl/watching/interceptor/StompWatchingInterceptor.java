@@ -137,6 +137,7 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 			return;
 		}
 
+		// destination 복원
 		subscriptionStore.getDestination(sessionId, subscriptionId)
 			.ifPresent(destination -> {
 				Matcher matcher = SUB_CONTENT_DESTINATION.matcher(destination);
@@ -145,7 +146,6 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 					UUID contentId = UUID.fromString(matcher.group(1));
 					UUID userId = getUserIdFromSession(sessionId);
 
-					// 세션 스토어에 유저가 없으면(정리 타이밍 경합 등) 퇴장 처리 생략 (NPE 방지)
 					watchingSessionService.leave(contentId, userId)
 						.ifPresent(change -> eventPublisher.publishEvent(
 							new WatchingSessionEvent(contentId, change)));
