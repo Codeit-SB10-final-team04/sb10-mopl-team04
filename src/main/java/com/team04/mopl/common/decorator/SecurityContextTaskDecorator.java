@@ -15,9 +15,8 @@ public class SecurityContextTaskDecorator implements TaskDecorator {
 			try {
 				if (securityContext != null) {
 					SecurityContextHolder.setContext(securityContext);
-
-					runnable.run();
 				}
+				runnable.run();
 			} finally {
 				SecurityContextHolder.clearContext();
 			}
