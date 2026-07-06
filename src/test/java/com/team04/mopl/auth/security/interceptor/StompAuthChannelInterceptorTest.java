@@ -22,16 +22,19 @@ import com.team04.mopl.auth.security.jwt.JwtAuthenticationClaims;
 import com.team04.mopl.auth.security.jwt.JwtTokenProvider;
 import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.watching.store.WebSocketSessionStore;
 
 class StompAuthChannelInterceptorTest {
 
 	private final JwtTokenProvider jwtTokenProvider = mock(JwtTokenProvider.class);
 	private final AuthSessionStore authSessionStore = mock(AuthSessionStore.class);
+	private final WebSocketSessionStore webSocketSessionStore = mock(WebSocketSessionStore.class);
 	private final MessageChannel channel = mock(MessageChannel.class);
 
 	private final StompAuthChannelInterceptor interceptor = new StompAuthChannelInterceptor(
 		jwtTokenProvider,
-		authSessionStore
+		authSessionStore,
+		webSocketSessionStore
 	);
 
 	@Test
