@@ -30,6 +30,7 @@ import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
 import com.team04.mopl.content.storage.ThumbnailStorage;
+import com.team04.mopl.watching.service.WatchingSessionService;
 
 @ExtendWith(MockitoExtension.class)
 class ContentServiceTest {
@@ -49,6 +50,9 @@ class ContentServiceTest {
 	@Mock
 	private ContentMapper contentMapper;
 
+	@Mock
+	private WatchingSessionService watchingSessionService;
+
 	@InjectMocks
 	private ContentService contentService;
 
@@ -65,7 +69,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(tags);
-		when(contentMapper.toDto(content, tags)).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(tags), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.getContent(contentId);
@@ -74,7 +78,7 @@ class ContentServiceTest {
 		assertThat(result).isEqualTo(expectedDto);
 		verify(contentRepository).findByIdAndDeletedAtIsNull(contentId);
 		verify(contentTagRepository).findTagNamesByContentId(contentId);
-		verify(contentMapper).toDto(content, tags);
+		verify(contentMapper).toDto(eq(content), eq(tags), anyLong());
 	}
 
 	@Test
@@ -90,7 +94,7 @@ class ContentServiceTest {
 			.isInstanceOf(ContentException.class);
 
 		verify(contentTagRepository, never()).findTagNamesByContentId(any());
-		verify(contentMapper, never()).toDto(any(), any());
+		verify(contentMapper, never()).toDto(any(), any(), anyLong());
 	}
 
 	// ========== createContent ==========
@@ -109,7 +113,7 @@ class ContentServiceTest {
 
 		when(thumbnailStorage.store(thumbnail)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
-		when(contentMapper.toDto(any(Content.class), eq(List.of()))).thenReturn(expectedDto);
+		when(contentMapper.toDto(any(Content.class), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.createContent(request, thumbnail);
@@ -140,7 +144,7 @@ class ContentServiceTest {
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
 		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(tag1)); // 액션만 기존 존재
 		when(tagRepository.save(any(Tag.class))).thenReturn(tag2);
-		when(contentMapper.toDto(any(Content.class), eq(List.of("액션", "SF")))).thenReturn(expectedDto);
+		when(contentMapper.toDto(any(Content.class), eq(List.of("액션", "SF")), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.createContent(request, thumbnail);
@@ -216,8 +220,8 @@ class ContentServiceTest {
 		when(contentRepository.findContents(req)).thenReturn(List.of(c1, c2));
 		when(contentRepository.countContents(req)).thenReturn(2L);
 		when(contentTagRepository.findTagNamesByContentIds(List.of(id1, id2))).thenReturn(List.of());
-		when(contentMapper.toDto(c1, List.of())).thenReturn(dto1);
-		when(contentMapper.toDto(c2, List.of())).thenReturn(dto2);
+		when(contentMapper.toDto(eq(c1), eq(List.of()), anyLong())).thenReturn(dto1);
+		when(contentMapper.toDto(eq(c2), eq(List.of()), anyLong())).thenReturn(dto2);
 
 		// when
 		CursorResponse<ContentDto> result = contentService.getContents(req);
@@ -252,8 +256,8 @@ class ContentServiceTest {
 		when(contentRepository.findContents(req)).thenReturn(List.of(c1, c2, c3));
 		when(contentRepository.countContents(req)).thenReturn(5L);
 		when(contentTagRepository.findTagNamesByContentIds(List.of(id1, id2))).thenReturn(List.of());
-		when(contentMapper.toDto(c1, List.of())).thenReturn(dto1);
-		when(contentMapper.toDto(c2, List.of())).thenReturn(dto2);
+		when(contentMapper.toDto(eq(c1), eq(List.of()), anyLong())).thenReturn(dto1);
+		when(contentMapper.toDto(eq(c2), eq(List.of()), anyLong())).thenReturn(dto2);
 
 		// when
 		CursorResponse<ContentDto> result = contentService.getContents(req);
@@ -282,14 +286,14 @@ class ContentServiceTest {
 		when(contentRepository.findContents(req)).thenReturn(List.of(c1));
 		when(contentRepository.countContents(req)).thenReturn(1L);
 		when(contentTagRepository.findTagNamesByContentIds(List.of(id1))).thenReturn(List.of(tagRow));
-		when(contentMapper.toDto(c1, List.of("액션"))).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(c1), eq(List.of("액션")), anyLong())).thenReturn(expectedDto);
 
 		// when
 		CursorResponse<ContentDto> result = contentService.getContents(req);
 
 		// then
 		assertThat(result.data().get(0)).isEqualTo(expectedDto);
-		verify(contentMapper).toDto(c1, List.of("액션"));
+		verify(contentMapper).toDto(eq(c1), eq(List.of("액션")), anyLong());
 	}
 
 	@Test
@@ -363,7 +367,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(existingTags);
-		when(contentMapper.toDto(content, existingTags)).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(existingTags), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.updateContent(contentId, request, null);
@@ -395,7 +399,7 @@ class ContentServiceTest {
 		when(content.getThumbnailUrl()).thenReturn(oldUrl);
 		when(thumbnailStorage.store(newThumbnail)).thenReturn(newUrl);
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(List.of());
-		when(contentMapper.toDto(content, List.of())).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.updateContent(contentId, request, newThumbnail);
@@ -421,7 +425,7 @@ class ContentServiceTest {
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(existingTag)); // 액션만 기존 존재
 		when(tagRepository.save(any(Tag.class))).thenReturn(newTag);
-		when(contentMapper.toDto(eq(content), eq(List.of("액션", "SF")))).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(List.of("액션", "SF")), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.updateContent(contentId, request, null);
@@ -445,7 +449,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(tagRepository.findAllByNameIn(List.of())).thenReturn(List.of());
-		when(contentMapper.toDto(content, List.of())).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.updateContent(contentId, request, null);
@@ -469,7 +473,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(existingTags);
-		when(contentMapper.toDto(content, existingTags)).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(existingTags), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.updateContent(contentId, request, null);

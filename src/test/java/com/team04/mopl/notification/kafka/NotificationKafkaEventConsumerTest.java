@@ -1,0 +1,367 @@
+package com.team04.mopl.notification.kafka;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.follow.event.FollowCreatedEvent;
+import com.team04.mopl.follow.repository.FollowRepository;
+import com.team04.mopl.notification.dto.response.NotificationDto;
+import com.team04.mopl.notification.enums.NotificationLevel;
+import com.team04.mopl.notification.enums.NotificationType;
+import com.team04.mopl.notification.kafka.exception.KafkaEventException;
+import com.team04.mopl.notification.service.NotificationService;
+import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
+import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
+import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
+import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
+import com.team04.mopl.sse.service.SseService;
+import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.event.UserRoleChangedEvent;
+
+@ExtendWith(MockitoExtension.class)
+class NotificationKafkaEventConsumerTest {
+
+	@Mock
+	private PlaylistSubscriptionRepository playlistSubscriptionRepository;
+
+	@Mock
+	private FollowRepository followRepository;
+
+	@Mock
+	private NotificationService notificationService;
+
+	@Mock
+	private SseService sseService;
+
+	@Mock
+	private ObjectMapper objectMapper;
+
+	@InjectMocks
+	private NotificationKafkaEventConsumer notificationKafkaEventConsumer;
+
+	@Test
+	@DisplayName("플레이리스트 구독 이벤트를 소비하면 플레이리스트 소유자에게 알림을 저장하고 SSE 전송한다.")
+	void consumePlaylistSubscribedEvent_saveNotificationAndSendSSE_whenValidRequest() throws Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID playlistOwnerId = UUID.randomUUID();
+		String content = "[구독자 이름] 님이 [플레이리스트 제목] 플레이리스트를 구독했습니다.";
+
+		PlaylistSubscribedEvent event = PlaylistSubscribedEvent.of(
+			UUID.randomUUID(),
+			"플레이리스트 제목",
+			playlistOwnerId,
+			UUID.randomUUID(),
+			"구독자 이름"
+		);
+
+		NotificationDto notificationDto = createNotificationDto(playlistOwnerId);
+
+		when(objectMapper.readValue(kafkaEvent, PlaylistSubscribedEvent.class))
+			.thenReturn(event);
+		when(notificationService.saveNotificationList(
+			Set.of(playlistOwnerId),
+			"새 플레이리스트 구독 알림",
+			content,
+			NotificationType.SUBSCRIBE,
+			NotificationLevel.INFO
+		)).thenReturn(List.of(notificationDto));
+
+		// when
+		notificationKafkaEventConsumer.consumePlaylistSubscribedEvent(kafkaEvent);
+
+		// then
+		verify(notificationService).saveNotificationList(
+			Set.of(playlistOwnerId),
+			"새 플레이리스트 구독 알림",
+			content,
+			NotificationType.SUBSCRIBE,
+			NotificationLevel.INFO
+		);
+		verify(sseService).sendToReceiver(playlistOwnerId, notificationDto.id(), "notifications", notificationDto);
+	}
+
+	@Test
+	@DisplayName("플레이리스트 콘텐츠 추가 이벤트를 소비하면 플레이리스트 구독자에게 알림을 저장하고 SSE 전송한다.")
+	void consumePlaylistContentAddedEvent_saveNotificationAndSendSSE_whenValidRequest() throws Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID playlistId = UUID.randomUUID();
+		UUID subscriberId1 = UUID.randomUUID();
+		UUID subscriberId2 = UUID.randomUUID();
+		String content = "[플레이리스트 제목] 플레이리스트에 [콘텐츠 제목] 이(가) 추가되었습니다.";
+
+		PlaylistContentAddedEvent event = PlaylistContentAddedEvent.of(
+			playlistId,
+			"플레이리스트 제목",
+			UUID.randomUUID(),
+			UUID.randomUUID(),
+			"콘텐츠 제목"
+		);
+
+		NotificationDto notificationDto1 = createNotificationDto(subscriberId1);
+		NotificationDto notificationDto2 = createNotificationDto(subscriberId2);
+
+		when(objectMapper.readValue(kafkaEvent, PlaylistContentAddedEvent.class))
+			.thenReturn(event);
+		when(playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId))
+			.thenReturn(Set.of(subscriberId1, subscriberId2));
+		when(notificationService.saveNotificationList(
+			Set.of(subscriberId1, subscriberId2),
+			"새 콘텐츠 추가 알림",
+			content,
+			NotificationType.CONTENT_ADD,
+			NotificationLevel.INFO
+		)).thenReturn(List.of(notificationDto1, notificationDto2));
+
+		// when
+		notificationKafkaEventConsumer.consumePlaylistContentAddedEvent(kafkaEvent);
+
+		// then
+		verify(notificationService).saveNotificationList(
+			Set.of(subscriberId1, subscriberId2),
+			"새 콘텐츠 추가 알림",
+			content,
+			NotificationType.CONTENT_ADD,
+			NotificationLevel.INFO
+		);
+		verify(playlistSubscriptionRepository).findSubscriberIdsByPlaylistId(playlistId);
+		verify(sseService).sendToReceiver(subscriberId1, notificationDto1.id(), "notifications", notificationDto1);
+		verify(sseService).sendToReceiver(subscriberId2, notificationDto2.id(), "notifications", notificationDto2);
+	}
+
+	@Test
+	@DisplayName("팔로우 생성 이벤트를 소비하면 팔로우를 당한 사용자에게 알림을 저장하고 SSE 전송한다.")
+	void consumeFollowCreatedEvent_saveNotificationAndSendSSE_whenValidRequest() throws Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID followeeId = UUID.randomUUID();
+		String content = "[팔로워 이름] 님이 팔로우했습니다.";
+
+		FollowCreatedEvent event = FollowCreatedEvent.of(
+			followeeId,
+			"팔로우 당한 사용자 이름",
+			UUID.randomUUID(),
+			"팔로워 이름"
+		);
+
+		NotificationDto notificationDto = createNotificationDto(followeeId);
+
+		when(objectMapper.readValue(kafkaEvent, FollowCreatedEvent.class))
+			.thenReturn(event);
+		when(notificationService.saveNotificationList(
+			Set.of(followeeId),
+			"새 팔로우 알림",
+			content,
+			NotificationType.FOLLOW,
+			NotificationLevel.INFO
+		)).thenReturn(List.of(notificationDto));
+
+		// when
+		notificationKafkaEventConsumer.consumeFollowCreatedEvent(kafkaEvent);
+
+		// then
+		verify(notificationService).saveNotificationList(
+			Set.of(followeeId),
+			"새 팔로우 알림",
+			content,
+			NotificationType.FOLLOW,
+			NotificationLevel.INFO
+		);
+		verify(sseService).sendToReceiver(followeeId, notificationDto.id(), "notifications", notificationDto);
+	}
+
+	@Test
+	@DisplayName("플레이리스트 생성 이벤트를 소비하면 해당 사용자의 구독자에게 알림을 저장하고 SSE 전송한다.")
+	void consumePlaylistCreatedEvent_saveNotificationAndSendSSE_whenValidRequest() throws Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID followeeId = UUID.randomUUID();
+		UUID followerId1 = UUID.randomUUID();
+		UUID followerId2 = UUID.randomUUID();
+		String content = "[플레이리스트 소유자 이름] 님이 [플레이리스트 제목] 플레이리스트를 생성하셨습니다.";
+
+		PlaylistCreatedEvent event = PlaylistCreatedEvent.of(
+			UUID.randomUUID(),
+			"플레이리스트 제목",
+			followeeId,
+			"플레이리스트 소유자 이름"
+		);
+
+		NotificationDto notificationDto1 = createNotificationDto(followerId1);
+		NotificationDto notificationDto2 = createNotificationDto(followerId2);
+
+		when(objectMapper.readValue(kafkaEvent, PlaylistCreatedEvent.class))
+			.thenReturn(event);
+		when(followRepository.findFollowerIdsByFolloweeId(followeeId))
+			.thenReturn(Set.of(followerId1, followerId2));
+		when(notificationService.saveNotificationList(
+			Set.of(followerId1, followerId2),
+			"새 활동 알림",
+			content,
+			NotificationType.FOLLOWING_ACTIVITY,
+			NotificationLevel.INFO
+		)).thenReturn(List.of(notificationDto1, notificationDto2));
+
+		// when
+		notificationKafkaEventConsumer.consumePlaylistCreatedEvent(kafkaEvent);
+
+		// then
+		verify(notificationService).saveNotificationList(
+			Set.of(followerId1, followerId2),
+			"새 활동 알림",
+			content,
+			NotificationType.FOLLOWING_ACTIVITY,
+			NotificationLevel.INFO
+		);
+		verify(followRepository).findFollowerIdsByFolloweeId(followeeId);
+		verify(sseService).sendToReceiver(followerId1, notificationDto1.id(), "notifications", notificationDto1);
+		verify(sseService).sendToReceiver(followerId2, notificationDto2.id(), "notifications", notificationDto2);
+	}
+
+	@Test
+	@DisplayName("사용자 권한 변경 이벤트를 소비하면 해당 사용자에게 알림을 저장하고 SSE 전송한다.")
+	void consumeUserRoleChangedEvent_saveNotificationAndSendSSE_whenValidRequest() throws Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID userId = UUID.randomUUID();
+		String content = "[일반 사용자] 권한에서 [관리자] 권한으로 변경되었습니다.";
+
+		UserRoleChangedEvent event = UserRoleChangedEvent.of(
+			userId,
+			UserRole.USER,
+			UserRole.ADMIN
+		);
+
+		NotificationDto notificationDto = createNotificationDto(userId);
+
+		when(objectMapper.readValue(kafkaEvent, UserRoleChangedEvent.class))
+			.thenReturn(event);
+		when(notificationService.saveNotificationList(
+			Set.of(userId),
+			"권한 변경 알림",
+			content,
+			NotificationType.ROLE_CHANGE,
+			NotificationLevel.INFO
+		)).thenReturn(List.of(notificationDto));
+
+		// when
+		notificationKafkaEventConsumer.consumeUserRoleChangedEvent(kafkaEvent);
+
+		// then
+		verify(notificationService).saveNotificationList(
+			Set.of(userId),
+			"권한 변경 알림",
+			content,
+			NotificationType.ROLE_CHANGE,
+			NotificationLevel.INFO
+		);
+		verify(sseService).sendToReceiver(userId, notificationDto.id(), "notifications", notificationDto);
+	}
+
+	@Test
+	@DisplayName("수신자 중 한 명의 SSE 전송에 실패해도 나머지 수신자에게 SSE 전송이 계속된다.")
+	void consumeKafkaEvent_continueSendSSE_whenOneReceiverSSESendFailed() throws Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID playlistId = UUID.randomUUID();
+		UUID subscriberId1 = UUID.randomUUID();
+		UUID subscriberId2 = UUID.randomUUID();
+		String content = "[플레이리스트 제목] 플레이리스트에 [콘텐츠 제목] 이(가) 추가되었습니다.";
+
+		PlaylistContentAddedEvent event = PlaylistContentAddedEvent.of(
+			playlistId,
+			"플레이리스트 제목",
+			UUID.randomUUID(),
+			UUID.randomUUID(),
+			"콘텐츠 제목"
+		);
+
+		NotificationDto notificationDto1 = createNotificationDto(subscriberId1);
+		NotificationDto notificationDto2 = createNotificationDto(subscriberId2);
+
+		when(objectMapper.readValue(kafkaEvent, PlaylistContentAddedEvent.class))
+			.thenReturn(event);
+		when(playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId))
+			.thenReturn(Set.of(subscriberId1, subscriberId2));
+		when(notificationService.saveNotificationList(
+			Set.of(subscriberId1, subscriberId2),
+			"새 콘텐츠 추가 알림",
+			content,
+			NotificationType.CONTENT_ADD,
+			NotificationLevel.INFO
+		)).thenReturn(List.of(notificationDto1, notificationDto2));
+
+		doThrow(new RuntimeException("SSE Send Failed"))
+			.when(sseService)
+			.sendToReceiver(subscriberId1, notificationDto1.id(), "notifications", notificationDto1);
+
+		// when, then
+		assertDoesNotThrow(() -> notificationKafkaEventConsumer.consumePlaylistContentAddedEvent(kafkaEvent));
+
+		verify(notificationService).saveNotificationList(
+			Set.of(subscriberId1, subscriberId2),
+			"새 콘텐츠 추가 알림",
+			content,
+			NotificationType.CONTENT_ADD,
+			NotificationLevel.INFO
+		);
+		verify(playlistSubscriptionRepository).findSubscriberIdsByPlaylistId(playlistId);
+		verify(sseService).sendToReceiver(subscriberId1, notificationDto1.id(), "notifications", notificationDto1);
+		verify(sseService).sendToReceiver(subscriberId2, notificationDto2.id(), "notifications", notificationDto2);
+	}
+
+	@Test
+	@DisplayName("Kafka 이벤트 역직렬화에 실패하면 알림 저장과 SSE 전송을 하지 않는다.")
+	void consumeKafkaEvent_doNotSaveAndSend_whenDeserializationFailed() throws Exception {
+		// given
+		String kafkaEvent = "invalid-kafka-event";
+
+		when(objectMapper.readValue(kafkaEvent, PlaylistSubscribedEvent.class))
+			.thenThrow(new JsonProcessingException("Invalid Kafka Event") {
+			});
+
+		// when, then
+		assertThrows(KafkaEventException.class,
+			() -> notificationKafkaEventConsumer.consumePlaylistSubscribedEvent(kafkaEvent));
+
+		verify(notificationService, never()).saveNotificationList(
+			anySet(),
+			anyString(),
+			anyString(),
+			any(NotificationType.class),
+			any(NotificationLevel.class)
+		);
+		verify(sseService, never()).sendToReceiver(
+			any(UUID.class),
+			any(UUID.class),
+			anyString(),
+			any(PlaylistSubscribedEvent.class)
+		);
+	}
+
+	private NotificationDto createNotificationDto(UUID receiverId) {
+		return new NotificationDto(
+			UUID.randomUUID(),
+			Instant.now(),
+			receiverId,
+			"알림 제목",
+			"알림 내용",
+			NotificationLevel.INFO
+		);
+	}
+}

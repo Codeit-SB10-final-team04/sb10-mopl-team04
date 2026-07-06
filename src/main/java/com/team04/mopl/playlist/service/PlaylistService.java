@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import com.team04.mopl.playlist.dto.response.PlaylistDto;
 import com.team04.mopl.playlist.dto.row.PlaylistContentRow;
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.enums.PlaylistSortBy;
+import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
 import com.team04.mopl.playlist.exception.PlaylistErrorCode;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.mapper.PlaylistMapper;
@@ -51,6 +53,8 @@ public class PlaylistService {
 	private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
 	private final PlaylistContentRepository playlistContentRepository;
 	private final PlaylistMapper playlistMapper;
+
+	private final ApplicationEventPublisher applicationEventPublisher;
 
 	@Transactional
 	public PlaylistDto createPlaylist(PlaylistCreateRequest request, UUID currentUserId) {
@@ -88,6 +92,16 @@ public class PlaylistService {
 			subscriberCount,
 			subscribedByMe,
 			contentSummaries
+		);
+
+		// 이벤트 발행
+		applicationEventPublisher.publishEvent(
+			PlaylistCreatedEvent.of(
+				playlist.getId(),
+				playlist.getTitle(),
+				owner.getId(),
+				owner.getName()
+			)
 		);
 
 		log.info("[PLAYLIST_CREATE] 플레이리스트 생성 완료: currentUserId={}, playlistId={}, title={}",

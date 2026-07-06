@@ -13,11 +13,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.team04.mopl.playlist.entity.Playlist;
 import com.team04.mopl.playlist.entity.PlaylistSubscription;
+import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
 import com.team04.mopl.playlist.exception.PlaylistException;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
@@ -36,6 +38,9 @@ class PlaylistSubscriptionServiceTest {
 
 	@Mock
 	private PlaylistSubscriptionRepository playlistSubscriptionRepository;
+
+	@Mock
+	private ApplicationEventPublisher applicationEventPublisher;
 
 	@InjectMocks
 	private PlaylistSubscriptionService playlistSubscriptionService;
@@ -66,6 +71,7 @@ class PlaylistSubscriptionServiceTest {
 		verify(userRepository).findByIdAndLockedFalse(currentUserId);
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository).existsByPlaylistIdAndSubscriberId(playlistId, currentUserId);
+		verify(applicationEventPublisher).publishEvent(any(PlaylistSubscribedEvent.class));
 
 		ArgumentCaptor<PlaylistSubscription> playlistSubscriptionCaptor =
 			ArgumentCaptor.forClass(PlaylistSubscription.class);
@@ -92,6 +98,7 @@ class PlaylistSubscriptionServiceTest {
 		verify(playlistSubscriptionRepository, never()).existsByPlaylistIdAndSubscriberId(any(UUID.class),
 			any(UUID.class));
 		verify(playlistSubscriptionRepository, never()).saveAndFlush(any(PlaylistSubscription.class));
+		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistSubscribedEvent.class));
 	}
 
 	@Test
@@ -118,6 +125,7 @@ class PlaylistSubscriptionServiceTest {
 		verify(playlistSubscriptionRepository, never()).existsByPlaylistIdAndSubscriberId(any(UUID.class),
 			any(UUID.class));
 		verify(playlistSubscriptionRepository, never()).saveAndFlush(any(PlaylistSubscription.class));
+		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistSubscribedEvent.class));
 	}
 
 	@Test
@@ -148,6 +156,7 @@ class PlaylistSubscriptionServiceTest {
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository).existsByPlaylistIdAndSubscriberId(playlistId, currentUserId);
 		verify(playlistSubscriptionRepository, never()).saveAndFlush(any(PlaylistSubscription.class));
+		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistSubscribedEvent.class));
 	}
 
 	@Test
@@ -180,6 +189,7 @@ class PlaylistSubscriptionServiceTest {
 		verify(playlistRepository).findByIdWithOwnerAndDeletedAtIsNull(playlistId);
 		verify(playlistSubscriptionRepository).existsByPlaylistIdAndSubscriberId(playlistId, currentUserId);
 		verify(playlistSubscriptionRepository).saveAndFlush(any(PlaylistSubscription.class));
+		verify(applicationEventPublisher, never()).publishEvent(any(PlaylistSubscribedEvent.class));
 	}
 
 	@Test

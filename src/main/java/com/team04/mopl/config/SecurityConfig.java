@@ -28,7 +28,6 @@ import org.springframework.security.web.savedrequest.NullRequestCache;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.team04.mopl.auth.security.csrf.SpaCsrfTokenRequestHandler;
-import com.team04.mopl.auth.security.provider.MoplAuthenticationProvider;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.auth.security.handler.AuthSessionLogoutHandler;
 import com.team04.mopl.auth.security.handler.LoginFailureHandler;
@@ -38,6 +37,7 @@ import com.team04.mopl.auth.security.handler.RestAuthenticationEntryPoint;
 import com.team04.mopl.auth.security.handler.RestLogoutSuccessHandler;
 import com.team04.mopl.auth.security.jwt.JwtExpiredTokenValidator;
 import com.team04.mopl.auth.security.jwt.JwtProperties;
+import com.team04.mopl.auth.security.provider.MoplAuthenticationProvider;
 
 @EnableMethodSecurity
 @Configuration
@@ -59,6 +59,7 @@ public class SecurityConfig {
 		return http
 			// CSRF 토큰 발급
 			.csrf(csrf -> csrf
+				.ignoringRequestMatchers("/ws/**")
 				.csrfTokenRepository(csrfTokenRepository())
 				.csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
 
@@ -105,10 +106,10 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll() // CSRF 토큰 조회
 				.requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll() // 비밀번호 초기화
 				.requestMatchers(
+					"/ws/**",
 					"/swagger-ui/**",
 					"/v3/api-docs/**",
 					"/actuator/health",
-					"/api/sse",
 					"/thumbnails/**",
 					"/",
 					"/index.html",
