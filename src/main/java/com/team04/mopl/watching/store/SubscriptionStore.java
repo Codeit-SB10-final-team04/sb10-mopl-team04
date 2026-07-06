@@ -1,6 +1,5 @@
 package com.team04.mopl.watching.store;
 
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,20 +30,6 @@ public class SubscriptionStore {
 	public void removeAllBySession(String sessionId) {
 		String prefix = sessionId + ":";
 		subscriptionMap.keySet().removeIf(key -> key.startsWith(prefix));
-	}
-
-	// 특정 세션의 모든 구독 조회 (DISCONNECT 시 정리용)
-	public Map<String, String> getAllBySession(String sessionId) {
-		String prefix = sessionId + ":";
-		ConcurrentHashMap<String, String> result = new ConcurrentHashMap<>();
-
-		subscriptionMap.forEach((key, value) -> {
-			if (key.startsWith(prefix)) {
-				result.put(key, value);
-			}
-		});
-
-		return result;
 	}
 
 	private String toKey(String sessionId, String subscriptionId) {
