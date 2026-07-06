@@ -58,16 +58,3 @@ CREATE TABLE IF NOT EXISTS content_reviews
     CONSTRAINT fk_reviews_user FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT fk_reviews_content FOREIGN KEY (content_id) REFERENCES contents (id)
 );
-
-CREATE TABLE IF NOT EXISTS notifications
-(
-    id          UUID PRIMARY KEY,
-    receiver_id UUID                     NOT NULL,
-    title       VARCHAR(50)              NOT NULL,
-    content     TEXT                     NOT NULL,
-    type        VARCHAR(30)              NOT NULL,
-    level       VARCHAR(20)              NOT NULL,
-    read_at     TIMESTAMP WITH TIME ZONE,
-    created_at  TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT fk_notifications_receiver FOREIGN KEY (receiver_id) REFERENCES users (id)
-);
