@@ -15,6 +15,7 @@ import com.team04.mopl.content.dto.request.ContentChatSendRequest;
 import com.team04.mopl.content.dto.response.ContentChatDto;
 import com.team04.mopl.content.service.ContentChatService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,7 +30,7 @@ public class ContentChatController {
 	@MessageMapping("/contents/{contentId}/chat")
 	public void sendMessage(
 		@DestinationVariable UUID contentId,
-		@Payload ContentChatSendRequest request,
+		@Valid @Payload ContentChatSendRequest request,
 		Principal principal
 	) {
 		ContentChatDto chatMessage = contentChatService.createChatMessage(principal, request);
