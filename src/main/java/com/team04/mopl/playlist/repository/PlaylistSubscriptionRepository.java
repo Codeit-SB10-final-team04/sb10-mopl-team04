@@ -36,4 +36,13 @@ public interface PlaylistSubscriptionRepository extends JpaRepository<PlaylistSu
 	boolean existsByPlaylistIdAndSubscriberId(UUID playlistId, UUID subscriberId);
 
 	Optional<PlaylistSubscription> findByPlaylistIdAndSubscriberId(UUID playlistId, UUID subscriberId);
+
+	@Query(value = """
+		SELECT s.id
+		FROM PlaylistSubscription AS ps
+		JOIN ps.subscriber AS s
+		WHERE ps.playlist.id = :playlistId
+			AND s.locked = false 
+		""")
+	Set<UUID> findSubscriberIdsByPlaylistId(@Param("playlistId") UUID playlistId);
 }

@@ -25,8 +25,15 @@ spring:
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
     producer:
+      acks: all
+      retries: 3
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        retry.backoff.ms: 1000
+        request.timeout.ms: 30000
+        delivery.timeout.ms: 120000
     consumer:
       group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
       auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}
