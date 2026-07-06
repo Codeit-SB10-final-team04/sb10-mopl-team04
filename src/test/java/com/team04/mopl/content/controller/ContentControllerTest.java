@@ -241,7 +241,10 @@ class ContentControllerTest {
 		// when & then
 		mockMvc.perform(multipart("/api/contents/{contentId}", contentId)
 				.file(requestPart)
-				.with(req -> { req.setMethod("PATCH"); return req; }))
+				.with(req -> {
+					req.setMethod("PATCH");
+					return req;
+				}))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(contentId.toString()))
 			.andExpect(jsonPath("$.title").value("새 제목"))
@@ -275,7 +278,10 @@ class ContentControllerTest {
 		mockMvc.perform(multipart("/api/contents/{contentId}", contentId)
 				.file(thumbnail)
 				.file(requestPart)
-				.with(req -> { req.setMethod("PATCH"); return req; }))
+				.with(req -> {
+					req.setMethod("PATCH");
+					return req;
+				}))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.thumbnailUrl").value("http://localhost:8080/thumbnails/new.png"));
 	}
@@ -297,7 +303,10 @@ class ContentControllerTest {
 		// when & then
 		mockMvc.perform(multipart("/api/contents/{contentId}", contentId)
 				.file(requestPart)
-				.with(req -> { req.setMethod("PATCH"); return req; }))
+				.with(req -> {
+					req.setMethod("PATCH");
+					return req;
+				}))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.exceptionName").value("ContentException"))
 			.andExpect(jsonPath("$.message").value("콘텐츠를 찾을 수 없습니다."));
