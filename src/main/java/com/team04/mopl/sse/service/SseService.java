@@ -81,7 +81,7 @@ public class SseService {
 	}
 
 	// 주기적으로 ping을 보내 만료된 SseEmitter 객체 삭제
-	@Scheduled(fixedDelay = 1000 * 60 * 30)
+	@Scheduled(fixedDelay = 1000 * 30)
 	public void cleanUp() {
 		sseEmitterRepository.findAll()
 			.forEach((receiverId, sseEmitterList) -> {
