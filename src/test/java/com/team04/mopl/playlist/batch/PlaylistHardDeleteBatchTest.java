@@ -54,14 +54,14 @@ public class PlaylistHardDeleteBatchTest {
 		UUID ownerId = UUID.randomUUID();
 		UUID deletedPlaylistId1 = UUID.randomUUID();
 		UUID deletedPlaylistId2 = UUID.randomUUID();
-		UUID deletedPlaylistId3 = UUID.randomUUID();
+		UUID cutoffDeletedPlaylistId = UUID.randomUUID();
 		UUID retentionPlaylistId = UUID.randomUUID();
 		UUID activePlaylistId = UUID.randomUUID();
 
 		insertUser(ownerId);
 		insertPlaylist(ownerId, deletedPlaylistId1, "삭제1", Instant.parse("2026-04-01T00:00:00Z"));
 		insertPlaylist(ownerId, deletedPlaylistId2, "삭제2", Instant.parse("2026-04-01T00:00:00Z"));
-		insertPlaylist(ownerId, deletedPlaylistId3, "삭제3", Instant.parse("2026-05-31T15:00:00Z"));
+		insertPlaylist(ownerId, cutoffDeletedPlaylistId, "경계", Instant.parse("2026-05-31T15:00:00Z"));
 		insertPlaylist(ownerId, retentionPlaylistId, "보관", Instant.parse("2026-06-02T00:00:00Z"));
 		insertPlaylist(ownerId, activePlaylistId, "활성", null);
 
@@ -77,7 +77,7 @@ public class PlaylistHardDeleteBatchTest {
 		assertEquals(BatchStatus.COMPLETED, jobExecution.getStatus());
 		assertFalse(playlistRepository.findById(deletedPlaylistId1).isPresent());
 		assertFalse(playlistRepository.findById(deletedPlaylistId2).isPresent());
-		assertTrue(playlistRepository.findById(deletedPlaylistId3).isPresent());
+		assertTrue(playlistRepository.findById(cutoffDeletedPlaylistId).isPresent());
 		assertTrue(playlistRepository.findById(retentionPlaylistId).isPresent());
 		assertTrue(playlistRepository.findById(activePlaylistId).isPresent());
 	}
