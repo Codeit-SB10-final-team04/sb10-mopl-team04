@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.team04.mopl.common.dto.CursorResponse;
+import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
 import com.team04.mopl.content.dto.request.ContentUpdateRequest;
@@ -28,7 +29,6 @@ import com.team04.mopl.content.mapper.ContentMapper;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
-import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.watching.service.WatchingSessionService;
 
 import lombok.RequiredArgsConstructor;
