@@ -51,14 +51,14 @@ logging:
 
 sports:
   batch:
-    season: 2024-2025
+    season: 2025-2026
 
-# S3 전용
-thumbnail:
-  storage:
-    type: s3
-    s3:
-      bucket: ${S3_BUCKET_NAME}
-      region: ${S3_REGION}
-      access-key: ${S3_ACCESS_KEY}
-      secret-key: ${S3_SECRET_KEY}
+# 파일 저장소 (썸네일, 유저 프로필 등 공용)
+storage:
+  type: s3
+  s3:
+    bucket: ${S3_BUCKET_NAME}
+    region: ${S3_REGION}
+    # 키 미설정 시 기본 체인(환경변수 → 프로파일 → EC2/ECS IAM Role) 자동 탐색
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
