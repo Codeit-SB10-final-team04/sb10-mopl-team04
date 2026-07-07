@@ -61,6 +61,8 @@ public class ContentService {
 	// 파일 저장, DB 저장은 한 트랜잭션에 묶일 수 없음
 	@Transactional
 	public ContentDto createContent(ContentCreateRequest contentCreateRequest, MultipartFile thumbnail) {
+		log.info("[콘텐츠 생성 시작] title={}", contentCreateRequest.title());
+
 		// 로컬에 썸네일 저장 후 Url 리턴
 		String thumbnailUrl = fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY);
 
@@ -90,6 +92,8 @@ public class ContentService {
 
 				tagNames = tags.stream().map(Tag::getName).toList();
 			}
+
+			log.info("[콘텐츠 생성 완료] contentId={}", content.getId());
 
 			return contentMapper.toDto(content, tagNames, watchingSessionService.getWatcherCount(content.getId()));
 

@@ -35,7 +35,13 @@ public class LocalFileStorage implements FileStorage {
 		try {
 			String filename = createFilename(file);
 
-			Path directoryRoot = Paths.get(rootDir).resolve(directory).toAbsolutePath().normalize();
+			// directory에 "../" 등이 들어와도 루트 밖으로 벗어나지 못하도록 검증
+			Path root = Paths.get(rootDir).toAbsolutePath().normalize();
+			Path directoryRoot = root.resolve(directory).normalize();
+			if (!directoryRoot.startsWith(root)) {
+				throw new FileStorageException("허용되지 않은 저장 경로입니다: " + directory);
+			}
+
 			Files.createDirectories(directoryRoot);
 
 			Path path = directoryRoot.resolve(filename).normalize();
@@ -55,6 +61,10 @@ public class LocalFileStorage implements FileStorage {
 
 	@Override
 	public void delete(String fileUrl) {
+		if (fileUrl == null || fileUrl.isBlank()) {
+			throw new FileStorageException("파일 URL이 비어 있습니다.");
+		}
+
 		try {
 			// URL 형식: http://localhost:8080/{directory}/{filename}
 			String[] segments = fileUrl.split("/");
@@ -66,7 +76,13 @@ public class LocalFileStorage implements FileStorage {
 			String filename = segments[segments.length - 1];
 			String directory = segments[segments.length - 2];
 
-			Path path = Paths.get(rootDir).resolve(directory).resolve(filename);
+			// 조작된 URL(../ 포함 등)로 루트 밖 파일을 삭제하지 못하도록 검증
+			Path root = Paths.get(rootDir).toAbsolutePath().normalize();
+			Path path = root.resolve(directory).resolve(filename).normalize();
+			if (!path.startsWith(root)) {
+				throw new FileStorageException("허용되지 않은 파일 경로입니다: " + fileUrl);
+			}
+
 			Files.deleteIfExists(path);
 		} catch (IOException e) {
 			throw new FileStorageException("파일 삭제 실패", e);

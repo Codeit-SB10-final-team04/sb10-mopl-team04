@@ -1,6 +1,7 @@
 package com.team04.mopl.common.storage;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -30,7 +31,8 @@ public class S3FileStorage implements FileStorage {
 	public String store(MultipartFile file, String directory) {
 		String key = directory + "/" + createFilename(file);
 
-		try {
+		// AWS SDK는 InputStream을 자동으로 닫지 않으므로 try-with-resources로 닫아 리소스 누수 방지
+		try (InputStream inputStream = file.getInputStream()) {
 			PutObjectRequest request = PutObjectRequest.builder()
 				.bucket(properties.bucket())
 				.key(key)
@@ -40,7 +42,7 @@ public class S3FileStorage implements FileStorage {
 
 			s3Client.putObject(
 				request,
-				RequestBody.fromInputStream(file.getInputStream(), file.getSize())
+				RequestBody.fromInputStream(inputStream, file.getSize())
 			);
 
 			log.info("[S3_STORE] 파일 업로드 완료: key={}", key);
@@ -103,6 +105,10 @@ public class S3FileStorage implements FileStorage {
 
 	// URL에서 S3 key 역추출 (도메인 뒤 경로 전체가 key)
 	private String extractKey(String fileUrl) {
+		if (fileUrl == null || fileUrl.isBlank()) {
+			throw new FileStorageException("파일 URL이 비어 있습니다.");
+		}
+
 		String domainSuffix = ".amazonaws.com/";
 		int index = fileUrl.indexOf(domainSuffix);
 

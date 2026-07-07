@@ -131,6 +131,13 @@ class S3FileStorageTest {
 	}
 
 	@Test
+	@DisplayName("URL이 null이면 FileStorageException을 던진다")
+	void delete_throwsFileStorageException_whenUrlIsNull() {
+		assertThatThrownBy(() -> storage().delete(null))
+			.isInstanceOf(FileStorageException.class);
+	}
+
+	@Test
 	@DisplayName("삭제 중 S3 예외가 발생하면 FileStorageException을 던진다")
 	void delete_throwsFileStorageException_whenS3Fails() {
 		// given

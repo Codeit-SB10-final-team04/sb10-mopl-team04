@@ -1,6 +1,7 @@
 package com.team04.mopl.common.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,6 +10,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
+
+import com.team04.mopl.common.storage.exception.FileStorageException;
 
 class LocalFileStorageTest {
 
@@ -99,5 +102,65 @@ class LocalFileStorageTest {
 			.doesNotContain("내 사진")
 			.doesNotContain(" ")
 			.endsWith(".png");
+	}
+
+	@Test
+	@DisplayName("확장자가 없는 파일명은 URL에 확장자가 붙지 않는다")
+	void store_handlesFilenameWithoutExtension() {
+		// given
+		MockMultipartFile file = new MockMultipartFile(
+			"thumbnail", "thumb", "image/png", "image-data".getBytes()
+		);
+
+		// when
+		String url = storage().store(file, "thumbnails");
+
+		// then: URL 마지막 조각 = UUID만 (확장자 없음)
+		String filename = url.substring(url.lastIndexOf("/") + 1);
+		assertThat(filename).doesNotContain(".");
+	}
+
+	@Test
+	@DisplayName("숨김 파일 형식(.png)의 파일명은 확장자로 취급하지 않는다")
+	void store_handlesHiddenFileStyleName() {
+		// given
+		MockMultipartFile file = new MockMultipartFile(
+			"thumbnail", ".png", "image/png", "image-data".getBytes()
+		);
+
+		// when
+		String url = storage().store(file, "thumbnails");
+
+		// then
+		String filename = url.substring(url.lastIndexOf("/") + 1);
+		assertThat(filename).doesNotContain(".");
+	}
+
+	@Test
+	@DisplayName("directory에 경로 탈출(../)이 포함되면 FileStorageException을 던진다")
+	void store_throwsException_whenDirectoryEscapesRoot() {
+		// given
+		MockMultipartFile file = new MockMultipartFile(
+			"thumbnail", "thumb.png", "image/png", "image-data".getBytes()
+		);
+
+		// when & then
+		assertThatThrownBy(() -> storage().store(file, "../escape"))
+			.isInstanceOf(FileStorageException.class);
+	}
+
+	@Test
+	@DisplayName("루트 밖을 가리키는 조작된 URL 삭제 요청은 FileStorageException을 던진다")
+	void delete_throwsException_whenUrlEscapesRoot() {
+		assertThatThrownBy(
+				() -> storage().delete("http://localhost:8080/../secret.txt"))
+			.isInstanceOf(FileStorageException.class);
+	}
+
+	@Test
+	@DisplayName("URL이 null이면 FileStorageException을 던진다")
+	void delete_throwsException_whenUrlIsNull() {
+		assertThatThrownBy(() -> storage().delete(null))
+			.isInstanceOf(FileStorageException.class);
 	}
 }

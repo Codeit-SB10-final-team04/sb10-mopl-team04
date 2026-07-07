@@ -56,6 +56,9 @@ class ContentServiceTest {
 	@InjectMocks
 	private ContentService contentService;
 
+	// ContentService의 썸네일 저장 디렉토리와 동일한 값
+	private static final String THUMBNAIL_DIRECTORY = "thumbnails";
+
 	// ========== getContent ==========
 
 	@Test
@@ -111,7 +114,7 @@ class ContentServiceTest {
 		);
 		ContentDto expectedDto = mock(ContentDto.class);
 
-		when(fileStorage.store(thumbnail, "thumbnails")).thenReturn("http://localhost:8080/thumbnails/thumb.png");
+		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
 		when(contentMapper.toDto(any(Content.class), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
@@ -120,7 +123,7 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(fileStorage).store(thumbnail, "thumbnails");
+		verify(fileStorage).store(thumbnail, THUMBNAIL_DIRECTORY);
 		verify(contentRepository).save(any(Content.class));
 		verify(tagRepository, never()).findAllByNameIn(any());
 		verify(contentTagRepository, never()).saveAll(any());
@@ -140,7 +143,7 @@ class ContentServiceTest {
 		Tag tag2 = Tag.builder().name("SF").build();
 		ContentDto expectedDto = mock(ContentDto.class);
 
-		when(fileStorage.store(thumbnail, "thumbnails")).thenReturn("http://localhost:8080/thumbnails/thumb.png");
+		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
 		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(tag1)); // 액션만 기존 존재
 		when(tagRepository.save(any(Tag.class))).thenReturn(tag2);
@@ -167,7 +170,7 @@ class ContentServiceTest {
 			"thumbnail", "thumb.png", "image/png", "image-data".getBytes()
 		);
 
-		when(fileStorage.store(thumbnail, "thumbnails")).thenThrow(new RuntimeException("썸네일 저장 실패"));
+		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenThrow(new RuntimeException("썸네일 저장 실패"));
 
 		// when & then
 		assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
@@ -189,7 +192,7 @@ class ContentServiceTest {
 		);
 		String storedUrl = "http://localhost:8080/thumbnails/thumb.png";
 
-		when(fileStorage.store(thumbnail, "thumbnails")).thenReturn(storedUrl);
+		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn(storedUrl);
 		when(contentRepository.save(any(Content.class))).thenThrow(new RuntimeException("DB 저장 실패"));
 
 		// when & then
@@ -326,7 +329,7 @@ class ContentServiceTest {
 		);
 		String storedUrl = "http://localhost:8080/thumbnails/thumb.png";
 
-		when(fileStorage.store(thumbnail, "thumbnails")).thenReturn(storedUrl);
+		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn(storedUrl);
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
 		when(tagRepository.findAllByNameIn(any())).thenThrow(new RuntimeException("태그 저장 실패"));
 
@@ -397,7 +400,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(content.getThumbnailUrl()).thenReturn(oldUrl);
-		when(fileStorage.store(newThumbnail, "thumbnails")).thenReturn(newUrl);
+		when(fileStorage.store(newThumbnail, THUMBNAIL_DIRECTORY)).thenReturn(newUrl);
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(List.of());
 		when(contentMapper.toDto(eq(content), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
@@ -406,7 +409,7 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(fileStorage).store(newThumbnail, "thumbnails");
+		verify(fileStorage).store(newThumbnail, THUMBNAIL_DIRECTORY);
 		verify(content).updateThumbnailUrl(newUrl);
 		verify(fileStorage).delete(oldUrl);
 	}
@@ -499,7 +502,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(content.getThumbnailUrl()).thenReturn(oldUrl);
-		when(fileStorage.store(newThumbnail, "thumbnails")).thenReturn(newUrl);
+		when(fileStorage.store(newThumbnail, THUMBNAIL_DIRECTORY)).thenReturn(newUrl);
 		doThrow(new RuntimeException("DB 저장 실패")).when(content).updateTitle("새 제목"); // DB 저장 예외 실패 떤지기
 
 		// when & then

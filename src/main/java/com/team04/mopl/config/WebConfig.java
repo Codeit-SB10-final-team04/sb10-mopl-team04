@@ -14,7 +14,8 @@ public class WebConfig implements WebMvcConfigurer {
 	private final String rootDir;
 
 	public WebConfig(@Value("${storage.local.path:uploads/}") String rootDir) {
-		this.rootDir = rootDir;
+		// 문자열 결합으로 경로를 만들므로 trailing slash 누락 시 보정 (file:uploadsthumbnails/ 방지)
+		this.rootDir = rootDir.endsWith("/") ? rootDir : rootDir + "/";
 	}
 
 	@Override
