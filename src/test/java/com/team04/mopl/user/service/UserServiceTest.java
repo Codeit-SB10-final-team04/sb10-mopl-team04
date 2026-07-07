@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -20,9 +21,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.team04.mopl.user.dto.request.UserCreateRequest;
+import com.team04.mopl.user.dto.request.UserUpdateRequest;
 import com.team04.mopl.user.dto.response.UserDto;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.entity.UserRole;
@@ -30,6 +34,7 @@ import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.mapper.UserMapper;
 import com.team04.mopl.user.repository.UserRepository;
+import com.team04.mopl.user.storage.ProfileImageStorage;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -42,6 +47,9 @@ class UserServiceTest {
 
 	@Mock
 	private PasswordEncoder passwordEncoder;
+
+	@Mock
+	private ProfileImageStorage profileImageStorage;
 
 	@InjectMocks
 	private UserService userService;
@@ -165,5 +173,181 @@ class UserServiceTest {
 		verify(passwordEncoder).encode("password123");
 		verify(userRepository).saveAndFlush(any(User.class));
 		verifyNoInteractions(userMapper);
+	}
+
+	@Test
+	@DisplayName("본인이 프로필 이름만 변경하면 사용자 정보를 반환한다")
+	void updateProfile_updateName_whenOwnerRequestsNameOnly() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, "기존이름", "http://localhost:8080/profile-images/old.png");
+		UserUpdateRequest request = new UserUpdateRequest("새이름");
+		UserDto expectedResponse = new UserDto(
+			userId,
+			Instant.parse("2026-07-06T00:00:00Z"),
+			"test@test.com",
+			"새이름",
+			"http://localhost:8080/profile-images/old.png",
+			UserRole.USER,
+			false
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+		given(userMapper.toDto(user))
+			.willReturn(expectedResponse);
+
+		// when
+		UserDto result = userService.updateProfile(userId, request, null, userId);
+
+		// then
+		assertThat(result).isEqualTo(expectedResponse);
+		assertThat(user.getName()).isEqualTo("새이름");
+		assertThat(user.getProfileImageUrl()).isEqualTo("http://localhost:8080/profile-images/old.png");
+
+		verify(userRepository).findById(userId);
+		verify(userMapper).toDto(user);
+		verifyNoInteractions(profileImageStorage);
+	}
+
+	@Test
+	@DisplayName("본인이 프로필 이미지와 이름을 변경하면 새 이미지를 저장하고 기존 이미지를 삭제한다")
+	void updateProfile_updateNameAndImage_whenOwnerRequestsImage() {
+		// given
+		UUID userId = UUID.randomUUID();
+		String oldProfileImageUrl = "http://localhost:8080/profile-images/old.png";
+		String newProfileImageUrl = "http://localhost:8080/profile-images/new.png";
+		User user = createUser(userId, "기존이름", oldProfileImageUrl);
+		UserUpdateRequest request = new UserUpdateRequest("새이름");
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			"image/png",
+			"image-data".getBytes()
+		);
+		UserDto expectedResponse = new UserDto(
+			userId,
+			Instant.parse("2026-07-06T00:00:00Z"),
+			"test@test.com",
+			"새이름",
+			newProfileImageUrl,
+			UserRole.USER,
+			false
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+		given(profileImageStorage.store(image))
+			.willReturn(newProfileImageUrl);
+		given(userMapper.toDto(user))
+			.willReturn(expectedResponse);
+
+		// when
+		UserDto result = userService.updateProfile(userId, request, image, userId);
+
+		// then
+		assertThat(result).isEqualTo(expectedResponse);
+		assertThat(user.getName()).isEqualTo("새이름");
+		assertThat(user.getProfileImageUrl()).isEqualTo(newProfileImageUrl);
+
+		verify(userRepository).findById(userId);
+		verify(profileImageStorage).store(image);
+		verify(profileImageStorage).delete(oldProfileImageUrl);
+		verify(userMapper).toDto(user);
+	}
+
+	@Test
+	@DisplayName("다른 사용자의 프로필 변경 요청이면 403 예외를 던진다")
+	void updateProfile_throwUserException_whenCurrentUserIsNotOwner() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID currentUserId = UUID.randomUUID();
+		UserUpdateRequest request = new UserUpdateRequest("새이름");
+
+		// when
+		ThrowingCallable action = () -> userService.updateProfile(userId, request, null, currentUserId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_PROFILE_ACCESS_DENIED)
+			);
+
+		verifyNoInteractions(userRepository);
+		verifyNoInteractions(profileImageStorage);
+		verifyNoInteractions(userMapper);
+	}
+
+	@Test
+	@DisplayName("프로필 변경 대상 사용자가 없으면 UserException을 던진다")
+	void updateProfile_throwUserException_whenUserNotFound() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UserUpdateRequest request = new UserUpdateRequest("새이름");
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.empty());
+
+		// when
+		ThrowingCallable action = () -> userService.updateProfile(userId, request, null, userId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception -> {
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_NOT_FOUND);
+				assertThat(exception.getDetails()).containsEntry("userId", userId);
+			});
+
+		verify(userRepository).findById(userId);
+		verifyNoInteractions(profileImageStorage);
+		verifyNoInteractions(userMapper);
+	}
+
+	@Test
+	@DisplayName("이미지를 저장한 뒤 프로필 변경에 실패하면 새 이미지를 삭제한다")
+	void updateProfile_deleteNewImage_whenUpdateFailsAfterImageStored() {
+		// given
+		UUID userId = UUID.randomUUID();
+		String newProfileImageUrl = "http://localhost:8080/profile-images/new.png";
+		User user = createUser(userId, "기존이름", null);
+		UserUpdateRequest request = new UserUpdateRequest("   ");
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			"image/png",
+			"image-data".getBytes()
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+		given(profileImageStorage.store(image))
+			.willReturn(newProfileImageUrl);
+
+		// when
+		ThrowingCallable action = () -> userService.updateProfile(userId, request, image, userId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_NAME_REQUIRED)
+			);
+
+		verify(userRepository).findById(userId);
+		verify(profileImageStorage).store(image);
+		verify(profileImageStorage).delete(newProfileImageUrl);
+		verifyNoInteractions(userMapper);
+	}
+
+	private User createUser(UUID userId, String name, String profileImageUrl) {
+		User user = User.builder()
+			.name(name)
+			.email("test@test.com")
+			.passwordHash("encoded-password")
+			.profileImageUrl(profileImageUrl)
+			.build();
+
+		ReflectionTestUtils.setField(user, "id", userId);
+
+		return user;
 	}
 }
