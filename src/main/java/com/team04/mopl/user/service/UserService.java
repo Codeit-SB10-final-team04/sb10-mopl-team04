@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.team04.mopl.auth.service.TemporaryPasswordService;
+import com.team04.mopl.user.dto.request.ChangePasswordRequest;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserUpdateRequest;
 import com.team04.mopl.user.dto.response.UserDto;
@@ -32,6 +34,7 @@ public class UserService {
 	private final UserMapper userMapper;
 	private final PasswordEncoder passwordEncoder;
 	private final ProfileImageStorage profileImageStorage;
+	private final TemporaryPasswordService temporaryPasswordService;
 
 	// 회원가입
 	@Transactional
@@ -113,6 +116,23 @@ public class UserService {
 		}
 	}
 
+	// 비밀번호 변경
+	@Transactional
+	public void updatePassword(UUID userId, ChangePasswordRequest request, UUID currentUserId) {
+		log.info("[USER_PASSWORD_UPDATE] 비밀번호 변경 시작: userId={}, currentUserId={}",
+			userId, currentUserId);
+
+		validatePasswordOwner(userId, currentUserId);
+
+		User user = getUserOrThrow(userId);
+		String passwordHash = passwordEncoder.encode(request.password());
+
+		user.updatePasswordHash(passwordHash);
+		temporaryPasswordService.deleteTemporaryPassword(userId);
+
+		log.info("[USER_PASSWORD_UPDATE] 비밀번호 변경 및 임시 비밀번호 삭제 완료: userId={}", userId);
+	}
+
 	// 사용자 상세 조회
 	public UserDto findById(UUID userId) {
 		log.info("[USER_FIND_BY_ID] 사용자 상세 조회 시작: userId={}", userId);
@@ -130,6 +150,16 @@ public class UserService {
 		if (!userId.equals(currentUserId)) {
 			throw new UserException(
 				UserErrorCode.USER_PROFILE_ACCESS_DENIED,
+				Map.of("userId", userId, "currentUserId", String.valueOf(currentUserId))
+			);
+		}
+	}
+
+	// 비밀번호 변경 대상 본인 여부 검증
+	private void validatePasswordOwner(UUID userId, UUID currentUserId) {
+		if (!userId.equals(currentUserId)) {
+			throw new UserException(
+				UserErrorCode.USER_PASSWORD_ACCESS_DENIED,
 				Map.of("userId", userId, "currentUserId", String.valueOf(currentUserId))
 			);
 		}

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
+import com.team04.mopl.user.dto.request.ChangePasswordRequest;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
 import com.team04.mopl.user.dto.request.UserPageRequest;
@@ -68,6 +69,23 @@ public class UserController implements UserControllerDocs {
 		);
 
 		return ResponseEntity.status(HttpStatus.OK).body(userDto);
+	}
+
+	// 비밀번호 변경
+	@Override
+	@PatchMapping("/{userId}/password")
+	public ResponseEntity<Void> updatePassword(
+		@PathVariable UUID userId,
+		@Valid @RequestBody ChangePasswordRequest changePasswordRequest,
+		@AuthenticationPrincipal MoplUserDetails moplUserDetails
+	) {
+		userService.updatePassword(
+			userId,
+			changePasswordRequest,
+			moplUserDetails.getUserId()
+		);
+
+		return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 	}
 
 	// 사용자 상세 조회

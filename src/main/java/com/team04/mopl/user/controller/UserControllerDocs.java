@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
+import com.team04.mopl.user.dto.request.ChangePasswordRequest;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
 import com.team04.mopl.user.dto.request.UserPageRequest;
@@ -30,6 +31,13 @@ public interface UserControllerDocs {
 		UUID userId,
 		UserUpdateRequest userUpdateRequest,
 		MultipartFile image,
+		MoplUserDetails moplUserDetails
+	);
+
+	@Operation(summary = "비밀번호 변경", description = "본인의 비밀번호만 변경할 수 있습니다.")
+	ResponseEntity<Void> updatePassword(
+		UUID userId,
+		ChangePasswordRequest changePasswordRequest,
 		MoplUserDetails moplUserDetails
 	);
 
