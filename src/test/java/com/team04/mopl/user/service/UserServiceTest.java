@@ -25,6 +25,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.team04.mopl.auth.service.TemporaryPasswordService;
+import com.team04.mopl.user.dto.request.ChangePasswordRequest;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserUpdateRequest;
 import com.team04.mopl.user.dto.response.UserDto;
@@ -50,6 +52,9 @@ class UserServiceTest {
 
 	@Mock
 	private ProfileImageStorage profileImageStorage;
+
+	@Mock
+	private TemporaryPasswordService temporaryPasswordService;
 
 	@InjectMocks
 	private UserService userService;
@@ -227,6 +232,85 @@ class UserServiceTest {
 			});
 
 		verify(userRepository).findById(userId);
+		verifyNoInteractions(userMapper);
+		verifyNoInteractions(profileImageStorage);
+	}
+
+	@Test
+	@DisplayName("본인이 비밀번호를 변경하면 비밀번호를 암호화하고 임시 비밀번호를 삭제한다")
+	void updatePassword_updatePasswordHashAndDeleteTemporaryPassword_whenOwnerRequests() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, "사용자", null);
+		ChangePasswordRequest request = new ChangePasswordRequest("newPassword123");
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+		given(passwordEncoder.encode(request.password()))
+			.willReturn("new-encoded-password");
+
+		// when
+		userService.updatePassword(userId, request, userId);
+
+		// then
+		assertThat(user.getPasswordHashForAuthentication()).isEqualTo("new-encoded-password");
+
+		verify(userRepository).findById(userId);
+		verify(passwordEncoder).encode("newPassword123");
+		verify(temporaryPasswordService).deleteTemporaryPassword(userId);
+		verifyNoInteractions(userMapper);
+		verifyNoInteractions(profileImageStorage);
+	}
+
+	@Test
+	@DisplayName("다른 사용자의 비밀번호 변경 요청이면 403 예외를 던진다")
+	void updatePassword_throwUserException_whenCurrentUserIsNotOwner() {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID currentUserId = UUID.randomUUID();
+		ChangePasswordRequest request = new ChangePasswordRequest("newPassword123");
+
+		// when
+		ThrowingCallable action = () -> userService.updatePassword(userId, request, currentUserId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception -> {
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_PASSWORD_ACCESS_DENIED);
+				assertThat(exception.getDetails()).containsEntry("userId", userId);
+				assertThat(exception.getDetails()).containsEntry("currentUserId", currentUserId.toString());
+			});
+
+		verifyNoInteractions(userRepository);
+		verifyNoInteractions(passwordEncoder);
+		verifyNoInteractions(temporaryPasswordService);
+		verifyNoInteractions(userMapper);
+		verifyNoInteractions(profileImageStorage);
+	}
+
+	@Test
+	@DisplayName("비밀번호 변경 대상 사용자가 없으면 UserException을 던진다")
+	void updatePassword_throwUserException_whenUserNotFound() {
+		// given
+		UUID userId = UUID.randomUUID();
+		ChangePasswordRequest request = new ChangePasswordRequest("newPassword123");
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.empty());
+
+		// when
+		ThrowingCallable action = () -> userService.updatePassword(userId, request, userId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception -> {
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_NOT_FOUND);
+				assertThat(exception.getDetails()).containsEntry("userId", userId);
+			});
+
+		verify(userRepository).findById(userId);
+		verifyNoInteractions(passwordEncoder);
+		verifyNoInteractions(temporaryPasswordService);
 		verifyNoInteractions(userMapper);
 		verifyNoInteractions(profileImageStorage);
 	}
