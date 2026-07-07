@@ -113,6 +113,18 @@ public class UserService {
 		}
 	}
 
+	// 사용자 상세 조회
+	public UserDto findById(UUID userId) {
+		log.info("[USER_FIND_BY_ID] 사용자 상세 조회 시작: userId={}", userId);
+
+		User user = getUserOrThrow(userId);
+		UserDto userDto = userMapper.toDto(user);
+
+		log.info("[USER_FIND_BY_ID] 사용자 상세 조회 완료: userId={}", userId);
+
+		return userDto;
+	}
+
 	// 프로필 변경 대상 본인 여부 검증
 	private void validateProfileOwner(UUID userId, UUID currentUserId) {
 		if (!userId.equals(currentUserId)) {

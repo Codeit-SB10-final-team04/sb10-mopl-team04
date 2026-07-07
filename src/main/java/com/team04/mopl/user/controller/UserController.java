@@ -70,6 +70,17 @@ public class UserController implements UserControllerDocs {
 		return ResponseEntity.status(HttpStatus.OK).body(userDto);
 	}
 
+	// 사용자 상세 조회
+	@Override
+	@GetMapping("/{userId}")
+	public ResponseEntity<UserDto> findById(
+		@PathVariable UUID userId
+	) {
+		UserDto userDto = userService.findById(userId);
+
+		return ResponseEntity.status(HttpStatus.OK).body(userDto);
+	}
+
 	// 관리자 사용자 목록 조회
 	@Override
 	@PreAuthorize("hasRole('ADMIN')")

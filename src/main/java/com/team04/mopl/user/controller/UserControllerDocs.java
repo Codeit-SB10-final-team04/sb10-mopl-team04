@@ -33,6 +33,11 @@ public interface UserControllerDocs {
 		MoplUserDetails moplUserDetails
 	);
 
+	@Operation(summary = "사용자 상세 조회")
+	ResponseEntity<UserDto> findById(
+		UUID userId
+	);
+
 	@Operation(summary = "[어드민] 사용자 목록 조회 (커서 페이지네이션)")
 	ResponseEntity<CursorResponseUserDto> findUsers(
 		UserPageRequest userPageRequest
