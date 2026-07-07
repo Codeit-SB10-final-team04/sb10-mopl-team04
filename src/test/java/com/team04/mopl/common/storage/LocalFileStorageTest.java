@@ -16,7 +16,7 @@ class LocalFileStorageTest {
 	Path tempDir;
 
 	private LocalFileStorage storage() {
-		return new LocalFileStorage(tempDir.toString() + "/");
+		return new LocalFileStorage(tempDir.toString() + "/", 8080);
 	}
 
 	@Test

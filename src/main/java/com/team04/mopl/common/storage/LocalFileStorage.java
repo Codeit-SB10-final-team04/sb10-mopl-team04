@@ -20,9 +20,14 @@ import com.team04.mopl.common.storage.exception.FileStorageException;
 public class LocalFileStorage implements FileStorage {
 
 	private final String rootDir;
+	private final int serverPort;
 
-	public LocalFileStorage(@Value("${storage.local.path:uploads/}") String rootDir) {
+	public LocalFileStorage(
+		@Value("${storage.local.path:uploads/}") String rootDir,
+		@Value("${server.port:8080}") int serverPort
+	) {
 		this.rootDir = rootDir;
+		this.serverPort = serverPort;
 	}
 
 	@Override
@@ -42,7 +47,7 @@ public class LocalFileStorage implements FileStorage {
 				Files.copy(inputStream, path);
 			}
 
-			return "http://localhost:8080/" + directory + "/" + filename;
+			return "http://localhost:" + serverPort + "/" + directory + "/" + filename;
 		} catch (IOException e) {
 			throw new FileStorageException("파일 저장 실패", e);
 		}
