@@ -1,0 +1,89 @@
+spring:
+  batch:
+    job:
+      enabled: false
+  sql:
+    init:
+      mode: never
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    show-sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: simple
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: mopl-test-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  mail:
+    host: localhost
+    port: 1025
+    username:
+    password:
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+# 더미 값 추가
+tmdb:
+  api:
+    key: test-dummy-key
+
+storage:
+  type: local
+  local:
+    path: ${java.io.tmpdir}/mopl-test-uploads/
+
+playlist:
+  hard-delete:
+    cron: "0 1 0 * * *"
+    retention-months: 1
+
+content:
+  hard-delete:
+    cron: "0 0 2 * * MON"
+    retention-days: 1
+
+review:
+  hard-delete:
+    cron: "0 0 2 * * MON"
+    retention-days: 1
+
+mopl:
+  jwt:
+    secret: test-secret-key-must-be-at-least-32-bytes
+    issuer: mopl
+    access-token-expiration-seconds: 1800
+    refresh-token-expiration-seconds: 1209600
+    refresh-token-cookie-name: REFRESH_TOKEN
+    refresh-token-cookie-secure: false
+    refresh-token-cookie-same-site: Lax
+  mail:
+    from: no-reply@test.local
+    from-name: MOPL_test
+  admin:
+    enabled: false

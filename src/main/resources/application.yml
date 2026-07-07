@@ -1,3 +1,59 @@
 spring:
   application:
     name: mopl
+  profiles:
+    active: dev
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+server:
+  port: 8080
+
+tmdb:
+  api:
+    key: ${TMDB_API_KEY}
+
+playlist:
+  hard-delete:
+    cron: "0 1 0 * * *"
+    retention-months: 1
+
+content:
+  hard-delete:
+    cron: "0 0 2 * * MON"
+    retention-days: 1
+
+review:
+  hard-delete:
+    cron: "0 30 2 * * MON"
+    retention-days: 1
+
+mopl:
+  jwt:
+    issuer: ${MOPL_JWT_ISSUER}
+    access-token-expiration-seconds: ${MOPL_ACCESS_TOKEN_EXPIRATION_SECONDS}
+    refresh-token-expiration-seconds: ${MOPL_REFRESH_TOKEN_EXPIRATION_SECONDS}
+    refresh-token-cookie-name: ${MOPL_REFRESH_TOKEN_COOKIE_NAME}
+    secret: ${MOPL_JWT_SECRET}
+    refresh-token-cookie-secure: ${MOPL_REFRESH_TOKEN_COOKIE_SECURE}
+    refresh-token-cookie-same-site: ${MOPL_REFRESH_TOKEN_COOKIE_SAME_SITE}
+  mail:
+    from: ${MOPL_MAIL_FROM}
+    from-name: ${MOPL_MAIL_FROM_NAME}
+  admin:
+    enabled: ${MOPL_ADMIN_ENABLED:true}
+    email: ${MOPL_ADMIN_EMAIL:}
+    password: ${MOPL_ADMIN_PASSWORD:}
+    name: ${MOPL_ADMIN_NAME:ADMIN}

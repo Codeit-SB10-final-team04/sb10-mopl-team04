@@ -1,0 +1,77 @@
+spring:
+  sql:
+    init:
+      mode: never
+  datasource:
+    # 각자 로컬 DB 정보 넣기! ^^
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST}
+      port: ${SPRING_DATA_REDIS_PORT}
+  cache:
+    type: caffeine
+    caffeine:
+      spec: >
+        maximumSize=1000,
+        expireAfterAccess=300s,
+        recordStats
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+    producer:
+      acks: all
+      retries: 3
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        retry.backoff.ms: 1000
+        request.timeout.ms: 30000
+        delivery.timeout.ms: 120000
+    consumer:
+      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
+      auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+
+logging:
+  level:
+    root: INFO
+    com.team04.mopl: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.springframework.data.redis: WARN
+    org.apache.kafka.clients.consumer.ConsumerConfig: WARN
+    org.apache.kafka.clients.consumer.internals: WARN
+    org.springframework.kafka.listener: WARN
+
+sports:
+  batch:
+    season: 2025-2026
+
+# 파일 저장소 (썸네일, 유저 프로필 등 공용)
+storage:
+  type: local
+  local:
+    path: uploads/

@@ -1,0 +1,64 @@
+spring:
+  sql:
+    init:
+      mode: never
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST}
+      port: ${SPRING_DATA_REDIS_PORT}
+  cache:
+    type: ${SPRING_CACHE_TYPE}
+    redis:
+      enable-statistics: true
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+    producer:
+      acks: all
+      retries: 3
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        retry.backoff.ms: 1000
+        request.timeout.ms: 30000
+        delivery.timeout.ms: 120000
+    consumer:
+      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
+      auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  batch:
+    jdbc:
+      initialize-schema: never
+    job:
+      enabled: false
+
+logging:
+  level:
+    root: WARN
+
+sports:
+  batch:
+    season: 2025-2026
+
+# 파일 저장소 (썸네일, 유저 프로필 등 공용)
+storage:
+  type: s3
+  s3:
+    bucket: ${S3_BUCKET_NAME}
+    region: ${S3_REGION}
+    # 키 미설정 시 기본 체인(환경변수 → 프로파일 → EC2/ECS IAM Role) 자동 탐색
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}

@@ -1,7 +1,10 @@
 plugins {
     id 'java'
+    id 'checkstyle'
     id 'org.springframework.boot' version '3.5.15'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.github.spotbugs' version '6.0.0'
+    id 'jacoco'
 }
 
 group = 'com.team04'
@@ -21,28 +24,168 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.16'
 
     // Security
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
+    // DB
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     runtimeOnly 'org.postgresql:postgresql'
-    testRuntimeOnly 'com.h2database:h2'
+
+    // Cache
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // event message (kafka)
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // Spring Batch
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    // Querydsl
+    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+
+    // MapStruct
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+    runtimeOnly 'com.h2database:h2'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // spotbugs
+    compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.6'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'com.h2database:h2'
+
+    // Mail
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // AWS S3
+    implementation platform('software.amazon.awssdk:bom:2.29.45')
+    implementation 'software.amazon.awssdk:s3'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// ---------------------------------------------------------------------------
+// 컴파일 및 프로세서 설정 (핵심: -parameters 및 MapStruct 조율)
+// ---------------------------------------------------------------------------
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << "-parameters"
+    // MapStruct Spring Bean 등록
+    options.compilerArgs << "-Amapstruct.defaultComponentModel=spring"
+    // 생성된 코드에 TimeStamp 제거
+    options.compilerArgs << "-Amapstruct.suppressGeneratorTimestamp=true"
+}
+
+// ---------------------------------------------------------------------------
+// Spotbugs 설정
+// ---------------------------------------------------------------------------
+import com.github.spotbugs.snom.Confidence
+import com.github.spotbugs.snom.Effort
+import com.github.spotbugs.snom.SpotBugsTask
+
+spotbugs {
+    ignoreFailures = true               // 일단 빌드 통과하도록 설정
+    effort = Effort.valueOf('MAX')
+    reportLevel = Confidence.valueOf('MEDIUM')
+}
+
+tasks.withType(SpotBugsTask).configureEach {
+    // 컴파일이 끝난 뒤에 실행되도록 강제
+    dependsOn compileJava, compileTestJava
+    mustRunAfter compileJava, compileTestJava
+}
+
+// ---------------------------------------------------------------------------
+// Checkstyle 설정
+// ---------------------------------------------------------------------------
+checkstyle {
+    ignoreFailures = true       // 초기 단계 설정 (빌드는 통과시키되, 리포트로 경고 확인)
+    toolVersion = "10.17.0"
+    configFile = file("${rootDir}/checkstyle/naver-checkstyle-rules.xml")
+    configProperties = ["suppressionFile": "${rootDir}/checkstyle/naver-checkstyle-suppressions.xml"]
+}
+
+tasks.withType(Checkstyle) {
+    source = fileTree('src') {
+        include '**/*.java'
+        exclude '**/generated/**'
+        exclude '**/gen/**'
+    }
+    // Gradle이 컴파일을 마친 후에만 Checkstyle이 실행되도록 순서 강제
+    mustRunAfter compileJava, compileTestJava
+
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Jacoco 설정
+// ---------------------------------------------------------------------------
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+jacocoTestReport {
+    dependsOn test              // 의존성 설정 (리포트 생성)
+
+    reports {
+        xml.required = true     // XML 리포트 생성 (커버리지 수치화)
+        html.required = true    // HTML 리포트 생성 (커버리지 시각화)
+    }
+
+    // 측정 의미가 없는 생성 코드/보일러플레이트 제외
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                '**/Q*.class',               // QueryDSL 자동 생성 QClass
+                '**/*MapperImpl.class',      // MapStruct 자동 생성 구현체
+                '**/MoplApplication.class',  // 메인 애플리케이션 클래스
+                '**/config/**',              // 설정 클래스
+                '**/dto/**',                 // DTO (record, 로직 없음)
+                '**/exception/**'            // ErrorCode enum 상수
+            ])
+        }))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// QueryDSL QClass 생성 및 빌드 설정
+// ---------------------------------------------------------------------------
+def querydslDir = layout.buildDirectory.dir("generated/querydsl")
+
+sourceSets {
+    main.java.srcDirs += [querydslDir]
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.getGeneratedSourceOutputDirectory().set(file(querydslDir))
+}
+
+clean {
+    delete layout.buildDirectory.dir("generated/querydsl")
 }
