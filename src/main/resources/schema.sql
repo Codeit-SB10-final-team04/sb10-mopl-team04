@@ -252,3 +252,32 @@ CREATE TABLE direct_messages (
                                  CONSTRAINT fk_direct_messages_receiver FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
                                  CONSTRAINT fk_direct_messages_conversation FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
 );
+
+-- ================================================================
+-- 6. INDEX
+-- ================================================================
+
+-- notifications
+
+CREATE INDEX idx_notifications_unread_receiver_created_id
+    ON notifications (receiver_id, created_at, id)
+    WHERE read_at IS NULL;
+
+CREATE INDEX idx_notifications_read_at_id
+    ON notifications (read_at, id)
+    WHERE read_at IS NOT NULL;
+
+-- playlists
+
+CREATE INDEX idx_playlists_active_updated_id
+    ON playlists (updated_at, id)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_playlists_deleted_at_id
+    ON playlists (deleted_at, id)
+    WHERE deleted_at IS NOT NULL;
+
+-- playlist_subscriptions
+
+CREATE INDEX idx_playlist_subscriptions_playlist_subscriber
+    ON playlist_subscriptions (playlist_id, subscriber_id);

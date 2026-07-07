@@ -63,6 +63,11 @@ playlist:
     cron: "0 1 0 * * *"
     retention-months: 1
 
+notification:
+  hard-delete:
+    cron: "0 0 1 * * *"
+    retention-months: 1
+
 content:
   hard-delete:
     cron: "0 0 2 * * MON"
