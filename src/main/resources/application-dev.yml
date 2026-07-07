@@ -76,3 +76,9 @@ thumbnail:
     type: local
     local:
       path: thumbnails/
+
+profile-image:
+  storage:
+    type: local
+    local:
+      path: .mopl/storage/profiles/

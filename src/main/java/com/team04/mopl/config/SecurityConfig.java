@@ -111,6 +111,7 @@ public class SecurityConfig {
 					"/v3/api-docs/**",
 					"/actuator/health",
 					"/thumbnails/**",
+					"/profile-images/**",
 					"/",
 					"/index.html",
 					"/favicon.svg",
