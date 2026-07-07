@@ -12,6 +12,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.exception.AuthException;
@@ -166,6 +167,25 @@ public class GlobalExceptionHandler {
 			.body(ErrorResponse.of(
 				exception,
 				"필수 요청 파라미터가 누락되었습니다.",
+				details
+			));
+	}
+
+	// 필수 multipart request part가 누락된 경우 처리
+	@ExceptionHandler(MissingServletRequestPartException.class)
+	public ResponseEntity<ErrorResponse> handleMissingRequestPartException(
+		MissingServletRequestPartException exception
+	) {
+		Map<String, String> details = Map.of(
+			"part",
+			exception.getRequestPartName()
+		);
+
+		return ResponseEntity
+			.badRequest()
+			.body(ErrorResponse.of(
+				exception,
+				"필수 요청 파트가 누락되었습니다.",
 				details
 			));
 	}
