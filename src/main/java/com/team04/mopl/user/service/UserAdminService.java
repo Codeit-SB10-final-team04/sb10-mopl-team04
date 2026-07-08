@@ -129,12 +129,7 @@ public class UserAdminService {
 	// 관리자 계정 잠금 상태 변경
 	@Transactional
 	public void updateLocked(UUID userId, UserLockUpdateRequest request) {
-		Boolean requestedLocked = request.locked();
-
-		// 잠금 상태 필수값 검증
-		validateLocked(requestedLocked);
-
-		boolean newLocked = requestedLocked;
+		boolean newLocked = request.locked();
 		log.info("[USER_LOCK_UPDATE] 계정 잠금 상태 변경 시작: userId={}, newLocked={}", userId, newLocked);
 
 		User user = getUserOrThrow(userId);
@@ -166,13 +161,6 @@ public class UserAdminService {
 				UserErrorCode.USER_NOT_FOUND,
 				Map.of("userId", userId)
 			));
-	}
-
-	// 잠금 상태 필수값 검증
-	private void validateLocked(Boolean locked) {
-		if (locked == null) {
-			throw new UserException(UserErrorCode.USER_LOCKED_REQUIRED);
-		}
 	}
 
 	// 정렬 기준별 다음 커서 값 추출

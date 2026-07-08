@@ -400,23 +400,6 @@ class UserAdminServiceTest {
 		verify(authSessionStore, never()).deleteByUserId(userId);
 	}
 
-	@Test
-	@DisplayName("잠금 상태가 null이면 UserException을 던지고 인증 세션을 삭제하지 않는다")
-	void updateLocked_throwUserException_whenLockedIsNull() {
-		// given
-		UUID userId = UUID.randomUUID();
-		UserLockUpdateRequest request = new UserLockUpdateRequest(null);
-
-		// when, then
-		assertThatThrownBy(() -> userAdminService.updateLocked(userId, request))
-			.isInstanceOfSatisfying(UserException.class, exception ->
-				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_LOCKED_REQUIRED)
-			);
-
-		verifyNoInteractions(userRepository);
-		verify(authSessionStore, never()).deleteByUserId(userId);
-	}
-
 	private String expectedNextCursor(UserSortBy sortBy, UserDto user) {
 		return switch (sortBy) {
 			case name -> user.name();
