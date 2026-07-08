@@ -129,43 +129,34 @@ public class UserAdminService {
 	// 관리자 계정 잠금 상태 변경
 	@Transactional
 	public void updateLocked(UUID userId, UserLockUpdateRequest request) {
-		Boolean newLocked = request.locked();
+		Boolean requestedLocked = request.locked();
 
+		// 잠금 상태 필수값 검증
+		validateLocked(requestedLocked);
+
+		boolean newLocked = requestedLocked;
 		log.info("[USER_LOCK_UPDATE] 계정 잠금 상태 변경 시작: userId={}, newLocked={}", userId, newLocked);
 
 		User user = getUserOrThrow(userId);
-
-		// 잠금 상태 필수값 검증
-		validateLocked(newLocked);
-
 		boolean previousLocked = user.isLocked();
 
-		// 같은 상태로 요청한 경우 DB 변경 없이 세션 정리만 수행
-		if (previousLocked == newLocked) {
-			if (newLocked) {
-				authSessionStore.deleteByUserId(userId);
-				log.info("[USER_LOCK_UPDATE] 이미 잠긴 계정의 인증 세션 삭제 완료: userId={}", userId);
-
-				return;
-			}
-
-			log.info("[USER_LOCK_UPDATE] 계정 잠금 상태 변경 없음: userId={}, locked={}", userId, newLocked);
-
-			return;
+		// 상태가 다를 때만 DB 변경
+		if (previousLocked != newLocked) {
+			user.updateLocked(newLocked);
 		}
 
-		// 계정 잠금 상태 변경
-		user.updateLocked(newLocked);
-
+		// 잠금 요청 시 기존 인증 세션 삭제
 		if (newLocked) {
-			// 잠긴 계정의 기존 인증 세션 삭제
 			authSessionStore.deleteByUserId(userId);
-			log.info("[USER_LOCK_UPDATE] 계정 잠금 및 인증 세션 삭제 완료: userId={}", userId);
-
-			return;
 		}
 
-		log.info("[USER_LOCK_UPDATE] 계정 잠금 해제 완료: userId={}", userId);
+		log.info(
+			"[USER_LOCK_UPDATE] 계정 잠금 상태 변경 완료: userId={}, previousLocked={}, newLocked={}, sessionDeleted={}",
+			userId,
+			previousLocked,
+			newLocked,
+			newLocked
+		);
 	}
 
 	// 관리자 기능에서 사용할 사용자 조회
