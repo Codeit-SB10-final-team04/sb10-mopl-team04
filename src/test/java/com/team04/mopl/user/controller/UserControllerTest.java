@@ -271,6 +271,25 @@ class UserControllerTest {
 	}
 
 	@Test
+	@DisplayName("관리자 계정 잠금 해제 요청이 유효하면 204 No Content를 반환한다")
+	void updateLocked_returnNoContent_whenUnlockRequestIsValid() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/locked", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"locked": false
+					}
+					"""))
+			.andExpect(status().isNoContent());
+
+		verify(userAdminService).updateLocked(userId, new UserLockUpdateRequest(false));
+	}
+
+	@Test
 	@DisplayName("관리자 사용자 목록 조회 요청이 유효하면 커서 페이지 응답을 반환한다")
 	void findUsers_returnCursorResponse_whenRequestIsValid() throws Exception {
 		// given

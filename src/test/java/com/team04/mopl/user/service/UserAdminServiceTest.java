@@ -405,10 +405,7 @@ class UserAdminServiceTest {
 	void updateLocked_throwUserException_whenLockedIsNull() {
 		// given
 		UUID userId = UUID.randomUUID();
-		User user = createUser(userId, UserRole.USER);
 		UserLockUpdateRequest request = new UserLockUpdateRequest(null);
-
-		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
 		// when, then
 		assertThatThrownBy(() -> userAdminService.updateLocked(userId, request))
@@ -416,6 +413,7 @@ class UserAdminServiceTest {
 				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_LOCKED_REQUIRED)
 			);
 
+		verifyNoInteractions(userRepository);
 		verify(authSessionStore, never()).deleteByUserId(userId);
 	}
 
