@@ -32,6 +32,7 @@ import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.common.exception.GlobalExceptionHandler;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
+import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
 import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
 import com.team04.mopl.user.dto.response.CursorResponseUserDto;
@@ -251,6 +252,44 @@ class UserControllerTest {
 	}
 
 	@Test
+	@DisplayName("관리자 계정 잠금 상태 변경 요청이 유효하면 204 No Content를 반환한다")
+	void updateLocked_returnNoContent_whenRequestIsValid() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/locked", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"locked": true
+					}
+					"""))
+			.andExpect(status().isNoContent());
+
+		verify(userAdminService).updateLocked(userId, new UserLockUpdateRequest(true));
+	}
+
+	@Test
+	@DisplayName("관리자 계정 잠금 해제 요청이 유효하면 204 No Content를 반환한다")
+	void updateLocked_returnNoContent_whenUnlockRequestIsValid() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/locked", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"locked": false
+					}
+					"""))
+			.andExpect(status().isNoContent());
+
+		verify(userAdminService).updateLocked(userId, new UserLockUpdateRequest(false));
+	}
+
+	@Test
 	@DisplayName("관리자 사용자 목록 조회 요청이 유효하면 커서 페이지 응답을 반환한다")
 	void findUsers_returnCursorResponse_whenRequestIsValid() throws Exception {
 		// given
@@ -465,6 +504,25 @@ class UserControllerTest {
 	}
 
 	@Test
+	@DisplayName("관리자 계정 잠금 상태 변경 요청에서 잠금 상태가 누락되면 400을 반환한다")
+	void updateLocked_returnBadRequest_whenLockedIsNull() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/locked", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userService);
+		verifyNoInteractions(userAdminService);
+	}
+
+	@Test
 	@DisplayName("관리자 권한 수정 대상 사용자가 없으면 404를 반환한다")
 	void updateRole_returnNotFound_whenUserDoesNotExist() throws Exception {
 		// given
@@ -483,6 +541,33 @@ class UserControllerTest {
 				.content("""
 					{
 						"role": "ADMIN"
+					}
+					"""))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("UserException"))
+			.andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."))
+			.andExpect(jsonPath("$.details.userId").value(userId.toString()));
+	}
+
+	@Test
+	@DisplayName("관리자 계정 잠금 상태 변경 대상 사용자가 없으면 404를 반환한다")
+	void updateLocked_returnNotFound_whenUserDoesNotExist() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		willThrow(new UserException(
+				UserErrorCode.USER_NOT_FOUND,
+				Map.of("userId", userId)
+			))
+			.given(userAdminService)
+			.updateLocked(userId, new UserLockUpdateRequest(true));
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/locked", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"locked": true
 					}
 					"""))
 			.andExpect(status().isNotFound())
