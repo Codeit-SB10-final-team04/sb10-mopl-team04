@@ -16,12 +16,12 @@ import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationType;
 import com.team04.mopl.notification.kafka.exception.KafkaEventErrorCode;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
+import com.team04.mopl.notification.realtime.NotificationRealtimePublisher;
 import com.team04.mopl.notification.service.NotificationService;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
 import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
 import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
 import com.team04.mopl.playlist.repository.PlaylistSubscriptionRepository;
-import com.team04.mopl.sse.service.SseService;
 import com.team04.mopl.user.entity.UserRole;
 import com.team04.mopl.user.event.UserRoleChangedEvent;
 
@@ -39,7 +39,7 @@ public class NotificationKafkaEventConsumer {
 	private final FollowRepository followRepository;
 
 	private final NotificationService notificationService;
-	private final SseService sseService;
+	private final NotificationRealtimePublisher notificationRealtimePublisher;
 
 	private final ObjectMapper objectMapper;
 
@@ -61,7 +61,7 @@ public class NotificationKafkaEventConsumer {
 		);
 
 		// 알림 저장 및 SSE 전송
-		sendNotification(
+		saveAndPublishNotifications(
 			Set.of(event.playlistOwnerId()),
 			title,
 			content,
@@ -92,7 +92,7 @@ public class NotificationKafkaEventConsumer {
 			.findSubscriberIdsByPlaylistId(event.playlistId());
 
 		// 알림 저장 및 SSE 전송
-		sendNotification(
+		saveAndPublishNotifications(
 			subscriberIds,
 			title,
 			content,
@@ -116,7 +116,7 @@ public class NotificationKafkaEventConsumer {
 		String content = String.format("[%s] 님이 팔로우했습니다.", event.followerName());
 
 		// 알림 저장 및 SSE 전송
-		sendNotification(
+		saveAndPublishNotifications(
 			Set.of(event.followeeId()),
 			title,
 			content,
@@ -147,7 +147,7 @@ public class NotificationKafkaEventConsumer {
 			.findFollowerIdsByFolloweeId(event.playlistOwnerId());
 
 		// 알림 저장 및 SSE 전송
-		sendNotification(
+		saveAndPublishNotifications(
 			followerIds,
 			title,
 			content,
@@ -174,7 +174,7 @@ public class NotificationKafkaEventConsumer {
 		);
 
 		// 알림 저장 및 SSE 전송
-		sendNotification(
+		saveAndPublishNotifications(
 			Set.of(event.userId()),
 			title,
 			content,
@@ -194,7 +194,7 @@ public class NotificationKafkaEventConsumer {
 		}
 	}
 
-	private void sendNotification(
+	private void saveAndPublishNotifications(
 		Set<UUID> receiverIds,
 		String title,
 		String content,
@@ -223,12 +223,7 @@ public class NotificationKafkaEventConsumer {
 		// SSE로 알림 전송
 		for (NotificationDto notificationDto : notificationDtoList) {
 			try {
-				sseService.sendToReceiver(
-					notificationDto.receiverId(),
-					notificationDto.id(),
-					"notifications",
-					notificationDto
-				);
+				notificationRealtimePublisher.publish(notificationDto);
 			} catch (Exception e) {
 				failureCount++;
 				log.warn("[NOTIFICATION_SSE_SEND_FAILED] SSE 전송 실패: receiverId={}, notificationId={}",
