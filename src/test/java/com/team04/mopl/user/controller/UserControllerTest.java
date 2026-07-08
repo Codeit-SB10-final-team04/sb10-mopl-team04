@@ -5,12 +5,14 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -27,11 +29,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
+import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.common.exception.GlobalExceptionHandler;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
+import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
+import com.team04.mopl.user.dto.response.CursorResponseUserDto;
 import com.team04.mopl.user.dto.response.UserDto;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.enums.UserSortBy;
 import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.service.UserAdminService;
@@ -242,6 +248,201 @@ class UserControllerTest {
 			.andExpect(status().isNoContent());
 
 		verify(userAdminService).updateRole(userId, new UserRoleUpdateRequest(UserRole.ADMIN));
+	}
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 요청이 유효하면 커서 페이지 응답을 반환한다")
+	void findUsers_returnCursorResponse_whenRequestIsValid() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant createdAt = Instant.parse("2026-07-02T00:00:00Z");
+		UserDto user = new UserDto(
+			userId,
+			createdAt,
+			"test@test.com",
+			"사용자",
+			null,
+			UserRole.USER,
+			false
+		);
+		UserPageRequest request = new UserPageRequest(
+			"test",
+			UserRole.USER,
+			false,
+			null,
+			null,
+			20,
+			SortDirection.ASCENDING,
+			UserSortBy.name
+		);
+		CursorResponseUserDto response = new CursorResponseUserDto(
+			List.of(user),
+			null,
+			null,
+			false,
+			1L,
+			"name",
+			SortDirection.ASCENDING
+		);
+
+		given(userAdminService.findUsers(request))
+			.willReturn(response);
+
+		// when & then
+		mockMvc.perform(get("/api/users")
+				.param("emailLike", "test")
+				.param("roleEqual", "USER")
+				.param("isLocked", "false")
+				.param("limit", "20")
+				.param("sortDirection", "ASCENDING")
+				.param("sortBy", "name"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data[0].id").value(userId.toString()))
+			.andExpect(jsonPath("$.data[0].email").value("test@test.com"))
+			.andExpect(jsonPath("$.data[0].name").value("사용자"))
+			.andExpect(jsonPath("$.data[0].role").value("USER"))
+			.andExpect(jsonPath("$.data[0].locked").value(false))
+			.andExpect(jsonPath("$.hasNext").value(false))
+			.andExpect(jsonPath("$.totalCount").value(1))
+			.andExpect(jsonPath("$.sortBy").value("name"))
+			.andExpect(jsonPath("$.sortDirection").value("ASCENDING"));
+
+		verify(userAdminService).findUsers(request);
+	}
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 결과에 다음 페이지가 있으면 다음 커서를 반환한다")
+	void findUsers_returnNextCursor_whenHasNextIsTrue() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant createdAt = Instant.parse("2026-07-02T00:00:00Z");
+		UserDto user = new UserDto(
+			userId,
+			createdAt,
+			"admin@test.com",
+			"관리자",
+			"https://example.com/admin.png",
+			UserRole.ADMIN,
+			true
+		);
+		UserPageRequest request = new UserPageRequest(
+			null,
+			null,
+			null,
+			null,
+			null,
+			1,
+			SortDirection.DESCENDING,
+			UserSortBy.createdAt
+		);
+		CursorResponseUserDto response = new CursorResponseUserDto(
+			List.of(user),
+			createdAt.toString(),
+			userId,
+			true,
+			2L,
+			"createdAt",
+			SortDirection.DESCENDING
+		);
+
+		given(userAdminService.findUsers(request))
+			.willReturn(response);
+
+		// when & then
+		mockMvc.perform(get("/api/users")
+				.param("limit", "1")
+				.param("sortDirection", "DESCENDING")
+				.param("sortBy", "createdAt"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data[0].id").value(userId.toString()))
+			.andExpect(jsonPath("$.data[0].profileImageUrl").value("https://example.com/admin.png"))
+			.andExpect(jsonPath("$.data[0].role").value("ADMIN"))
+			.andExpect(jsonPath("$.data[0].locked").value(true))
+			.andExpect(jsonPath("$.nextCursor").value(createdAt.toString()))
+			.andExpect(jsonPath("$.nextIdAfter").value(userId.toString()))
+			.andExpect(jsonPath("$.hasNext").value(true))
+			.andExpect(jsonPath("$.totalCount").value(2))
+			.andExpect(jsonPath("$.sortBy").value("createdAt"))
+			.andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
+
+		verify(userAdminService).findUsers(request);
+	}
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 요청에서 필수 파라미터가 누락되면 400을 반환한다")
+	void findUsers_returnBadRequest_whenRequiredParameterMissing() throws Exception {
+		// given
+
+		// when & then
+		mockMvc.perform(get("/api/users")
+				.param("limit", "20")
+				.param("sortDirection", "ASCENDING"))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userAdminService);
+	}
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 요청에서 커서와 보조 커서가 함께 없지 않으면 400을 반환한다")
+	void findUsers_returnBadRequest_whenCursorAndIdAfterNotPaired() throws Exception {
+		// given
+
+		// when & then
+		mockMvc.perform(get("/api/users")
+				.param("cursor", "Alpha")
+				.param("limit", "20")
+				.param("sortDirection", "ASCENDING")
+				.param("sortBy", "name"))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userAdminService);
+	}
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 요청에서 보조 커서만 있으면 400을 반환한다")
+	void findUsers_returnBadRequest_whenOnlyIdAfterExists() throws Exception {
+		// given
+		UUID idAfter = UUID.randomUUID();
+
+		// when & then
+		mockMvc.perform(get("/api/users")
+				.param("idAfter", idAfter.toString())
+				.param("limit", "20")
+				.param("sortDirection", "ASCENDING")
+				.param("sortBy", "name"))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userAdminService);
+	}
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 요청에서 limit이 범위를 벗어나면 400을 반환한다")
+	void findUsers_returnBadRequest_whenLimitOutOfRange() throws Exception {
+		// given
+
+		// when & then
+		mockMvc.perform(get("/api/users")
+				.param("limit", "101")
+				.param("sortDirection", "ASCENDING")
+				.param("sortBy", "name"))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userAdminService);
+	}
+
+	@Test
+	@DisplayName("관리자 사용자 목록 조회 요청에서 limit이 1보다 작으면 400을 반환한다")
+	void findUsers_returnBadRequest_whenLimitIsLessThanOne() throws Exception {
+		// given
+
+		// when & then
+		mockMvc.perform(get("/api/users")
+				.param("limit", "0")
+				.param("sortDirection", "ASCENDING")
+				.param("sortBy", "name"))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userAdminService);
 	}
 
 	@Test

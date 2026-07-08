@@ -5,7 +5,9 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 import com.team04.mopl.user.dto.request.UserCreateRequest;
+import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
+import com.team04.mopl.user.dto.response.CursorResponseUserDto;
 import com.team04.mopl.user.dto.response.UserDto;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +19,11 @@ public interface UserControllerDocs {
 	@Operation(summary = "사용자 등록 (회원가입)")
 	ResponseEntity<UserDto> create(
 		UserCreateRequest userCreateRequest
+	);
+
+	@Operation(summary = "[어드민] 사용자 목록 조회 (커서 페이지네이션)")
+	ResponseEntity<CursorResponseUserDto> findUsers(
+		UserPageRequest userPageRequest
 	);
 
 	@Operation(summary = "[어드민] 권한 수정")

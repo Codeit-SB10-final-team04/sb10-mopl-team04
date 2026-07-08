@@ -8,8 +8,9 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.repository.qdsl.UserQdslRepository;
 
-public interface UserRepository extends JpaRepository<User, UUID> {
+public interface UserRepository extends JpaRepository<User, UUID>, UserQdslRepository {
 	// 이메일 중복 확인 시 사용
 	boolean existsByEmail(String email);
 

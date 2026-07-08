@@ -281,3 +281,20 @@ CREATE INDEX idx_playlists_deleted_at_id
 
 CREATE INDEX idx_playlist_subscriptions_playlist_subscriber
     ON playlist_subscriptions (playlist_id, subscriber_id);
+
+-- users
+
+CREATE INDEX idx_users_name_id
+    ON users (name, id);
+
+CREATE INDEX idx_users_email_id
+    ON users (email, id);
+
+CREATE INDEX idx_users_created_at_id
+    ON users (created_at, id);
+
+CREATE INDEX idx_users_is_locked_id
+    ON users (is_locked, id);
+
+CREATE INDEX idx_users_role_id
+    ON users (role, id);
