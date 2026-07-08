@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.enums.NotificationLevel;
+import com.team04.mopl.notification.realtime.local.LocalNotificationRealtimePublisher;
 import com.team04.mopl.sse.event.SseEventNames;
 import com.team04.mopl.sse.service.SseService;
 

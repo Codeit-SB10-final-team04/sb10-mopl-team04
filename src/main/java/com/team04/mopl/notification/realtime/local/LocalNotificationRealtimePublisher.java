@@ -1,9 +1,10 @@
-package com.team04.mopl.notification.realtime;
+package com.team04.mopl.notification.realtime.local;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import com.team04.mopl.notification.dto.response.NotificationDto;
+import com.team04.mopl.notification.realtime.NotificationRealtimePublisher;
 import com.team04.mopl.sse.event.SseEventNames;
 import com.team04.mopl.sse.service.SseService;
 
