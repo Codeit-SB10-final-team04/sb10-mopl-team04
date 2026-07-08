@@ -3,7 +3,7 @@ spring:
     init:
       mode: never
   datasource:
-    # 각자 로컬 DB 정보 주입
+    # 각자 로컬 DB 정보 넣기! ^^
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
@@ -70,15 +70,8 @@ sports:
   batch:
     season: 2025-2026
 
-# 파일 저장소 공용 설정
+# 파일 저장소 (썸네일, 유저 프로필 등 공용)
 storage:
   type: local
   local:
     path: uploads/
-
-# 프로필 이미지 로컬 전용 설정
-profile-image:
-  storage:
-    type: local
-    local:
-      path: .mopl/storage/profiles/

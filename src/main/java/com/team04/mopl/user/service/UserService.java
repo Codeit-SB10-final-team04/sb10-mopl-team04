@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserUpdateRequest;
 import com.team04.mopl.user.dto.response.UserDto;
@@ -17,7 +18,6 @@ import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.mapper.UserMapper;
 import com.team04.mopl.user.repository.UserRepository;
-import com.team04.mopl.user.storage.ProfileImageStorage;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,10 +28,13 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional(readOnly = true)
 public class UserService {
 
+	// 프로필 사진이 저장될 디렉토리
+	private static final String PROFILE_IMAGE_DIRECTORY = "profile-images";
+
 	private final UserRepository userRepository;
 	private final UserMapper userMapper;
 	private final PasswordEncoder passwordEncoder;
-	private final ProfileImageStorage profileImageStorage;
+	private final FileStorage fileStorage;
 
 	// 회원가입
 	@Transactional
@@ -91,7 +94,7 @@ public class UserService {
 		String newProfileImageUrl = null;
 
 		if (hasImage(image)) {
-			newProfileImageUrl = profileImageStorage.store(image);
+			newProfileImageUrl = fileStorage.store(image, PROFILE_IMAGE_DIRECTORY);
 		}
 
 		try {
@@ -161,7 +164,7 @@ public class UserService {
 		}
 
 		try {
-			profileImageStorage.delete(oldProfileImageUrl);
+			fileStorage.delete(oldProfileImageUrl);
 		} catch (Exception exception) {
 			log.error("[USER_PROFILE_UPDATE] 기존 프로필 이미지 삭제 실패, 배치 정리 필요: profileImageUrl={}",
 				oldProfileImageUrl, exception);
@@ -175,7 +178,7 @@ public class UserService {
 		}
 
 		try {
-			profileImageStorage.delete(newProfileImageUrl);
+			fileStorage.delete(newProfileImageUrl);
 		} catch (Exception exception) {
 			log.error("[USER_PROFILE_UPDATE] 새 프로필 이미지 삭제 실패, 배치 정리 필요: profileImageUrl={}",
 				newProfileImageUrl, exception);

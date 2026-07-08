@@ -25,6 +25,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserUpdateRequest;
 import com.team04.mopl.user.dto.response.UserDto;
@@ -34,7 +35,6 @@ import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.mapper.UserMapper;
 import com.team04.mopl.user.repository.UserRepository;
-import com.team04.mopl.user.storage.ProfileImageStorage;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -49,7 +49,7 @@ class UserServiceTest {
 	private PasswordEncoder passwordEncoder;
 
 	@Mock
-	private ProfileImageStorage profileImageStorage;
+	private FileStorage fileStorage;
 
 	@InjectMocks
 	private UserService userService;
@@ -207,7 +207,7 @@ class UserServiceTest {
 
 		verify(userRepository).findById(userId);
 		verify(userMapper).toDto(user);
-		verifyNoInteractions(profileImageStorage);
+		verifyNoInteractions(fileStorage);
 	}
 
 	@Test
@@ -237,7 +237,7 @@ class UserServiceTest {
 
 		given(userRepository.findById(userId))
 			.willReturn(Optional.of(user));
-		given(profileImageStorage.store(image))
+		given(fileStorage.store(image, "profile-images"))
 			.willReturn(newProfileImageUrl);
 		given(userMapper.toDto(user))
 			.willReturn(expectedResponse);
@@ -251,8 +251,8 @@ class UserServiceTest {
 		assertThat(user.getProfileImageUrl()).isEqualTo(newProfileImageUrl);
 
 		verify(userRepository).findById(userId);
-		verify(profileImageStorage).store(image);
-		verify(profileImageStorage).delete(oldProfileImageUrl);
+		verify(fileStorage).store(image, "profile-images");
+		verify(fileStorage).delete(oldProfileImageUrl);
 		verify(userMapper).toDto(user);
 	}
 
@@ -274,7 +274,7 @@ class UserServiceTest {
 			);
 
 		verifyNoInteractions(userRepository);
-		verifyNoInteractions(profileImageStorage);
+		verifyNoInteractions(fileStorage);
 		verifyNoInteractions(userMapper);
 	}
 
@@ -299,7 +299,7 @@ class UserServiceTest {
 			});
 
 		verify(userRepository).findById(userId);
-		verifyNoInteractions(profileImageStorage);
+		verifyNoInteractions(fileStorage);
 		verifyNoInteractions(userMapper);
 	}
 
@@ -320,7 +320,7 @@ class UserServiceTest {
 
 		given(userRepository.findById(userId))
 			.willReturn(Optional.of(user));
-		given(profileImageStorage.store(image))
+		given(fileStorage.store(image, "profile-images"))
 			.willReturn(newProfileImageUrl);
 
 		// when
@@ -333,8 +333,8 @@ class UserServiceTest {
 			);
 
 		verify(userRepository).findById(userId);
-		verify(profileImageStorage).store(image);
-		verify(profileImageStorage).delete(newProfileImageUrl);
+		verify(fileStorage).store(image, "profile-images");
+		verify(fileStorage).delete(newProfileImageUrl);
 		verifyNoInteractions(userMapper);
 	}
 

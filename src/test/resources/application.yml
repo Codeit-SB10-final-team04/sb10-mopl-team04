@@ -58,12 +58,6 @@ storage:
   local:
     path: ${java.io.tmpdir}/mopl-test-uploads/
 
-profile-image:
-  storage:
-    type: local
-    local:
-      path: ${java.io.tmpdir}/mopl-test-profile-images/
-
 playlist:
   hard-delete:
     cron: "0 1 0 * * *"

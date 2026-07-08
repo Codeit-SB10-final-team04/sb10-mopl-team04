@@ -12,15 +12,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
 
 	private final String rootDir;
-	private final String profileImageUploadDir;
 
-	public WebConfig(
-		@Value("${storage.local.path:uploads/}") String rootDir,
-		@Value("${profile-image.storage.local.path:profile-images/}") String profileImageUploadDir
-	) {
-		// 문자열 결합 시 경로가 붙는 문제 방지를 위한 trailing slash 보정
+	public WebConfig(@Value("${storage.local.path:uploads/}") String rootDir) {
+		// 문자열 결합으로 경로를 만들므로 trailing slash 누락 시 보정 (file:uploadsthumbnails/ 방지)
 		this.rootDir = appendTrailingSlash(rootDir);
-		this.profileImageUploadDir = appendTrailingSlash(profileImageUploadDir);
 	}
 
 	@Override
@@ -31,7 +26,7 @@ public class WebConfig implements WebMvcConfigurer {
 
 		// 프로필 이미지 정적 리소스 매핑
 		registry.addResourceHandler("/profile-images/**")
-			.addResourceLocations("file:" + profileImageUploadDir);
+			.addResourceLocations("file:" + rootDir + "profile-images/");
 	}
 
 	private static String appendTrailingSlash(String path) {
