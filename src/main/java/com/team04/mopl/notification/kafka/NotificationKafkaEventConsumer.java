@@ -28,8 +28,7 @@ import com.team04.mopl.user.event.UserRoleChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-// Kafka topic을 구독해서 알림 저장/전송하는 listener
-// SSE를 이용해 서버에서 실시간 알림 전송
+// Kafka topic을 구독해서 알림을 저장하고 실시간 전송하는 listener
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -60,7 +59,7 @@ public class NotificationKafkaEventConsumer {
 			event.playlistTitle()
 		);
 
-		// 알림 저장 및 SSE 전송
+		// 알림 저장 및 실시간 전송
 		saveAndPublishNotifications(
 			Set.of(event.playlistOwnerId()),
 			title,
@@ -91,7 +90,7 @@ public class NotificationKafkaEventConsumer {
 		Set<UUID> subscriberIds = playlistSubscriptionRepository
 			.findSubscriberIdsByPlaylistId(event.playlistId());
 
-		// 알림 저장 및 SSE 전송
+		// 알림 저장 및 실시간 전송
 		saveAndPublishNotifications(
 			subscriberIds,
 			title,
@@ -115,7 +114,7 @@ public class NotificationKafkaEventConsumer {
 		// content
 		String content = String.format("[%s] 님이 팔로우했습니다.", event.followerName());
 
-		// 알림 저장 및 SSE 전송
+		// 알림 저장 및 실시간 전송
 		saveAndPublishNotifications(
 			Set.of(event.followeeId()),
 			title,
@@ -146,7 +145,7 @@ public class NotificationKafkaEventConsumer {
 		Set<UUID> followerIds = followRepository
 			.findFollowerIdsByFolloweeId(event.playlistOwnerId());
 
-		// 알림 저장 및 SSE 전송
+		// 알림 저장 및 실시간 전송
 		saveAndPublishNotifications(
 			followerIds,
 			title,
@@ -173,7 +172,7 @@ public class NotificationKafkaEventConsumer {
 			roleToDisplayName(event.newRole())
 		);
 
-		// 알림 저장 및 SSE 전송
+		// 알림 저장 및 실시간 전송
 		saveAndPublishNotifications(
 			Set.of(event.userId()),
 			title,
@@ -202,11 +201,11 @@ public class NotificationKafkaEventConsumer {
 		NotificationLevel level
 	) {
 		if (receiverIds.isEmpty()) {
-			log.info("[NOTIFICATION_SSE_SEND_SKIP] 알림 수신자가 없어 알림 저장 및 SSE 전송 생략: type={}", type);
+			log.info("[NOTIFICATION_REALTIME_PUBLISH_SKIP] 알림 수신자가 없어 알림 저장 및 실시간 전송 생략: type={}", type);
 			return;
 		}
 
-		log.info("[NOTIFICATION_SSE_SEND_START] 알림 저장 및 SSE 전송 시작: receiverCount={}, type={}",
+		log.info("[NOTIFICATION_REALTIME_PUBLISH_START] 알림 저장 및 실시간 전송 시작: receiverCount={}, type={}",
 			receiverIds.size(), type);
 
 		List<NotificationDto> notificationDtoList = notificationService.saveNotificationList(
@@ -220,19 +219,19 @@ public class NotificationKafkaEventConsumer {
 		// 실패 count
 		int failureCount = 0;
 
-		// SSE로 알림 전송
+		// 실시간 알림 전송
 		for (NotificationDto notificationDto : notificationDtoList) {
 			try {
 				notificationRealtimePublisher.publish(notificationDto);
 			} catch (Exception e) {
 				failureCount++;
-				log.warn("[NOTIFICATION_SSE_SEND_FAILED] SSE 전송 실패: receiverId={}, notificationId={}",
+				log.warn("[NOTIFICATION_REALTIME_PUBLISH_FAILED] 실시간 전송 실패: receiverId={}, notificationId={}",
 					notificationDto.receiverId(), notificationDto.id(), e);
 			}
 		}
 
 		log.info(
-			"[NOTIFICATION_SSE_SEND_COMPLETE] 알림 저장 및 SSE 전송 완료: receiverCount={}, notificationCount={}, failureCount={}, type={}",
+			"[NOTIFICATION_REALTIME_PUBLISH_COMPLETE] 알림 저장 및 실시간 전송 완료: receiverCount={}, notificationCount={}, failureCount={}, type={}",
 			receiverIds.size(), notificationDtoList.size(), failureCount, type);
 	}
 
