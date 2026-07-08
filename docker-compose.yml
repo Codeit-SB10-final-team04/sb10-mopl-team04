@@ -7,10 +7,6 @@ services:
       SERVER_PORT: ${SERVER_PORT}
       TMDB_API_KEY: ${TMDB_API_KEY}
 
-      MOPL_STORAGE_TYPE: ${MOPL_STORAGE_TYPE}
-      PROFILE_STORAGE_LOCAL_ROOT_PATH: ${PROFILE_STORAGE_LOCAL_ROOT_PATH}
-      THUMBNAIL_STORAGE_LOCAL_ROOT_PATH: ${THUMBNAIL_STORAGE_LOCAL_ROOT_PATH}
-
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -48,9 +44,8 @@ services:
     ports: # 포트 매핑(로컬:컨테이너)
       - "8080:8080"
     volumes: # 애플리케이션 볼륨 구성
-      # 컨테이너가 재시작되어도 데이터 유지
-      - ./.mopl/storage/profiles:/app/${PROFILE_STORAGE_LOCAL_ROOT_PATH}
-      - ./.mopl/storage/thumbnails:/app/${THUMBNAIL_STORAGE_LOCAL_ROOT_PATH}
+      # 컨테이너가 재시작되어도 파일 저장소 데이터 유지 (uploads/ 단일 루트, 하위에 thumbnails/ 등 자동 생성)
+      - ./.mopl/storage:/app/uploads
       - ./.logs:/app/.logs
     depends_on: # 서비스간 의존성 설정
       postgres:

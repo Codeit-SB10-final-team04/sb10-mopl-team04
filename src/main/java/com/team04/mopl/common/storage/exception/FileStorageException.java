@@ -1,4 +1,4 @@
-package com.team04.mopl.content.storage.exception;
+package com.team04.mopl.common.storage.exception;
 
 public class FileStorageException extends RuntimeException {
 	public FileStorageException(String message) {
