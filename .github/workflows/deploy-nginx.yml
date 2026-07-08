@@ -1,0 +1,75 @@
+name: Nginx CD (ECR & ECS)
+
+concurrency:
+  group: deploy-nginx-${{ github.ref }}
+  cancel-in-progress: false
+
+on:
+  # nginx 설정이 바뀔 때만 배포 (앱 배포와 분리 - nginx는 거의 안 바뀌므로)
+  push:
+    branches: [ "release" ]
+    paths:
+      - 'nginx/**'
+      - '.github/workflows/deploy-nginx.yml'
+  # 수동 배포 트리거 (최초 배포 등 paths 조건 없이 실행하고 싶을 때)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Nginx 이미지 빌드 및 ECS 배포
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 소스 코드 체크아웃
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: AWS 자격 증명 설정
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Amazon ECR 로그인
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker 이미지 빌드 및 ECR 푸시
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ vars.NGINX_ECR_REPOSITORY_NAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest ./nginx
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: ECS 태스크 정의 다운로드 및 정리
+        env:
+          TASK_DEFINITION: ${{ vars.NGINX_ECS_TASK_DEFINITION }}
+        run: |
+          aws ecs describe-task-definition --task-definition "$TASK_DEFINITION" --query taskDefinition > raw-task-def.json
+          cat raw-task-def.json | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-definition.json
+
+      - name: 새 이미지 주소로 태스크 정의 렌더링
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: mopl-nginx
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: 새 태스크 정의 배포 (Rolling Update)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ vars.NGINX_ECS_SERVICE }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          wait-for-service-stability: true
