@@ -299,6 +299,54 @@ class UserControllerTest {
 	}
 
 	@Test
+	@DisplayName("프로필 변경 요청에서 이미지만 있으면 200과 변경된 사용자 정보를 반환한다")
+	void updateProfile_returnUpdatedUser_whenOnlyImageIsProvided() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant createdAt = Instant.parse("2026-07-06T00:00:00Z");
+		UserUpdateRequest request = new UserUpdateRequest(null);
+		UserDto response = new UserDto(
+			userId,
+			createdAt,
+			"test@test.com",
+			"기존이름",
+			"http://localhost:8080/profile-images/profile.png",
+			UserRole.USER,
+			false
+		);
+		MockMultipartFile requestPart = createRequestPart(request);
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			MediaType.IMAGE_PNG_VALUE,
+			"image-data".getBytes()
+		);
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		given(userService.updateProfile(eq(userId), eq(request), any(MultipartFile.class), eq(userId)))
+			.willReturn(response);
+
+		// when & then
+		mockMvc.perform(multipart("/api/users/{userId}", userId)
+				.file(requestPart)
+				.file(image)
+				.with(req -> {
+					req.setMethod("PATCH");
+					return req;
+				}))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(userId.toString()))
+			.andExpect(jsonPath("$.email").value("test@test.com"))
+			.andExpect(jsonPath("$.name").value("기존이름"))
+			.andExpect(jsonPath("$.profileImageUrl").value("http://localhost:8080/profile-images/profile.png"))
+			.andExpect(jsonPath("$.role").value("USER"))
+			.andExpect(jsonPath("$.locked").value(false));
+
+		verify(userService).updateProfile(eq(userId), eq(request), any(MultipartFile.class), eq(userId));
+	}
+
+	@Test
 	@DisplayName("프로필 변경 요청에서 이름이 50자를 초과하면 400을 반환한다")
 	void updateProfile_returnBadRequest_whenNameIsTooLong() throws Exception {
 		// given
