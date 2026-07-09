@@ -1,8 +1,12 @@
 package com.team04.mopl.conversation.service;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -49,7 +53,11 @@ public class ConversationService {
 	private final ConversationParticipantMapper conversationParticipantMapper;
 	private final DirectMessageMapper directMessageMapper;
 
-	// 대화 생성
+	/*
+	=========================
+	   대화 생성
+	=========================
+	 */
 	@Transactional
 	@PreAuthorize("#conversationCreateRequest.withUserId() != #requestUserId")
 	public ConversationDto createConversation(
@@ -107,7 +115,11 @@ public class ConversationService {
 		conversationParticipantRepository.saveAll(participants);
 	}
 
-	// 대화 단건 조회
+	/*
+	=========================
+	   대화 단건 조회
+	=========================
+	 */
 	public ConversationDto findConversationById(
 		UUID conversationId,
 		UUID requestUserId
@@ -143,7 +155,11 @@ public class ConversationService {
 			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 	}
 
-	// 특정 사용자와의 대화 조회
+	/*
+	=========================
+	   특정 사용자와의 대화 조회
+	=========================
+	 */
 	public ConversationDto findConversationByUserId(
 		UUID userId,
 		UUID requestUserId
@@ -173,7 +189,12 @@ public class ConversationService {
 			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
 	}
 
-	// 대화 목록 조회 (정렬 + 필터링 + 커서 페이지네이션)
+	/*
+	=================================
+	   대화 목록 조회
+	   (정렬 + 필터링 + 커서 페이지네이션)
+	=================================
+	 */
 	public CursorResponseConversationDto findAll(
 		ConversationPageRequest conversationPageRequest,
 		UUID requestUserId
@@ -181,13 +202,15 @@ public class ConversationService {
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 시작: keyword={}", conversationPageRequest.keywordLike());
 
 		// 1. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
-		List<Conversation> conversations = conversationRepository.searchConversation(conversationPageRequest,
-			requestUserId);
+		List<Conversation> conversations = conversationRepository.searchConversation(
+			conversationPageRequest,
+			requestUserId
+		);
 
 		// 2. 대화 전체 개수 조회
 		Long totalCount = conversationRepository.countConversation(conversationPageRequest, requestUserId);
 
-		// 3. 다음 페이지 유무 확인 및 limit 만큼 자르기
+		// 3. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기
 		boolean hasNext = conversations.size() > conversationPageRequest.limit();
 		List<Conversation> pagedConversations = hasNext
 			? conversations.subList(0, conversationPageRequest.limit())
@@ -197,22 +220,17 @@ public class ConversationService {
 		String nextCursor = null;
 		UUID nextIdAfter = null;
 
+		// 조회 결과로 대화 목록이 존재하고, 다음 페이지가 존재할 경우에만 다음 커서 값 지정
 		if (!pagedConversations.isEmpty() && hasNext) {
+			// 마지막 요소
 			Conversation lastConversation = pagedConversations.get(pagedConversations.size() - 1);
 
 			nextCursor = lastConversation.getCreatedAt().toString();
 			nextIdAfter = lastConversation.getId();
 		}
 
-		// TODO: N+3 문제 해결 필요
-		// 5. Conversation -> ConversationDto (내부 메서드 활용)
-		List<ConversationDto> data = pagedConversations.stream()
-			.map(conversation -> {
-				// 기존 메서드를 활용하여 현재 대화방의 상대방 유저 조회
-				User withUser = getWithUserEntityOrThrow(conversation.getId(), requestUserId);
-				return mapToConversationDto(conversation, withUser, requestUserId);
-			})
-			.toList();
+		// 5. Conversation -> ConversationDto
+		List<ConversationDto> data = mapToConversationDtoList(pagedConversations, requestUserId);
 
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 완료: keyword={}", conversationPageRequest.keywordLike());
 
@@ -227,6 +245,12 @@ public class ConversationService {
 			conversationPageRequest.sortDirection().name()
 		);
 	}
+
+	/*
+	=========================
+	   유효성 검증
+	=========================
+	 */
 
 	// 유효성 검증: 대화 중복 검사
 	private void validateDuplicateConversation(UUID requestUserId, UUID withUserId) {
@@ -254,6 +278,12 @@ public class ConversationService {
 		}
 	}
 
+	/*
+	=========================
+	   엔티티 조회 및 예외 처리
+	=========================
+	 */
+
 	// 대화 엔티티 반환
 	private Conversation getConversationEntityOrThrow(UUID conversationId) {
 		return conversationRepository.findById(conversationId)
@@ -277,7 +307,11 @@ public class ConversationService {
 		);
 	}
 
-	// DTO 변환 로직
+	/*
+	=========================
+	   DTO 변환
+	=========================
+	 */
 	private ConversationDto mapToConversationDto(
 		Conversation conversation,
 		User withUser,
@@ -305,5 +339,85 @@ public class ConversationService {
 	// 안 읽은 메시지 여부 확인
 	private boolean hasUnreadMessage(UUID conversationId, UUID receiverId) {
 		return directMessageRepository.existsByConversationIdAndReceiverIdAndReadFalse(conversationId, receiverId);
+	}
+
+	/*
+	=========================
+	   DTO 목록 조회
+	=========================
+	 */
+	private List<ConversationDto> mapToConversationDtoList(
+		List<Conversation> conversations,
+		UUID requestUserId
+	) {
+		// 대화 엔티티 목록이 비어있을 경우, 빈 리스트 반환
+		if (conversations.isEmpty()) {
+			return Collections.emptyList();
+		}
+
+		// 대화 엔티티 목록 -> 대화 ID 목록
+		List<UUID> conversationIds = conversations.stream()
+			.map(Conversation::getId)
+			.toList();
+
+		// 다건 조회: 대화 ID 목록에 해당하는 대화 상대 정보, 마지막 메시지, 안 읽음 여부 한 번에 조회
+		// 단건 조회와 마찬가지로 대화 목록 크기에 상관없이 총 3번의 쿼리문만 발생하여, N+3 문제 해결
+		Map<UUID, User> withUserMap = getWithUserMap(conversationIds, requestUserId);
+		Map<UUID, DirectMessage> latestMessageMap = getLatestMessageMap(conversationIds);
+		Set<UUID> unreadConversationIds = getUnreadConversationIds(conversationIds, requestUserId);
+
+		return conversations.stream()
+			.map(conversation -> {
+				UUID conversationId = conversation.getId();
+
+				// 대화 상대 정보 조회
+				User withUser = withUserMap.get(conversationId);
+				UserSummary withSummary = (withUser != null)
+					? getUserSummary(withUser)
+					: null;
+
+				// 마지막 메시지 조회
+				DirectMessage latestMessage = latestMessageMap.get(conversationId);
+				DirectMessageDto latestDto = (latestMessage != null)
+					? directMessageMapper.toDto(latestMessage)
+					: null;
+
+				// 안 읽음 여부 판단
+				boolean hasUnread = unreadConversationIds.contains(conversationId);
+
+				return conversationMapper.toDto(conversation, withSummary, latestDto, hasUnread);
+			})
+			.toList();
+	}
+
+	// 대화 상대 조회: 요청자를 제외한 각 대화방의 상대방 유저 정보를 Map으로 반환
+	private Map<UUID, User> getWithUserMap(List<UUID> conversationIds, UUID requestUserId) {
+		return conversationParticipantRepository.findByConversationIdIn(conversationIds).stream()
+			.filter(participant -> !participant.getUser().getId().equals(requestUserId))
+			.collect(
+				Collectors.toMap(
+					participant -> participant.getConversation().getId(),
+					ConversationParticipant::getUser,
+					// 참가자가 2명을 초과하는 예외 상황 대비
+					(existing, replacement) -> existing)
+			);
+	}
+
+	// 마지막 메시지 조회: 각 대화방에 속한 가장 최근 메시지를 Map으로 반환
+	private Map<UUID, DirectMessage> getLatestMessageMap(List<UUID> conversationIds) {
+		return directMessageRepository.findLatestMessagesByConversationIds(conversationIds).stream()
+			.collect(
+				Collectors.toMap(
+					latestMessage -> latestMessage.getConversation().getId(),
+					latestMessage -> latestMessage,
+					// 두 개 이상의 메시시의 생성 시간이 같은 경우, 기존값을 유지하여 DuplicationKeyException 방지
+					(existing, replacement) -> existing
+				)
+			);
+	}
+
+	// 안 읽음 여부 조회: 요청자가 아직 읽지 않은 메시지가 존재하는 대화방 ID 목록을 Set으로 반환
+	private Set<UUID> getUnreadConversationIds(List<UUID> conversationIds, UUID receiverId) {
+		return directMessageRepository.findUnreadConversationIds(conversationIds, receiverId);
 	}
 }

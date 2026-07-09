@@ -3,6 +3,9 @@ package com.team04.mopl.conversation.dto.response;
 import java.util.List;
 import java.util.UUID;
 
+import lombok.Builder;
+
+@Builder
 public record CursorResponseConversationDto(
 	// 대화 목록
 	List<ConversationDto> data,
