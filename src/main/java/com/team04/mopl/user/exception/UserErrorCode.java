@@ -20,7 +20,9 @@ public enum UserErrorCode implements ErrorCode {
 	USER_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "US10", "커서 값이 올바르지 않습니다."),
 	USER_LOCKED_REQUIRED(HttpStatus.BAD_REQUEST, "US11", "잠금 상태는 필수입니다."),
 	USER_PROFILE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "US12", "본인의 프로필만 변경할 수 있습니다."),
-	USER_PASSWORD_ACCESS_DENIED(HttpStatus.FORBIDDEN, "US13", "본인의 비밀번호만 변경할 수 있습니다.");
+	USER_INVALID_PROFILE_IMAGE(HttpStatus.BAD_REQUEST, "US13", "프로필 이미지는 10MB 이하의 이미지 파일만 업로드할 수 있습니다."),
+	USER_PASSWORD_ACCESS_DENIED(HttpStatus.FORBIDDEN, "US14", "본인의 비밀번호만 변경할 수 있습니다.");
+
 
 	private final HttpStatus httpStatus;
 	private final String code;

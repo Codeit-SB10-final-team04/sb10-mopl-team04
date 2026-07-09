@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -27,7 +28,9 @@ import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
+import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
+import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.service.ConversationService;
@@ -329,5 +332,117 @@ class ConversationControllerTest {
 				.param("userId", UUID.randomUUID().toString()))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage()));
+	}
+
+	/*
+	=========================
+	   대화 목록 조회
+	=========================
+	 */
+	@Test
+	@DisplayName("성공: 올바른 페이징 파라미터가 주어지면 대화 목록을 200 OK와 함께 반환한다.")
+	void findAll_Success() throws Exception {
+		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
+		// 빌더 패턴 적용
+		CursorResponseConversationDto mockResponse = CursorResponseConversationDto.builder()
+			.data(Collections.emptyList())
+			.nextCursor(null)
+			.nextIdAfter(null)
+			.hasNext(false)
+			.totalCount(0L)
+			.sortBy("createdAt")
+			.sortDirection("DESCENDING")
+			.build();
+
+		given(conversationService.findAll(any(ConversationPageRequest.class), eq(requesterUserId)))
+			.willReturn(mockResponse);
+
+		// when & then
+		mockMvc.perform(get("/api/conversations")
+				.param("limit", "10")
+				.param("sortBy", "createdAt")
+				.param("sortDirection", "DESCENDING")
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.sortBy").value("createdAt"))
+			.andExpect(jsonPath("$.sortDirection").value("DESCENDING"))
+			.andExpect(jsonPath("$.hasNext").value(false));
+	}
+
+	@Test
+	@DisplayName("실패: limit 파라미터에 0 이하의 값이 전달되면 400 Bad Request를 반환한다 (DTO 컴팩트 생성자 검증).")
+	void findAll_Fail_InvalidLimit() throws Exception {
+		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
+		// when & then
+		mockMvc.perform(get("/api/conversations")
+				.param("limit", "-5")
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("실패: 잘못된 cursor 형식이 전달되면 ConversationException이 발생하여 400 Bad Request를 반환한다.")
+	void findAll_Fail_InvalidCursor() throws Exception {
+		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
+		given(conversationService.findAll(any(ConversationPageRequest.class), eq(requesterUserId)))
+			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT));
+
+		// when & then
+		mockMvc.perform(get("/api/conversations")
+				.param("cursor", "invalid-cursor-string")
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage()));
+	}
+
+	@Test
+	@DisplayName("실패: 지원하지 않는 sortBy 정렬 기준이 전달되면 ConversationException이 발생하여 400 Bad Request를 반환한다.")
+	void findAll_Fail_InvalidSortBy() throws Exception {
+		// given
+		UUID requesterUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requesterUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
+		given(conversationService.findAll(any(ConversationPageRequest.class), eq(requesterUserId)))
+			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT));
+
+		// when & then
+		mockMvc.perform(get("/api/conversations")
+				.param("sortBy", "unsupportedField")
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage()));
 	}
 }
