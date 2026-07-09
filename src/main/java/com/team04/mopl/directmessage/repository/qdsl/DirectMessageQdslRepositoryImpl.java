@@ -15,7 +15,7 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.team04.mopl.common.enums.SortDirection;
-import com.team04.mopl.directmessage.dto.request.DirectMessagePagedRequest;
+import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
@@ -31,7 +31,7 @@ public class DirectMessageQdslRepositoryImpl implements DirectMessageQdslReposit
 	@Override
 	public List<DirectMessage> findDirectMessagesByCursor(
 		UUID conversationId,
-		DirectMessagePagedRequest directMessagePagedRequest
+		DirectMessagePageRequest directMessagePageRequest
 	) {
 		return jpaQueryFactory
 			.selectFrom(directMessage)
@@ -43,14 +43,14 @@ public class DirectMessageQdslRepositoryImpl implements DirectMessageQdslReposit
 				directMessage.conversation.id.eq(conversationId),
 				// 2. 커서 페이지네이션 적용: 마지막 메시지의 생성 시간 및 ID 값
 				cursorCondition(
-					directMessagePagedRequest.cursor(),
-					directMessagePagedRequest.idAfter(),
-					directMessagePagedRequest.sortDirection()
+					directMessagePageRequest.cursor(),
+					directMessagePageRequest.idAfter(),
+					directMessagePageRequest.sortDirection()
 				)
 			)
 			// 3. 정렬: 생성 시간 및 ID
-			.orderBy(createOrderSpecifier(directMessagePagedRequest))
-			.limit(directMessagePagedRequest.limit() + 1)
+			.orderBy(createOrderSpecifier(directMessagePageRequest))
+			.limit(directMessagePageRequest.limit() + 1)
 			.fetch();
 	}
 
@@ -58,7 +58,7 @@ public class DirectMessageQdslRepositoryImpl implements DirectMessageQdslReposit
 	@Override
 	public Long countDirectMessage(
 		UUID conversationId,
-		DirectMessagePagedRequest directMessagePagedRequest
+		DirectMessagePageRequest directMessagePageRequest
 	) {
 		Long count = jpaQueryFactory
 			.select(directMessage.count())
@@ -116,7 +116,7 @@ public class DirectMessageQdslRepositoryImpl implements DirectMessageQdslReposit
 	}
 
 	// 정렬
-	private OrderSpecifier<?>[] createOrderSpecifier(DirectMessagePagedRequest request) {
+	private OrderSpecifier<?>[] createOrderSpecifier(DirectMessagePageRequest request) {
 		// 유효성 검증: 정렬 기준 일치 여부
 		validateSortBy(request.sortBy());
 

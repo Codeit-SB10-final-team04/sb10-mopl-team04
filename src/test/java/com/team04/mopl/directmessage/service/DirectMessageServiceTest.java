@@ -23,7 +23,7 @@ import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
-import com.team04.mopl.directmessage.dto.request.DirectMessagePagedRequest;
+import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
@@ -241,7 +241,7 @@ class DirectMessageServiceTest {
 		ConversationParticipant participant = mock(ConversationParticipant.class);
 		given(participant.getUser()).willReturn(mockUser);
 
-		DirectMessagePagedRequest request = new DirectMessagePagedRequest(
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
 			null,
 			null,
 			2,
@@ -305,7 +305,7 @@ class DirectMessageServiceTest {
 		ConversationParticipant participant = mock(ConversationParticipant.class);
 		given(participant.getUser()).willReturn(mockUser);
 
-		DirectMessagePagedRequest request = new DirectMessagePagedRequest(
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
 			null,
 			null,
 			10,
@@ -346,7 +346,7 @@ class DirectMessageServiceTest {
 		// given
 		UUID conversationId = UUID.randomUUID();
 		UUID requestUserId = UUID.randomUUID();
-		DirectMessagePagedRequest request = new DirectMessagePagedRequest(
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
 			null,
 			null,
 			10,
@@ -371,7 +371,7 @@ class DirectMessageServiceTest {
 		given(conversation.getId()).willReturn(conversationId);
 
 		UUID requestUserId = UUID.randomUUID();
-		DirectMessagePagedRequest request = new DirectMessagePagedRequest(
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
 			null,
 			null,
 			10,
@@ -403,7 +403,7 @@ class DirectMessageServiceTest {
 		ConversationParticipant participant = mock(ConversationParticipant.class);
 		given(participant.getUser()).willReturn(mockUser);
 
-		DirectMessagePagedRequest request = mock(DirectMessagePagedRequest.class);
+		DirectMessagePageRequest request = mock(DirectMessagePageRequest.class);
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 		given(conversationParticipantRepository.findByConversationId(conversationId))

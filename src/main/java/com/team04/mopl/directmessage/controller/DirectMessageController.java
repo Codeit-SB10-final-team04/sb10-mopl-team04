@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
-import com.team04.mopl.directmessage.dto.request.DirectMessagePagedRequest;
+import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.service.DirectMessageService;
 
@@ -43,13 +43,13 @@ public class DirectMessageController implements DirectMessageControllerDocs {
 	@GetMapping("/{conversationId}/direct-messages")
 	public ResponseEntity<CursorResponseDirectMessageDto> findAll(
 		@PathVariable UUID conversationId,
-		@ModelAttribute DirectMessagePagedRequest directMessagePagedRequest,
+		@ModelAttribute DirectMessagePageRequest directMessagePageRequest,
 		@AuthenticationPrincipal MoplUserDetails moplUserDetails
 	) {
 
 		CursorResponseDirectMessageDto cursorResponseDirectMessageDto = directMessageService.findAll(
 			conversationId,
-			directMessagePagedRequest,
+			directMessagePageRequest,
 			moplUserDetails.getUserId()
 		);
 

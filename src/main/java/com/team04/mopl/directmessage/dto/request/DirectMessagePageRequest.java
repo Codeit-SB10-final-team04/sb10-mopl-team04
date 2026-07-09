@@ -8,7 +8,7 @@ import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 
-public record DirectMessagePagedRequest(
+public record DirectMessagePageRequest(
 	// 메인 커서
 	String cursor,
 
@@ -25,7 +25,7 @@ public record DirectMessagePagedRequest(
 	String sortBy
 ) {
 	// 기본값 설정을 위한 생성자
-	public DirectMessagePagedRequest {
+	public DirectMessagePageRequest {
 		// 유효성 검증: 입력값 필수 여부
 		validateCursorRequest(cursor, idAfter);
 

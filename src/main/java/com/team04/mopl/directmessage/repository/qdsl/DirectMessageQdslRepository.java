@@ -3,7 +3,7 @@ package com.team04.mopl.directmessage.repository.qdsl;
 import java.util.List;
 import java.util.UUID;
 
-import com.team04.mopl.directmessage.dto.request.DirectMessagePagedRequest;
+import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 
 /*
@@ -15,12 +15,12 @@ public interface DirectMessageQdslRepository {
 	// 정렬 + 커서 페이지네이션이 적용된 DM 목록 조회
 	List<DirectMessage> findDirectMessagesByCursor(
 		UUID conversationId,
-		DirectMessagePagedRequest directMessagePagedRequest
+		DirectMessagePageRequest directMessagePageRequest
 	);
 
 	// DM 목록의 전체 개수 조회
 	Long countDirectMessage(
 		UUID conversationId,
-		DirectMessagePagedRequest directMessagePagedRequest
+		DirectMessagePageRequest directMessagePageRequest
 	);
 }

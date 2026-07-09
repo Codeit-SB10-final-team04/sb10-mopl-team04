@@ -19,7 +19,7 @@ import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.config.JpaAuditingConfig;
 import com.team04.mopl.config.QuerydslConfig;
 import com.team04.mopl.conversation.entity.Conversation;
-import com.team04.mopl.directmessage.dto.request.DirectMessagePagedRequest;
+import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
@@ -62,7 +62,7 @@ public class DirectMessageQdslRepositoryImplTest {
 		em.clear();
 
 		// 첫 페이지 요청 (커서 null)
-		DirectMessagePagedRequest request = new DirectMessagePagedRequest(
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
 			null,
 			null,
 			limit,
@@ -92,7 +92,7 @@ public class DirectMessageQdslRepositoryImplTest {
 		em.flush();
 		em.clear();
 
-		DirectMessagePagedRequest request = new DirectMessagePagedRequest(
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
 			msg2.getCreatedAt().toString(),
 			msg2.getId(),
 			10,
@@ -123,7 +123,7 @@ public class DirectMessageQdslRepositoryImplTest {
 		em.flush();
 		em.clear();
 
-		DirectMessagePagedRequest request = new DirectMessagePagedRequest(
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
 			msg1.getCreatedAt().toString(),
 			msg1.getId(),
 			10,
@@ -144,7 +144,7 @@ public class DirectMessageQdslRepositoryImplTest {
 	void countDirectMessage_Empty_Success() {
 		// given
 		UUID conversationId = UUID.randomUUID();
-		DirectMessagePagedRequest request = new DirectMessagePagedRequest(
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
 			null,
 			null,
 			10,
@@ -164,7 +164,7 @@ public class DirectMessageQdslRepositoryImplTest {
 	void findDirectMessages_InvalidSortBy_Fail() {
 		// given
 		UUID conversationId = UUID.randomUUID();
-		DirectMessagePagedRequest request = new DirectMessagePagedRequest(
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
 			null,
 			null,
 			10,
@@ -182,7 +182,7 @@ public class DirectMessageQdslRepositoryImplTest {
 	@DisplayName("실패: 잘못된 문자열 형식의 커서(cursor) 전달 시 파싱 예외가 발생한다.")
 	void findDirectMessages_InvalidCursorFormat_Fail() {
 		// given
-		DirectMessagePagedRequest request = new DirectMessagePagedRequest(
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
 			"invalid-date-format", UUID.randomUUID(), 10, SortDirection.DESCENDING, "createdAt"
 		);
 

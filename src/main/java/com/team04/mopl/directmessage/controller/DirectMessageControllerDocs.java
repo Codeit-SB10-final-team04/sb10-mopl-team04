@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 import com.team04.mopl.auth.security.MoplUserDetails;
-import com.team04.mopl.directmessage.dto.request.DirectMessagePagedRequest;
+import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,7 +30,7 @@ public interface DirectMessageControllerDocs {
 	)
 	ResponseEntity<CursorResponseDirectMessageDto> findAll(
 		UUID conversationId,
-		DirectMessagePagedRequest directMessagePagedRequest,
+		DirectMessagePageRequest directMessagePageRequest,
 		MoplUserDetails moplUserDetails
 	);
 }

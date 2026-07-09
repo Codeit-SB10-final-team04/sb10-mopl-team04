@@ -11,7 +11,7 @@ import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
-import com.team04.mopl.directmessage.dto.request.DirectMessagePagedRequest;
+import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
@@ -70,7 +70,7 @@ public class DirectMessageService {
 	// DM 목록 조회 (정렬 + 커서 페이지네이션)
 	public CursorResponseDirectMessageDto findAll(
 		UUID conversationId,
-		DirectMessagePagedRequest directMessagePagedRequest,
+		DirectMessagePageRequest directMessagePageRequest,
 		UUID requestUserId
 	) {
 		log.debug("[DM_FIND_ALL] DM 목록 조회 시작");
@@ -84,19 +84,19 @@ public class DirectMessageService {
 		// 3. 정렬 + 커서 기반 페이지네이션이 적용된 DM 리스트
 		List<DirectMessage> directMessages = directMessageRepository.findDirectMessagesByCursor(
 			conversation.getId(),
-			directMessagePagedRequest
+			directMessagePageRequest
 		);
 
 		// 4. DM 전체 개수 조회
 		Long totalCount = directMessageRepository.countDirectMessage(
 			conversation.getId(),
-			directMessagePagedRequest
+			directMessagePageRequest
 		);
 
 		// 5. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기
-		boolean hasNext = directMessages.size() > directMessagePagedRequest.limit();
+		boolean hasNext = directMessages.size() > directMessagePageRequest.limit();
 		List<DirectMessage> pagedDirectMessages = hasNext
-			? directMessages.subList(0, directMessagePagedRequest.limit())
+			? directMessages.subList(0, directMessagePageRequest.limit())
 			: directMessages;
 
 		// 6. 다음 커서 값 계산 (메인 커서, 보조 커서)
@@ -124,8 +124,8 @@ public class DirectMessageService {
 			nextIdAfter,
 			hasNext,
 			totalCount,
-			directMessagePagedRequest.sortBy(),
-			directMessagePagedRequest.sortDirection().name()
+			directMessagePageRequest.sortBy(),
+			directMessagePageRequest.sortDirection().name()
 		);
 	}
 

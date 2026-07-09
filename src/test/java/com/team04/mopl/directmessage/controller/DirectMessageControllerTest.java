@@ -26,7 +26,7 @@ import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
-import com.team04.mopl.directmessage.dto.request.DirectMessagePagedRequest;
+import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
@@ -237,7 +237,7 @@ class DirectMessageControllerTest {
 			.sortDirection("DESCENDING")
 			.build();
 
-		given(directMessageService.findAll(eq(conversationId), any(DirectMessagePagedRequest.class), eq(requestUserId)))
+		given(directMessageService.findAll(eq(conversationId), any(DirectMessagePageRequest.class), eq(requestUserId)))
 			.willReturn(expectedResponse);
 
 		// when & then
@@ -310,7 +310,7 @@ class DirectMessageControllerTest {
 		);
 		mockSecurityContext(mockUserDetails);
 
-		given(directMessageService.findAll(eq(conversationId), any(DirectMessagePagedRequest.class), eq(requestUserId)))
+		given(directMessageService.findAll(eq(conversationId), any(DirectMessagePageRequest.class), eq(requestUserId)))
 			.willThrow(new DirectMessageException(DirectMessageErrorCode.DM_INVALID_FORMAT));
 
 		// when & then
