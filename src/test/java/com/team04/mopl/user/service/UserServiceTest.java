@@ -207,7 +207,7 @@ class UserServiceTest {
 
 		verify(userRepository).findById(userId);
 		verify(userMapper).toDto(user);
-		verifyNoInteractions(profileImageStorage);
+		verifyNoInteractions(fileStorage);
 	}
 
 	@Test
@@ -231,7 +231,7 @@ class UserServiceTest {
 
 		verify(userRepository).findById(userId);
 		verifyNoInteractions(userMapper);
-		verifyNoInteractions(profileImageStorage);
+		verifyNoInteractions(fileStorage);
 	}
 
 	@Test
