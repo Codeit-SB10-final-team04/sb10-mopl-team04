@@ -12,12 +12,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
 import com.team04.mopl.follow.entity.Follow;
+import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.follow.exception.FollowErrorCode;
 import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
@@ -41,6 +43,9 @@ class FollowServiceTest {
 
 	@Mock
 	private FollowMapper followMapper;
+
+	@Mock
+	private ApplicationEventPublisher applicationEventPublisher;
 
 	/*
 	=========================
@@ -80,6 +85,7 @@ class FollowServiceTest {
 		// then
 		assertThat(result).isNotNull();
 		verify(followRepository, times(1)).save(mockFollow);
+		verify(applicationEventPublisher, times(1)).publishEvent(any(FollowCreatedEvent.class));
 	}
 
 	@Test

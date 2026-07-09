@@ -192,9 +192,9 @@ public class DataCollectScheduler {
 			.flatMap(instance -> jobExplorer.getJobExecutions(instance).stream())
 			.filter(exec -> season.equals(exec.getJobParameters().getString("season")))
 			.anyMatch(exec ->
-				exec.getStatus() == BatchStatus.COMPLETED ||
-				exec.getStatus() == BatchStatus.STARTED ||
-				exec.getStatus() == BatchStatus.STARTING
+				exec.getStatus() == BatchStatus.COMPLETED
+					|| exec.getStatus() == BatchStatus.STARTED
+					|| exec.getStatus() == BatchStatus.STARTING
 			);
 	}
 }

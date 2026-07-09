@@ -397,7 +397,9 @@ public class ConversationService {
 			.collect(
 				Collectors.toMap(
 					participant -> participant.getConversation().getId(),
-					ConversationParticipant::getUser)
+					ConversationParticipant::getUser,
+					// 참가자가 2명을 초과하는 예외 상황 대비
+					(existing, replacement) -> existing)
 			);
 	}
 

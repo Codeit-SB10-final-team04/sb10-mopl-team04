@@ -144,13 +144,13 @@ public class ConversationQdslRepositoryImpl implements ConversationQdslRepositor
 		}
 	}
 
-	// 커서 변환
+	// 커서 반환
 	private Instant parseCursorToInstant(String cursor) {
 		try {
 			return Instant.parse(cursor);
 		} catch (DateTimeParseException e) {
 			// 커서 값이 잘못된 형태인 경우, 예외 발생
-			throw new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT)
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT, e)
 				.addDetail("invalidCursor", cursor);
 		}
 	}

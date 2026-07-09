@@ -184,7 +184,7 @@ class NotificationQdslRepositoryImplTest {
 			receiver1,
 			"동일 시간 알림 id 작음",
 			"동일 시간 알림 내용",
-			NotificationType.CONTENT_ADDED,
+			NotificationType.CONTENT_ADD,
 			NotificationLevel.INFO,
 			null,
 			createdAt2

@@ -2,6 +2,8 @@ package com.team04.mopl.conversation.repository.qdsl;
 
 import static org.assertj.core.api.Assertions.*;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -11,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.config.JpaAuditingConfig;
@@ -76,25 +79,29 @@ class ConversationQdslRepositoryImplTest {
 
 	@Test
 	@DisplayName("성공: 내림차순(DESC) 커서 페이지네이션 적용 시 커서 시간 및 ID보다 작은 데이터를 조회한다.")
-	void searchConversation_CursorPaginationDesc_Success() throws InterruptedException {
+	void searchConversation_CursorPaginationDesc_Success() {
 		// given
 		User requestUser = createUser("requestUser");
+		Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
 		Conversation conv1 = em.persist(Conversation.create());
 		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
-		Thread.sleep(10);
 
 		Conversation conv2 = em.persist(Conversation.create());
 		em.persist(ConversationParticipant.builder().conversation(conv2).user(requestUser).build());
-		Thread.sleep(10);
 
 		Conversation conv3 = em.persist(Conversation.create());
 		em.persist(ConversationParticipant.builder().conversation(conv3).user(requestUser).build());
 
 		em.flush();
+
+		updateConversationTime(conv1, now.minus(30, ChronoUnit.SECONDS));
+		updateConversationTime(conv2, now.minus(20, ChronoUnit.SECONDS));
+		updateConversationTime(conv3, now.minus(10, ChronoUnit.SECONDS));
+
 		em.clear();
 
-		// 내림차순 조회
+		// 내림차순 조회: conv2(-20초) 기준, 더 과거인 conv1(-30초)만 나와야 함
 		ConversationPageRequest request = new ConversationPageRequest(
 			null,
 			conv2.getCreatedAt().toString(),
@@ -114,25 +121,29 @@ class ConversationQdslRepositoryImplTest {
 
 	@Test
 	@DisplayName("성공: 오름차순(ASC) 커서 페이지네이션 적용 시 커서 시간 및 ID보다 큰 데이터를 조회한다.")
-	void searchConversation_CursorPaginationAsc_Success() throws InterruptedException {
+	void searchConversation_CursorPaginationAsc_Success() {
 		// given
 		User requestUser = createUser("requestUser");
+		Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
 		Conversation conv1 = em.persist(Conversation.create());
 		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
-		Thread.sleep(10);
 
 		Conversation conv2 = em.persist(Conversation.create());
 		em.persist(ConversationParticipant.builder().conversation(conv2).user(requestUser).build());
-		Thread.sleep(10);
 
 		Conversation conv3 = em.persist(Conversation.create());
 		em.persist(ConversationParticipant.builder().conversation(conv3).user(requestUser).build());
 
 		em.flush();
+
+		updateConversationTime(conv1, now.minus(30, ChronoUnit.SECONDS));
+		updateConversationTime(conv2, now.minus(20, ChronoUnit.SECONDS));
+		updateConversationTime(conv3, now.minus(10, ChronoUnit.SECONDS));
+
 		em.clear();
 
-		// 오름차순 조회
+		// 오름차순 조회: conv2(-20초) 기준, 더 미래인 conv3(-10초)만 나와야 함
 		ConversationPageRequest request = new ConversationPageRequest(
 			null,
 			conv2.getCreatedAt().toString(),
@@ -148,6 +159,64 @@ class ConversationQdslRepositoryImplTest {
 		// then
 		assertThat(result).hasSize(1);
 		assertThat(result.get(0).getId()).isEqualTo(conv3.getId());
+	}
+
+	@Test
+	@DisplayName("성공: 커서 값만 전달되고 idAfter가 null이면 첫 페이지 조회처럼 동작한다.")
+	void searchConversation_OnlyCursorProvided_Success() {
+		// given
+		User requestUser = createUser("requestUser");
+		Conversation conv1 = em.persist(Conversation.create());
+		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
+
+		em.flush();
+		em.clear();
+
+		// cursor는 있지만 idAfter가 null인 경우
+		ConversationPageRequest request = new ConversationPageRequest(
+			null,
+			conv1.getCreatedAt().toString(),
+			null,
+			10,
+			SortDirection.DESCENDING,
+			"createdAt"
+		);
+
+		// when
+		List<Conversation> result = conversationRepository.searchConversation(request, requestUser.getId());
+
+		// then
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getId()).isEqualTo(conv1.getId());
+	}
+
+	@Test
+	@DisplayName("성공: idAfter만 전달되고 커서 값이 null이면 첫 페이지 조회처럼 동작한다.")
+	void searchConversation_OnlyIdAfterProvided_Success() {
+		// given
+		User requestUser = createUser("requestUser");
+		Conversation conv1 = em.persist(Conversation.create());
+		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
+
+		em.flush();
+		em.clear();
+
+		// idAfter는 있지만 cursor가 null인 경우
+		ConversationPageRequest request = new ConversationPageRequest(
+			null,
+			null,
+			conv1.getId(),
+			10,
+			SortDirection.DESCENDING,
+			"createdAt"
+		);
+
+		// when
+		List<Conversation> result = conversationRepository.searchConversation(request, requestUser.getId());
+
+		// then
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getId()).isEqualTo(conv1.getId());
 	}
 
 	@Test
@@ -299,5 +368,17 @@ class ConversationQdslRepositoryImplTest {
 			.executeUpdate();
 
 		return em.getEntityManager().getReference(User.class, userId);
+	}
+
+	private void updateConversationTime(Conversation conversation, Instant time) {
+		em.getEntityManager().createNativeQuery(
+				"UPDATE conversations SET created_at = :time WHERE id = :id"
+			)
+			.setParameter("time", time)
+			.setParameter("id", conversation.getId())
+			.executeUpdate();
+
+		// 메모리의 객체도 변경된 시간을 가지도록 세팅 (request 생성 시 getCreatedAt()을 호출하기 때문)
+		ReflectionTestUtils.setField(conversation, "createdAt", time);
 	}
 }
