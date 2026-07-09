@@ -165,7 +165,7 @@ public class ConversationQdslRepositoryImpl implements ConversationQdslRepositor
 			? Order.DESC
 			: Order.ASC;
 
-		return new OrderSpecifier[] {
+		return new OrderSpecifier<?>[] {
 			// 1순위 정렬: 생성 시간 (createdAt)
 			new OrderSpecifier<>(direction, conversation.createdAt),
 			// 2순위 정렬: 생성 시간이 똑같을 경우, ID 기준 정렬
