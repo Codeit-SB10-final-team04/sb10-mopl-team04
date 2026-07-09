@@ -84,15 +84,13 @@ public class DirectMessageService {
 		// 3. 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
 		List<DirectMessage> directMessages = directMessageRepository.findDirectMessagesByCursor(
 			conversation.getId(),
-			directMessagePagedRequest,
-			requestUserId
+			directMessagePagedRequest
 		);
 
 		// 4. 대화 전체 개수 조회
 		Long totalCount = directMessageRepository.countDirectMessage(
 			conversation.getId(),
-			directMessagePagedRequest,
-			requestUserId
+			directMessagePagedRequest
 		);
 
 		// 5. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기

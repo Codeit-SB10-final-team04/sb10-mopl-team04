@@ -31,11 +31,12 @@ public class DirectMessageQdslRepositoryImpl implements DirectMessageQdslReposit
 	@Override
 	public List<DirectMessage> findDirectMessagesByCursor(
 		UUID conversationId,
-		DirectMessagePagedRequest directMessagePagedRequest,
-		UUID requestId
+		DirectMessagePagedRequest directMessagePagedRequest
 	) {
 		return jpaQueryFactory
 			.selectFrom(directMessage)
+			.leftJoin(directMessage.sender).fetchJoin()
+			.leftJoin(directMessage.receiver).fetchJoin()
 			.where(
 				// 1. 유효성 검증: 해당 대화방(conversationId)의 메시지만 조회
 				directMessage.conversation.id.eq(conversationId),
@@ -56,8 +57,7 @@ public class DirectMessageQdslRepositoryImpl implements DirectMessageQdslReposit
 	@Override
 	public Long countDirectMessage(
 		UUID conversationId,
-		DirectMessagePagedRequest directMessagePagedRequest,
-		UUID requestId
+		DirectMessagePagedRequest directMessagePagedRequest
 	) {
 		Long count = jpaQueryFactory
 			.select(directMessage.count())

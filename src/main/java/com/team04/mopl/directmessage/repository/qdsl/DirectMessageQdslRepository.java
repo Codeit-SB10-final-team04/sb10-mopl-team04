@@ -15,14 +15,12 @@ public interface DirectMessageQdslRepository {
 	// 정렬 + 커서 페이지네이션이 적용된 DM 목록 조회
 	List<DirectMessage> findDirectMessagesByCursor(
 		UUID conversationId,
-		DirectMessagePagedRequest directMessagePagedRequest,
-		UUID requestId
+		DirectMessagePagedRequest directMessagePagedRequest
 	);
 
 	// DM 목록의 전체 개수 조회
 	Long countDirectMessage(
 		UUID conversationId,
-		DirectMessagePagedRequest directMessagePagedRequest,
-		UUID requestId
+		DirectMessagePagedRequest directMessagePagedRequest
 	);
 }
