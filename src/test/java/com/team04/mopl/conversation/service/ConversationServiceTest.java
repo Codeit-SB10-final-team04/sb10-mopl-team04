@@ -3,6 +3,7 @@ package com.team04.mopl.conversation.service;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,8 +17,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import com.team04.mopl.common.dto.UserSummary;
+import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
+import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
+import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 import com.team04.mopl.conversation.entity.Conversation;
 import com.team04.mopl.conversation.entity.ConversationParticipant;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
@@ -379,5 +383,135 @@ class ConversationServiceTest {
 		assertThatThrownBy(() -> conversationService.findConversationByUserId(withUserId, requestUserId))
 			.isInstanceOf(ConversationException.class)
 			.hasFieldOrPropertyWithValue("errorCode", ConversationErrorCode.CONVERSATION_NOT_FOUND);
+	}
+
+	/*
+	=========================
+	   대화 목록 조회
+	=========================
+	 */
+	@Test
+	@DisplayName("성공: 조건에 맞는 대화 목록을 N+3 최적화하여 반환한다.")
+	void findAll_Success_HasNext() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		ConversationPageRequest request = new ConversationPageRequest(
+			null,
+			"createdAt",
+			null,
+			2,
+			SortDirection.DESCENDING,
+			null
+		);
+
+		Conversation conv1 = mock(Conversation.class);
+		Conversation conv2 = mock(Conversation.class);
+		// 다음 페이지에 존재하는 대화
+		Conversation conv3 = mock(Conversation.class);
+
+		UUID conv1Id = UUID.randomUUID();
+		given(conv1.getId()).willReturn(conv1Id);
+		UUID conv2Id = UUID.randomUUID();
+		given(conv2.getId()).willReturn(conv2Id);
+
+		// 마지막 요소로부터 커서 추출
+		String mockCursorTime = java.time.Instant.now().toString();
+		given(conv2.getCreatedAt()).willReturn(java.time.Instant.parse(mockCursorTime));
+
+		List<Conversation> pagedConversations = List.of(conv1, conv2, conv3);
+
+		given(conversationRepository.searchConversation(request, requestUserId)).willReturn(pagedConversations);
+		given(conversationRepository.countConversation(request, requestUserId)).willReturn(3L);
+
+		// N+3 방어 로직
+		given(conversationParticipantRepository.findByConversationIdIn(anyList())).willReturn(List.of());
+		given(directMessageRepository.findLatestMessagesByConversationIds(anyList())).willReturn(List.of());
+		given(directMessageRepository.findUnreadConversationIds(anyList(), eq(requestUserId))).willReturn(
+			java.util.Set.of());
+
+		// 빌더 패턴 적용
+		CursorResponseConversationDto expectedResponse = CursorResponseConversationDto.builder()
+			.data(List.of(mock(ConversationDto.class), mock(ConversationDto.class)))
+			.nextCursor(mockCursorTime) // conv2의 생성 시간
+			.nextIdAfter(conv2Id)       // conv2의 ID
+			.hasNext(true)
+			.totalCount(3L)
+			.sortBy("createdAt")
+			.sortDirection("DESCENDING")
+			.build();
+
+		given(conversationMapper.toCursorPageResponse(anyList(), anyString(), any(UUID.class), eq(true), eq(3L), any(),
+			any()))
+			.willReturn(expectedResponse);
+
+		// when
+		CursorResponseConversationDto result = conversationService.findAll(request, requestUserId);
+
+		// then
+		assertThat(result).isNotNull();
+		assertThat(result).isEqualTo(expectedResponse);
+		verify(conversationMapper).toCursorPageResponse(anyList(), anyString(), any(UUID.class), eq(true), eq(3L),
+			any(), any());
+	}
+
+	@Test
+	@DisplayName("성공: 조회된 대화 목록이 빈 리스트일 경우 정상적으로 빈 커서 응답을 반환한다.")
+	void findAll_Success_EmptyList() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		ConversationPageRequest request = new ConversationPageRequest(
+			null,
+			"createdAt",
+			null,
+			10,
+			SortDirection.DESCENDING,
+			null
+		);
+
+		given(conversationRepository.searchConversation(request, requestUserId)).willReturn(List.of());
+		given(conversationRepository.countConversation(request, requestUserId)).willReturn(0L);
+
+		// 빌더 패턴 적용
+		CursorResponseConversationDto expectedResponse = CursorResponseConversationDto.builder()
+			.data(Collections.emptyList())
+			.nextCursor(null)
+			.nextIdAfter(null)
+			.hasNext(false)
+			.totalCount(0L)
+			.sortBy("createdAt")
+			.sortDirection("DESCENDING")
+			.build();
+
+		given(conversationMapper.toCursorPageResponse(anyList(), isNull(), isNull(), eq(false), eq(0L), any(), any()))
+			.willReturn(expectedResponse);
+
+		// when
+		CursorResponseConversationDto result = conversationService.findAll(request, requestUserId);
+
+		// then
+		assertThat(result).isNotNull();
+		assertThat(result).isEqualTo(expectedResponse);
+		verify(conversationParticipantRepository, never()).findByConversationIdIn(anyList());
+		verify(directMessageRepository, never()).findLatestMessagesByConversationIds(anyList());
+	}
+
+	@Test
+	@DisplayName("실패: Repository 조회 중 파라미터(cursor/sortBy) 검증 실패로 인한 예외 발생 시 Service도 예외를 던진다.")
+	void findAll_Fail_RepositoryThrowsException() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		ConversationPageRequest request = mock(ConversationPageRequest.class);
+
+		// QDSL 예외 발생
+		given(conversationRepository.searchConversation(request, requestUserId))
+			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT));
+
+		// when & then
+		assertThatThrownBy(() -> conversationService.findAll(request, requestUserId))
+			.isInstanceOf(ConversationException.class)
+			.hasMessageContaining(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage());
+
+		verifyNoInteractions(conversationParticipantRepository);
+		verifyNoInteractions(directMessageRepository);
 	}
 }

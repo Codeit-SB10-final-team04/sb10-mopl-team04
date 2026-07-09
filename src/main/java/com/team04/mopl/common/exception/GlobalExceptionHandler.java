@@ -3,6 +3,7 @@ package com.team04.mopl.common.exception;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.beans.BeanInstantiationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.exception.AuthException;
@@ -94,6 +96,41 @@ public class GlobalExceptionHandler {
 			));
 	}
 
+	// DTO 객체 생성 시 컴팩트 생성자에서 발생한 예외 처리
+	@ExceptionHandler(BeanInstantiationException.class)
+	public ResponseEntity<ErrorResponse> handleBeanInstantiationException(
+		BeanInstantiationException exception
+	) {
+		Map<String, String> details = new LinkedHashMap<>();
+		// 원본 예외 메시지 추출
+		Throwable cause = exception.getCause();
+
+		log.warn("[BeanInstantiationException] cause={}",
+			cause != null ? cause.getClass().getSimpleName() : "unknown", exception);
+
+		// 검증 목적으로 던진 예외인 경우에만 상세 정보 추가
+		if (cause instanceof IllegalArgumentException || cause instanceof MoplException) {
+			mergeDetail(
+				details,
+				"_global",
+				defaultMessage(cause.getMessage())
+			);
+
+			return ResponseEntity
+				.badRequest()
+				.body(ErrorResponse.of(
+					exception,
+					"요청 파라미터 유효성 검사에 실패했습니다.",
+					details
+				));
+		}
+
+		// 검증 실패가 아닌 서버 내부 문제인 경우 500 응답
+		return ResponseEntity
+			.status(HttpStatus.INTERNAL_SERVER_ERROR)
+			.body(ErrorResponse.internalServerError());
+	}
+
 	// @RequestParam, @PathVariable 등에 직접 적용된 Validation 실패 처리
 	@ExceptionHandler(ConstraintViolationException.class)
 	public ResponseEntity<ErrorResponse> handleConstraintViolationException(
@@ -166,6 +203,25 @@ public class GlobalExceptionHandler {
 			.body(ErrorResponse.of(
 				exception,
 				"필수 요청 파라미터가 누락되었습니다.",
+				details
+			));
+	}
+
+	// 필수 multipart request part가 누락된 경우 처리
+	@ExceptionHandler(MissingServletRequestPartException.class)
+	public ResponseEntity<ErrorResponse> handleMissingRequestPartException(
+		MissingServletRequestPartException exception
+	) {
+		Map<String, String> details = Map.of(
+			"part",
+			exception.getRequestPartName()
+		);
+
+		return ResponseEntity
+			.badRequest()
+			.body(ErrorResponse.of(
+				exception,
+				"필수 요청 파트가 누락되었습니다.",
 				details
 			));
 	}

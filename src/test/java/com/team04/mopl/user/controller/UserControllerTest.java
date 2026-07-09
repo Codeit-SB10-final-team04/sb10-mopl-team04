@@ -1,11 +1,13 @@
 package com.team04.mopl.user.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,15 +28,23 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.common.exception.GlobalExceptionHandler;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
+import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
 import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
+import com.team04.mopl.user.dto.request.UserUpdateRequest;
 import com.team04.mopl.user.dto.response.CursorResponseUserDto;
 import com.team04.mopl.user.dto.response.UserDto;
 import com.team04.mopl.user.entity.UserRole;
@@ -57,11 +68,19 @@ class UserControllerTest {
 	@Autowired
 	private MockMvc mockMvc;
 
+	@Autowired
+	private ObjectMapper objectMapper;
+
 	@MockitoBean
 	private UserService userService;
 
 	@MockitoBean
 	private UserAdminService userAdminService;
+
+	@AfterEach
+	void tearDown() {
+		SecurityContextHolder.clearContext();
+	}
 
 	@Test
 	@DisplayName("사용자 등록 요청이 유효하면 201과 사용자 정보를 반환한다")
@@ -232,6 +251,270 @@ class UserControllerTest {
 	}
 
 	@Test
+	@DisplayName("사용자 상세 조회 요청이 유효하면 200과 사용자 정보를 반환한다")
+	void findById_returnUser_whenUserExists() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant createdAt = Instant.parse("2026-07-07T00:00:00Z");
+		UserDto response = new UserDto(
+			userId,
+			createdAt,
+			"test@test.com",
+			"사용자",
+			"http://localhost:8080/profile-images/profile.png",
+			UserRole.USER,
+			false
+		);
+
+		given(userService.findById(userId))
+			.willReturn(response);
+
+		// when & then
+		mockMvc.perform(get("/api/users/{userId}", userId))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(userId.toString()))
+			.andExpect(jsonPath("$.createdAt").value(createdAt.toString()))
+			.andExpect(jsonPath("$.email").value("test@test.com"))
+			.andExpect(jsonPath("$.name").value("사용자"))
+			.andExpect(jsonPath("$.profileImageUrl").value("http://localhost:8080/profile-images/profile.png"))
+			.andExpect(jsonPath("$.role").value("USER"))
+			.andExpect(jsonPath("$.locked").value(false));
+
+		verify(userService).findById(userId);
+	}
+
+	@Test
+	@DisplayName("사용자 상세 조회 대상 사용자가 없으면 404를 반환한다")
+	void findById_returnNotFound_whenUserDoesNotExist() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		willThrow(new UserException(
+				UserErrorCode.USER_NOT_FOUND,
+				Map.of("userId", userId)
+			))
+			.given(userService)
+			.findById(userId);
+
+		// when & then
+		mockMvc.perform(get("/api/users/{userId}", userId))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("UserException"))
+			.andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."))
+			.andExpect(jsonPath("$.details.userId").value(userId.toString()));
+	}
+
+	@Test
+	@DisplayName("사용자 상세 조회 요청에서 userId가 UUID 형식이 아니면 400을 반환한다")
+	void findById_returnBadRequest_whenUserIdIsInvalid() throws Exception {
+		// given
+
+		// when & then
+		mockMvc.perform(get("/api/users/{userId}", "invalid-user-id"))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userService);
+	}
+
+	@Test
+	@DisplayName("프로필 변경 요청이 유효하면 200과 변경된 사용자 정보를 반환한다")
+	void updateProfile_returnUpdatedUser_whenRequestIsValid() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant createdAt = Instant.parse("2026-07-06T00:00:00Z");
+		UserUpdateRequest request = new UserUpdateRequest("새이름");
+		UserDto response = new UserDto(
+			userId,
+			createdAt,
+			"test@test.com",
+			"새이름",
+			"http://localhost:8080/profile-images/profile.png",
+			UserRole.USER,
+			false
+		);
+		MockMultipartFile requestPart = createRequestPart(request);
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			MediaType.IMAGE_PNG_VALUE,
+			"image-data".getBytes()
+		);
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		given(userService.updateProfile(eq(userId), eq(request), any(MultipartFile.class), eq(userId)))
+			.willReturn(response);
+
+		// when & then
+		mockMvc.perform(multipart("/api/users/{userId}", userId)
+				.file(requestPart)
+				.file(image)
+				.with(req -> {
+					req.setMethod("PATCH");
+					return req;
+				}))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(userId.toString()))
+			.andExpect(jsonPath("$.email").value("test@test.com"))
+			.andExpect(jsonPath("$.name").value("새이름"))
+			.andExpect(jsonPath("$.profileImageUrl").value("http://localhost:8080/profile-images/profile.png"))
+			.andExpect(jsonPath("$.role").value("USER"))
+			.andExpect(jsonPath("$.locked").value(false));
+
+		verify(userService).updateProfile(eq(userId), eq(request), any(MultipartFile.class), eq(userId));
+	}
+
+	@Test
+	@DisplayName("프로필 변경 요청에서 이미지만 있으면 200과 변경된 사용자 정보를 반환한다")
+	void updateProfile_returnUpdatedUser_whenOnlyImageIsProvided() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant createdAt = Instant.parse("2026-07-06T00:00:00Z");
+		UserUpdateRequest request = new UserUpdateRequest(null);
+		UserDto response = new UserDto(
+			userId,
+			createdAt,
+			"test@test.com",
+			"기존이름",
+			"http://localhost:8080/profile-images/profile.png",
+			UserRole.USER,
+			false
+		);
+		MockMultipartFile requestPart = createRequestPart(request);
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			MediaType.IMAGE_PNG_VALUE,
+			"image-data".getBytes()
+		);
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		given(userService.updateProfile(eq(userId), eq(request), any(MultipartFile.class), eq(userId)))
+			.willReturn(response);
+
+		// when & then
+		mockMvc.perform(multipart("/api/users/{userId}", userId)
+				.file(requestPart)
+				.file(image)
+				.with(req -> {
+					req.setMethod("PATCH");
+					return req;
+				}))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(userId.toString()))
+			.andExpect(jsonPath("$.email").value("test@test.com"))
+			.andExpect(jsonPath("$.name").value("기존이름"))
+			.andExpect(jsonPath("$.profileImageUrl").value("http://localhost:8080/profile-images/profile.png"))
+			.andExpect(jsonPath("$.role").value("USER"))
+			.andExpect(jsonPath("$.locked").value(false));
+
+		verify(userService).updateProfile(eq(userId), eq(request), any(MultipartFile.class), eq(userId));
+	}
+
+	@Test
+	@DisplayName("프로필 변경 요청에서 이름이 50자를 초과하면 400을 반환한다")
+	void updateProfile_returnBadRequest_whenNameIsTooLong() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		UserUpdateRequest request = new UserUpdateRequest("가".repeat(51));
+		MockMultipartFile requestPart = createRequestPart(request);
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		// when & then
+		mockMvc.perform(multipart("/api/users/{userId}", userId)
+				.file(requestPart)
+				.with(req -> {
+					req.setMethod("PATCH");
+					return req;
+				}))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userService);
+	}
+
+	@Test
+	@DisplayName("프로필 변경 요청에서 본인이 아니면 403을 반환한다")
+	void updateProfile_returnForbidden_whenCurrentUserIsNotOwner() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID currentUserId = UUID.randomUUID();
+		UserUpdateRequest request = new UserUpdateRequest("새이름");
+		MockMultipartFile requestPart = createRequestPart(request);
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(currentUserId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		willThrow(new UserException(
+				UserErrorCode.USER_PROFILE_ACCESS_DENIED,
+				Map.of("userId", userId, "currentUserId", currentUserId.toString())
+			))
+			.given(userService)
+			.updateProfile(userId, request, null, currentUserId);
+
+		// when & then
+		mockMvc.perform(multipart("/api/users/{userId}", userId)
+				.file(requestPart)
+				.with(req -> {
+					req.setMethod("PATCH");
+					return req;
+				}))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.exceptionName").value("UserException"))
+			.andExpect(jsonPath("$.message").value("본인의 프로필만 변경할 수 있습니다."))
+			.andExpect(jsonPath("$.details.userId").value(userId.toString()));
+	}
+
+	@Test
+	@DisplayName("프로필 변경 대상 사용자가 없으면 404를 반환한다")
+	void updateProfile_returnNotFound_whenUserDoesNotExist() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		UserUpdateRequest request = new UserUpdateRequest("새이름");
+		MockMultipartFile requestPart = createRequestPart(request);
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		willThrow(new UserException(
+				UserErrorCode.USER_NOT_FOUND,
+				Map.of("userId", userId)
+			))
+			.given(userService)
+			.updateProfile(userId, request, null, userId);
+
+		// when & then
+		mockMvc.perform(multipart("/api/users/{userId}", userId)
+				.file(requestPart)
+				.with(req -> {
+					req.setMethod("PATCH");
+					return req;
+				}))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("UserException"))
+			.andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."))
+			.andExpect(jsonPath("$.details.userId").value(userId.toString()));
+	}
+
+	@Test
+	@DisplayName("프로필 변경 요청에서 request 파트가 누락되면 400을 반환한다")
+	void updateProfile_returnBadRequest_whenRequestPartMissing() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		// when & then
+		mockMvc.perform(multipart("/api/users/{userId}", userId)
+				.with(req -> {
+					req.setMethod("PATCH");
+					return req;
+				}))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userService);
+	}
+
+	@Test
 	@DisplayName("관리자 권한 수정 요청이 유효하면 204 No Content를 반환한다")
 	void updateRole_returnNoContent_whenRequestIsValid() throws Exception {
 		// given
@@ -248,6 +531,44 @@ class UserControllerTest {
 			.andExpect(status().isNoContent());
 
 		verify(userAdminService).updateRole(userId, new UserRoleUpdateRequest(UserRole.ADMIN));
+	}
+
+	@Test
+	@DisplayName("관리자 계정 잠금 상태 변경 요청이 유효하면 204 No Content를 반환한다")
+	void updateLocked_returnNoContent_whenRequestIsValid() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/locked", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"locked": true
+					}
+					"""))
+			.andExpect(status().isNoContent());
+
+		verify(userAdminService).updateLocked(userId, new UserLockUpdateRequest(true));
+	}
+
+	@Test
+	@DisplayName("관리자 계정 잠금 해제 요청이 유효하면 204 No Content를 반환한다")
+	void updateLocked_returnNoContent_whenUnlockRequestIsValid() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/locked", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"locked": false
+					}
+					"""))
+			.andExpect(status().isNoContent());
+
+		verify(userAdminService).updateLocked(userId, new UserLockUpdateRequest(false));
 	}
 
 	@Test
@@ -465,6 +786,25 @@ class UserControllerTest {
 	}
 
 	@Test
+	@DisplayName("관리자 계정 잠금 상태 변경 요청에서 잠금 상태가 누락되면 400을 반환한다")
+	void updateLocked_returnBadRequest_whenLockedIsNull() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/locked", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userService);
+		verifyNoInteractions(userAdminService);
+	}
+
+	@Test
 	@DisplayName("관리자 권한 수정 대상 사용자가 없으면 404를 반환한다")
 	void updateRole_returnNotFound_whenUserDoesNotExist() throws Exception {
 		// given
@@ -489,5 +829,53 @@ class UserControllerTest {
 			.andExpect(jsonPath("$.exceptionName").value("UserException"))
 			.andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."))
 			.andExpect(jsonPath("$.details.userId").value(userId.toString()));
+	}
+
+	@Test
+	@DisplayName("관리자 계정 잠금 상태 변경 대상 사용자가 없으면 404를 반환한다")
+	void updateLocked_returnNotFound_whenUserDoesNotExist() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		willThrow(new UserException(
+				UserErrorCode.USER_NOT_FOUND,
+				Map.of("userId", userId)
+			))
+			.given(userAdminService)
+			.updateLocked(userId, new UserLockUpdateRequest(true));
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/locked", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"locked": true
+					}
+					"""))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("UserException"))
+			.andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."))
+			.andExpect(jsonPath("$.details.userId").value(userId.toString()));
+	}
+
+	private MockMultipartFile createRequestPart(UserUpdateRequest request) throws Exception {
+		return new MockMultipartFile(
+			"request",
+			"",
+			MediaType.APPLICATION_JSON_VALUE,
+			objectMapper.writeValueAsBytes(request)
+		);
+	}
+
+	private void mockSecurityContext(MoplUserDetails userDetails) {
+		SecurityContextHolder.getContext().setAuthentication(createAuthentication(userDetails));
+	}
+
+	private UsernamePasswordAuthenticationToken createAuthentication(MoplUserDetails userDetails) {
+		return new UsernamePasswordAuthenticationToken(
+			userDetails,
+			null,
+			userDetails.getAuthorities()
+		);
 	}
 }
