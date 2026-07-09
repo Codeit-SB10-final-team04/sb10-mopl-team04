@@ -14,13 +14,17 @@ CREATE TABLE IF NOT EXISTS users
 
 CREATE TABLE IF NOT EXISTS notifications
 (
-    id          UUID PRIMARY KEY,
-    receiver_id UUID                     NOT NULL,
-    title       VARCHAR(50)              NOT NULL,
-    content     TEXT                     NOT NULL,
-    type        VARCHAR(30)              NOT NULL,
-    level       VARCHAR(20)              NOT NULL,
-    read_at     TIMESTAMP WITH TIME ZONE,
-    created_at  TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT fk_notifications_receiver FOREIGN KEY (receiver_id) REFERENCES users (id)
+    id              UUID        NOT NULL,
+    receiver_id     UUID        NOT NULL,
+    source_event_id UUID,
+    title           VARCHAR(50) NOT NULL,
+    content         TEXT        NOT NULL,
+    type            VARCHAR(30) NOT NULL,
+    level           VARCHAR(20) NOT NULL,
+    read_at         TIMESTAMPTZ NULL,
+    created_at      TIMESTAMPTZ NOT NULL,
+
+    CONSTRAINT pk_notifications PRIMARY KEY (id),
+    CONSTRAINT fk_notifications_receiver FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT up_notifications_source_event_receiver UNIQUE (source_event_id, receiver_id);
 );
