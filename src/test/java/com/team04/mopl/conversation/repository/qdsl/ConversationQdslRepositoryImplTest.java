@@ -82,7 +82,7 @@ class ConversationQdslRepositoryImplTest {
 	void searchConversation_CursorPaginationDesc_Success() {
 		// given
 		User requestUser = createUser("requestUser");
-		Instant now = Instant.now();
+		Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
 		Conversation conv1 = em.persist(Conversation.create());
 		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
@@ -93,14 +93,13 @@ class ConversationQdslRepositoryImplTest {
 		Conversation conv3 = em.persist(Conversation.create());
 		em.persist(ConversationParticipant.builder().conversation(conv3).user(requestUser).build());
 
-		em.flush(); // 여기서 JPA Auditing이 현재 시간으로 DB에 밀어넣음
+		em.flush();
 
-		// Native Query로 JPA Auditing을 무시하고 DB의 시간을 강제로 과거로 업데이트
 		updateConversationTime(conv1, now.minus(30, ChronoUnit.SECONDS));
 		updateConversationTime(conv2, now.minus(20, ChronoUnit.SECONDS));
 		updateConversationTime(conv3, now.minus(10, ChronoUnit.SECONDS));
 
-		em.clear(); // 영속성 컨텍스트 초기화 (이후 조회 시 DB에서 방금 조작한 시간을 가져오게 함)
+		em.clear();
 
 		// 내림차순 조회: conv2(-20초) 기준, 더 과거인 conv1(-30초)만 나와야 함
 		ConversationPageRequest request = new ConversationPageRequest(
@@ -125,7 +124,7 @@ class ConversationQdslRepositoryImplTest {
 	void searchConversation_CursorPaginationAsc_Success() {
 		// given
 		User requestUser = createUser("requestUser");
-		Instant now = Instant.now();
+		Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
 		Conversation conv1 = em.persist(Conversation.create());
 		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
@@ -138,7 +137,6 @@ class ConversationQdslRepositoryImplTest {
 
 		em.flush();
 
-		// Native Query로 강제 업데이트
 		updateConversationTime(conv1, now.minus(30, ChronoUnit.SECONDS));
 		updateConversationTime(conv2, now.minus(20, ChronoUnit.SECONDS));
 		updateConversationTime(conv3, now.minus(10, ChronoUnit.SECONDS));
@@ -162,7 +160,7 @@ class ConversationQdslRepositoryImplTest {
 		assertThat(result).hasSize(1);
 		assertThat(result.get(0).getId()).isEqualTo(conv3.getId());
 	}
-	
+
 	@Test
 	@DisplayName("성공: 커서 값만 전달되고 idAfter가 null이면 첫 페이지 조회처럼 동작한다.")
 	void searchConversation_OnlyCursorProvided_Success() {
