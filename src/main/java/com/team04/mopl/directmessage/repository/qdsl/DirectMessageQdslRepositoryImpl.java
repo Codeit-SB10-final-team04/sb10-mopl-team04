@@ -79,8 +79,14 @@ public class DirectMessageQdslRepositoryImpl implements DirectMessageQdslReposit
 		UUID idAfter,
 		SortDirection sortDirection
 	) {
+		boolean hasCursor = StringUtils.hasText(cursor);
+		boolean hasIdAfter = idAfter != null;
+
+		// 유효성 검증: 입력값 누락 여부
+		validateCursorRequest(hasCursor, hasIdAfter);
+
 		// 첫 페이지 요청이거나 커서값이 공백인 경우, 빈 객체 반환
-		if (!StringUtils.hasText(cursor) || idAfter == null) {
+		if (!hasCursor && !hasIdAfter) {
 			return null;
 		}
 
@@ -132,6 +138,13 @@ public class DirectMessageQdslRepositoryImpl implements DirectMessageQdslReposit
 		if (!"createdAt".equals(sortBy)) {
 			throw new DirectMessageException(DirectMessageErrorCode.DM_INVALID_FORMAT)
 				.addDetail("sortBy", sortBy);
+		}
+	}
+
+	// 유효성 검증: 입력값 누락 여부
+	private void validateCursorRequest(boolean hasCursor, boolean hasIdAfter) {
+		if (hasCursor != hasIdAfter) {
+			throw new DirectMessageException(DirectMessageErrorCode.DM_INVALID_FORMAT);
 		}
 	}
 }
