@@ -75,3 +75,7 @@ storage:
   type: local
   local:
     path: uploads/
+
+notification:
+  realtime:
+    mode: redis

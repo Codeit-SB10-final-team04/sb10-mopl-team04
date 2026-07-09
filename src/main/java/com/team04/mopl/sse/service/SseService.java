@@ -10,6 +10,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.service.NotificationRestoreService;
+import com.team04.mopl.sse.event.SseEventNames;
 import com.team04.mopl.sse.repository.SseEmitterRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -121,7 +122,7 @@ public class SseService {
 				sendEvent(
 					sseEmitter,
 					notificationDto.id(),
-					"notifications",
+					SseEventNames.NOTIFICATIONS,
 					notificationDto
 				);
 			} catch (Exception e) {

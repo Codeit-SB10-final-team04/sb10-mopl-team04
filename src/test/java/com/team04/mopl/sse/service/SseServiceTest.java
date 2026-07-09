@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.team04.mopl.notification.service.NotificationRestoreService;
+import com.team04.mopl.sse.event.SseEventNames;
 import com.team04.mopl.sse.repository.SseEmitterRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -72,7 +73,7 @@ class SseServiceTest {
 		// given
 		UUID receiverId = UUID.randomUUID();
 		UUID eventId = UUID.randomUUID();
-		String eventName = "notifications";
+		String eventName = SseEventNames.NOTIFICATIONS;
 		String data = "data";
 
 		SseEmitter sseEmitter = mock(SseEmitter.class);
@@ -95,7 +96,7 @@ class SseServiceTest {
 		// given
 		UUID receiverId = UUID.randomUUID();
 		UUID eventId = UUID.randomUUID();
-		String eventName = "notifications";
+		String eventName = SseEventNames.NOTIFICATIONS;
 		String data = "data";
 
 		when(sseEmitterRepository.findAllByReceiverId(receiverId))
@@ -115,7 +116,7 @@ class SseServiceTest {
 		// given
 		UUID receiverId = UUID.randomUUID();
 		UUID eventId = UUID.randomUUID();
-		String eventName = "notifications";
+		String eventName = SseEventNames.NOTIFICATIONS;
 		String data = "data";
 
 		SseEmitter sseEmitter = mock(SseEmitter.class);
@@ -141,7 +142,7 @@ class SseServiceTest {
 		// given
 		UUID receiverId = UUID.randomUUID();
 		UUID eventId = UUID.randomUUID();
-		String eventName = "notifications";
+		String eventName = SseEventNames.NOTIFICATIONS;
 		String data = "data";
 
 		SseEmitter sseEmitter1 = mock(SseEmitter.class);
