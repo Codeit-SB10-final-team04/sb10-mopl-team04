@@ -179,6 +179,62 @@ class UserServiceTest {
 	}
 
 	@Test
+	@DisplayName("사용자가 존재하면 상세 정보를 반환한다")
+	void findById_returnUser_whenUserExists() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, "사용자", "http://localhost:8080/profile-images/profile.png");
+		UserDto expectedResponse = new UserDto(
+			userId,
+			Instant.parse("2026-07-07T00:00:00Z"),
+			"test@test.com",
+			"사용자",
+			"http://localhost:8080/profile-images/profile.png",
+			UserRole.USER,
+			false
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+		given(userMapper.toDto(user))
+			.willReturn(expectedResponse);
+
+		// when
+		UserDto result = userService.findById(userId);
+
+		// then
+		assertThat(result).isEqualTo(expectedResponse);
+
+		verify(userRepository).findById(userId);
+		verify(userMapper).toDto(user);
+		verifyNoInteractions(fileStorage);
+	}
+
+	@Test
+	@DisplayName("상세 조회 대상 사용자가 없으면 UserException을 던진다")
+	void findById_throwUserException_whenUserNotFound() {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.empty());
+
+		// when
+		ThrowingCallable action = () -> userService.findById(userId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception -> {
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_NOT_FOUND);
+				assertThat(exception.getDetails()).containsEntry("userId", userId);
+			});
+
+		verify(userRepository).findById(userId);
+		verifyNoInteractions(userMapper);
+		verifyNoInteractions(fileStorage);
+	}
+
+	@Test
 	@DisplayName("본인이 프로필 이름만 변경하면 사용자 정보를 반환한다")
 	void updateProfile_updateName_whenOwnerRequestsNameOnly() {
 		// given

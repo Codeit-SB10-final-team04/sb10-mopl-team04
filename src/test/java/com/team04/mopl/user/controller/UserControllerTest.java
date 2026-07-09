@@ -251,6 +251,72 @@ class UserControllerTest {
 	}
 
 	@Test
+	@DisplayName("사용자 상세 조회 요청이 유효하면 200과 사용자 정보를 반환한다")
+	void findById_returnUser_whenUserExists() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant createdAt = Instant.parse("2026-07-07T00:00:00Z");
+		UserDto response = new UserDto(
+			userId,
+			createdAt,
+			"test@test.com",
+			"사용자",
+			"http://localhost:8080/profile-images/profile.png",
+			UserRole.USER,
+			false
+		);
+
+		given(userService.findById(userId))
+			.willReturn(response);
+
+		// when & then
+		mockMvc.perform(get("/api/users/{userId}", userId))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(userId.toString()))
+			.andExpect(jsonPath("$.createdAt").value(createdAt.toString()))
+			.andExpect(jsonPath("$.email").value("test@test.com"))
+			.andExpect(jsonPath("$.name").value("사용자"))
+			.andExpect(jsonPath("$.profileImageUrl").value("http://localhost:8080/profile-images/profile.png"))
+			.andExpect(jsonPath("$.role").value("USER"))
+			.andExpect(jsonPath("$.locked").value(false));
+
+		verify(userService).findById(userId);
+	}
+
+	@Test
+	@DisplayName("사용자 상세 조회 대상 사용자가 없으면 404를 반환한다")
+	void findById_returnNotFound_whenUserDoesNotExist() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+
+		willThrow(new UserException(
+				UserErrorCode.USER_NOT_FOUND,
+				Map.of("userId", userId)
+			))
+			.given(userService)
+			.findById(userId);
+
+		// when & then
+		mockMvc.perform(get("/api/users/{userId}", userId))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("UserException"))
+			.andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."))
+			.andExpect(jsonPath("$.details.userId").value(userId.toString()));
+	}
+
+	@Test
+	@DisplayName("사용자 상세 조회 요청에서 userId가 UUID 형식이 아니면 400을 반환한다")
+	void findById_returnBadRequest_whenUserIdIsInvalid() throws Exception {
+		// given
+
+		// when & then
+		mockMvc.perform(get("/api/users/{userId}", "invalid-user-id"))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userService);
+	}
+
+	@Test
 	@DisplayName("프로필 변경 요청이 유효하면 200과 변경된 사용자 정보를 반환한다")
 	void updateProfile_returnUpdatedUser_whenRequestIsValid() throws Exception {
 		// given
