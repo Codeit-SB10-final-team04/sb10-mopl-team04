@@ -67,6 +67,8 @@ notification:
   hard-delete:
     cron: "0 0 1 * * *"
     retention-months: 1
+  realtime:
+    mode: local
 
 content:
   hard-delete:
