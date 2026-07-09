@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.auth.session.AuthSessionStore;
+import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
 import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
 import com.team04.mopl.user.dto.response.CursorResponseUserDto;
@@ -32,7 +33,7 @@ public class UserAdminService {
 
 	private final UserRepository userRepository;
 	private final AuthSessionStore authSessionStore;
-  private final ApplicationEventPublisher applicationEventPublisher;
+	private final ApplicationEventPublisher applicationEventPublisher;
 
 	// 관리자 사용자 목록 조회
 	public CursorResponseUserDto findUsers(UserPageRequest request) {
@@ -122,6 +123,34 @@ public class UserAdminService {
 			userId,
 			previousRole,
 			newRole
+		);
+	}
+
+	// 관리자 계정 잠금 상태 변경
+	@Transactional
+	public void updateLocked(UUID userId, UserLockUpdateRequest request) {
+		boolean newLocked = request.locked();
+		log.info("[USER_LOCK_UPDATE] 계정 잠금 상태 변경 시작: userId={}, newLocked={}", userId, newLocked);
+
+		User user = getUserOrThrow(userId);
+		boolean previousLocked = user.isLocked();
+
+		// 상태가 다를 때만 DB 변경
+		if (previousLocked != newLocked) {
+			user.updateLocked(newLocked);
+		}
+
+		// 잠금 요청 시 기존 인증 세션 삭제
+		if (newLocked) {
+			authSessionStore.deleteByUserId(userId);
+		}
+
+		log.info(
+			"[USER_LOCK_UPDATE] 계정 잠금 상태 변경 완료: userId={}, previousLocked={}, newLocked={}, sessionDeleted={}",
+			userId,
+			previousLocked,
+			newLocked,
+			newLocked
 		);
 	}
 
