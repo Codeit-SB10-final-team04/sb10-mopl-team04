@@ -9,6 +9,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 import com.team04.mopl.auth.security.interceptor.StompAuthChannelInterceptor;
 import com.team04.mopl.common.stomp.StompErrorHandler;
+import com.team04.mopl.watching.interceptor.StompWatchingInterceptor;
 
 import lombok.RequiredArgsConstructor;
 
@@ -36,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 	private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
+	private final StompWatchingInterceptor stompWatchingInterceptor;
 	private final StompErrorHandler stompErrorHandler;
 
 	// 메시지 브로커 경로 설정
@@ -66,6 +68,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	// 클라이언트 → 서버 메시지 채널에 인증 인터셉터 등록
 	@Override
 	public void configureClientInboundChannel(ChannelRegistration registration) {
-		registration.interceptors(stompAuthChannelInterceptor);
+		// 인증 인터셉터가 먼저 실행되어 Principal을 설정한 후, 시청 세션 인터셉터가 처리
+		registration.interceptors(stompAuthChannelInterceptor, stompWatchingInterceptor);
 	}
 }

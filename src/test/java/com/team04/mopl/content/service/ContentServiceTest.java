@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
 import com.team04.mopl.common.dto.CursorResponse;
+import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
 import com.team04.mopl.content.dto.request.ContentPageRequest;
 import com.team04.mopl.content.dto.request.ContentUpdateRequest;
@@ -29,7 +30,7 @@ import com.team04.mopl.content.mapper.ContentMapper;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
-import com.team04.mopl.content.storage.ThumbnailStorage;
+import com.team04.mopl.watching.service.WatchingSessionService;
 
 @ExtendWith(MockitoExtension.class)
 class ContentServiceTest {
@@ -44,13 +45,19 @@ class ContentServiceTest {
 	private TagRepository tagRepository;
 
 	@Mock
-	private ThumbnailStorage thumbnailStorage;
+	private FileStorage fileStorage;
 
 	@Mock
 	private ContentMapper contentMapper;
 
+	@Mock
+	private WatchingSessionService watchingSessionService;
+
 	@InjectMocks
 	private ContentService contentService;
+
+	// ContentService의 썸네일 저장 디렉토리와 동일한 값
+	private static final String THUMBNAIL_DIRECTORY = "thumbnails";
 
 	// ========== getContent ==========
 
@@ -65,7 +72,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(tags);
-		when(contentMapper.toDto(content, tags)).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(tags), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.getContent(contentId);
@@ -74,7 +81,7 @@ class ContentServiceTest {
 		assertThat(result).isEqualTo(expectedDto);
 		verify(contentRepository).findByIdAndDeletedAtIsNull(contentId);
 		verify(contentTagRepository).findTagNamesByContentId(contentId);
-		verify(contentMapper).toDto(content, tags);
+		verify(contentMapper).toDto(eq(content), eq(tags), anyLong());
 	}
 
 	@Test
@@ -90,7 +97,7 @@ class ContentServiceTest {
 			.isInstanceOf(ContentException.class);
 
 		verify(contentTagRepository, never()).findTagNamesByContentId(any());
-		verify(contentMapper, never()).toDto(any(), any());
+		verify(contentMapper, never()).toDto(any(), any(), anyLong());
 	}
 
 	// ========== createContent ==========
@@ -107,16 +114,16 @@ class ContentServiceTest {
 		);
 		ContentDto expectedDto = mock(ContentDto.class);
 
-		when(thumbnailStorage.store(thumbnail)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
+		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
-		when(contentMapper.toDto(any(Content.class), eq(List.of()))).thenReturn(expectedDto);
+		when(contentMapper.toDto(any(Content.class), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.createContent(request, thumbnail);
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(thumbnailStorage).store(thumbnail);
+		verify(fileStorage).store(thumbnail, THUMBNAIL_DIRECTORY);
 		verify(contentRepository).save(any(Content.class));
 		verify(tagRepository, never()).findAllByNameIn(any());
 		verify(contentTagRepository, never()).saveAll(any());
@@ -136,11 +143,11 @@ class ContentServiceTest {
 		Tag tag2 = Tag.builder().name("SF").build();
 		ContentDto expectedDto = mock(ContentDto.class);
 
-		when(thumbnailStorage.store(thumbnail)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
+		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
 		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(tag1)); // 액션만 기존 존재
 		when(tagRepository.save(any(Tag.class))).thenReturn(tag2);
-		when(contentMapper.toDto(any(Content.class), eq(List.of("액션", "SF")))).thenReturn(expectedDto);
+		when(contentMapper.toDto(any(Content.class), eq(List.of("액션", "SF")), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.createContent(request, thumbnail);
@@ -163,7 +170,7 @@ class ContentServiceTest {
 			"thumbnail", "thumb.png", "image/png", "image-data".getBytes()
 		);
 
-		when(thumbnailStorage.store(thumbnail)).thenThrow(new RuntimeException("썸네일 저장 실패"));
+		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenThrow(new RuntimeException("썸네일 저장 실패"));
 
 		// when & then
 		assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
@@ -185,14 +192,14 @@ class ContentServiceTest {
 		);
 		String storedUrl = "http://localhost:8080/thumbnails/thumb.png";
 
-		when(thumbnailStorage.store(thumbnail)).thenReturn(storedUrl);
+		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn(storedUrl);
 		when(contentRepository.save(any(Content.class))).thenThrow(new RuntimeException("DB 저장 실패"));
 
 		// when & then
 		assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
 			.isInstanceOf(RuntimeException.class);
 
-		verify(thumbnailStorage).delete(storedUrl);
+		verify(fileStorage).delete(storedUrl);
 	}
 
 	// ========== getContents ==========
@@ -216,8 +223,8 @@ class ContentServiceTest {
 		when(contentRepository.findContents(req)).thenReturn(List.of(c1, c2));
 		when(contentRepository.countContents(req)).thenReturn(2L);
 		when(contentTagRepository.findTagNamesByContentIds(List.of(id1, id2))).thenReturn(List.of());
-		when(contentMapper.toDto(c1, List.of())).thenReturn(dto1);
-		when(contentMapper.toDto(c2, List.of())).thenReturn(dto2);
+		when(contentMapper.toDto(eq(c1), eq(List.of()), anyLong())).thenReturn(dto1);
+		when(contentMapper.toDto(eq(c2), eq(List.of()), anyLong())).thenReturn(dto2);
 
 		// when
 		CursorResponse<ContentDto> result = contentService.getContents(req);
@@ -252,8 +259,8 @@ class ContentServiceTest {
 		when(contentRepository.findContents(req)).thenReturn(List.of(c1, c2, c3));
 		when(contentRepository.countContents(req)).thenReturn(5L);
 		when(contentTagRepository.findTagNamesByContentIds(List.of(id1, id2))).thenReturn(List.of());
-		when(contentMapper.toDto(c1, List.of())).thenReturn(dto1);
-		when(contentMapper.toDto(c2, List.of())).thenReturn(dto2);
+		when(contentMapper.toDto(eq(c1), eq(List.of()), anyLong())).thenReturn(dto1);
+		when(contentMapper.toDto(eq(c2), eq(List.of()), anyLong())).thenReturn(dto2);
 
 		// when
 		CursorResponse<ContentDto> result = contentService.getContents(req);
@@ -282,14 +289,14 @@ class ContentServiceTest {
 		when(contentRepository.findContents(req)).thenReturn(List.of(c1));
 		when(contentRepository.countContents(req)).thenReturn(1L);
 		when(contentTagRepository.findTagNamesByContentIds(List.of(id1))).thenReturn(List.of(tagRow));
-		when(contentMapper.toDto(c1, List.of("액션"))).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(c1), eq(List.of("액션")), anyLong())).thenReturn(expectedDto);
 
 		// when
 		CursorResponse<ContentDto> result = contentService.getContents(req);
 
 		// then
 		assertThat(result.data().get(0)).isEqualTo(expectedDto);
-		verify(contentMapper).toDto(c1, List.of("액션"));
+		verify(contentMapper).toDto(eq(c1), eq(List.of("액션")), anyLong());
 	}
 
 	@Test
@@ -322,7 +329,7 @@ class ContentServiceTest {
 		);
 		String storedUrl = "http://localhost:8080/thumbnails/thumb.png";
 
-		when(thumbnailStorage.store(thumbnail)).thenReturn(storedUrl);
+		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn(storedUrl);
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
 		when(tagRepository.findAllByNameIn(any())).thenThrow(new RuntimeException("태그 저장 실패"));
 
@@ -330,7 +337,7 @@ class ContentServiceTest {
 		assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
 			.isInstanceOf(RuntimeException.class);
 
-		verify(thumbnailStorage).delete(storedUrl);
+		verify(fileStorage).delete(storedUrl);
 	}
 
 	// ========== updateContent ==========
@@ -348,7 +355,7 @@ class ContentServiceTest {
 		assertThatThrownBy(() -> contentService.updateContent(contentId, request, null))
 			.isInstanceOf(ContentException.class);
 
-		verify(thumbnailStorage, never()).store(any());
+		verify(fileStorage, never()).store(any(), any());
 	}
 
 	@Test
@@ -363,7 +370,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(existingTags);
-		when(contentMapper.toDto(content, existingTags)).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(existingTags), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.updateContent(contentId, request, null);
@@ -373,8 +380,8 @@ class ContentServiceTest {
 		verify(content).updateTitle("새 제목");
 		verify(content).updateDescription("새 설명");
 		verify(content, never()).updateThumbnailUrl(any());
-		verify(thumbnailStorage, never()).store(any());
-		verify(thumbnailStorage, never()).delete(any());
+		verify(fileStorage, never()).store(any(), any());
+		verify(fileStorage, never()).delete(any());
 	}
 
 	@Test
@@ -393,18 +400,18 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(content.getThumbnailUrl()).thenReturn(oldUrl);
-		when(thumbnailStorage.store(newThumbnail)).thenReturn(newUrl);
+		when(fileStorage.store(newThumbnail, THUMBNAIL_DIRECTORY)).thenReturn(newUrl);
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(List.of());
-		when(contentMapper.toDto(content, List.of())).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.updateContent(contentId, request, newThumbnail);
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(thumbnailStorage).store(newThumbnail);
+		verify(fileStorage).store(newThumbnail, THUMBNAIL_DIRECTORY);
 		verify(content).updateThumbnailUrl(newUrl);
-		verify(thumbnailStorage).delete(oldUrl);
+		verify(fileStorage).delete(oldUrl);
 	}
 
 	@Test
@@ -421,7 +428,7 @@ class ContentServiceTest {
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(existingTag)); // 액션만 기존 존재
 		when(tagRepository.save(any(Tag.class))).thenReturn(newTag);
-		when(contentMapper.toDto(eq(content), eq(List.of("액션", "SF")))).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(List.of("액션", "SF")), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.updateContent(contentId, request, null);
@@ -445,7 +452,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(tagRepository.findAllByNameIn(List.of())).thenReturn(List.of());
-		when(contentMapper.toDto(content, List.of())).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.updateContent(contentId, request, null);
@@ -469,7 +476,7 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(existingTags);
-		when(contentMapper.toDto(content, existingTags)).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(existingTags), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.updateContent(contentId, request, null);
@@ -495,15 +502,15 @@ class ContentServiceTest {
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(content.getThumbnailUrl()).thenReturn(oldUrl);
-		when(thumbnailStorage.store(newThumbnail)).thenReturn(newUrl);
+		when(fileStorage.store(newThumbnail, THUMBNAIL_DIRECTORY)).thenReturn(newUrl);
 		doThrow(new RuntimeException("DB 저장 실패")).when(content).updateTitle("새 제목"); // DB 저장 예외 실패 떤지기
 
 		// when & then
 		assertThatThrownBy(() -> contentService.updateContent(contentId, request, newThumbnail))
 			.isInstanceOf(RuntimeException.class);
 
-		verify(thumbnailStorage).delete(newUrl);
-		verify(thumbnailStorage, never()).delete(oldUrl);
+		verify(fileStorage).delete(newUrl);
+		verify(fileStorage, never()).delete(oldUrl);
 	}
 
 	// ========== deleteContent ==========

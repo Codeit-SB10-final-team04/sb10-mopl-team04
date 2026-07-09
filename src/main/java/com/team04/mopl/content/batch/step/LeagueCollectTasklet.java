@@ -32,8 +32,7 @@ public class LeagueCollectTasklet implements Tasklet {
 	private final SportsDbClient sportsDbClient;
 
 	@Override
-	public RepeatStatus execute(StepContribution contribution // 따로 사용 X
-		, ChunkContext chunkContext) {
+	public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) { // contribution은 따로 사용 X
 		log.info("[Batch] ===== Step 1: LeagueCollectTasklet 시작 =====");
 
 		// Step 2(EventCollect)에서 사용할 리그 ID를 JobContext에 저장

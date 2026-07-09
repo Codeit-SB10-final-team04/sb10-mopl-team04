@@ -2,6 +2,7 @@ package com.team04.mopl.follow.service;
 
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
 import com.team04.mopl.follow.entity.Follow;
+import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.follow.exception.FollowErrorCode;
 import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
@@ -32,6 +34,8 @@ public class FollowService {
 	private final FollowRepository followRepository;
 
 	private final FollowMapper followMapper;
+
+	private final ApplicationEventPublisher applicationEventPublisher;
 
 	// 팔로우 생성
 	@Transactional
@@ -56,6 +60,15 @@ public class FollowService {
 		try {
 			Follow newFollow = followMapper.toEntity(followeeUser, followerUser);
 			followRepository.save(newFollow);
+
+			applicationEventPublisher.publishEvent(
+				FollowCreatedEvent.of(
+					followeeUser.getId(),
+					followeeUser.getName(),
+					followerUser.getId(),
+					followerUser.getName()
+				)
+			);
 
 			log.info("[FOLLOW_CREATE] 팔로우 생성 완료: followId={}, followeeId={}, followerId={}",
 				newFollow.getId(), followeeUser.getId(), followerUser.getId());

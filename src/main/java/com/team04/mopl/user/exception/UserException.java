@@ -11,6 +11,10 @@ public class UserException extends MoplException {
 		super(errorCode);
 	}
 
+	public UserException(ErrorCode errorCode, Throwable cause) {
+		super(errorCode, cause);
+	}
+
 	public UserException(ErrorCode errorCode, Map<String, Object> details) {
 		super(errorCode);
 

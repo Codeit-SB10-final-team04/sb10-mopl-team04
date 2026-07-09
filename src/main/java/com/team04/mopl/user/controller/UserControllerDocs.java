@@ -5,7 +5,10 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 import com.team04.mopl.user.dto.request.UserCreateRequest;
+import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
+import com.team04.mopl.user.dto.request.UserPageRequest;
 import com.team04.mopl.user.dto.request.UserRoleUpdateRequest;
+import com.team04.mopl.user.dto.response.CursorResponseUserDto;
 import com.team04.mopl.user.dto.response.UserDto;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,9 +22,20 @@ public interface UserControllerDocs {
 		UserCreateRequest userCreateRequest
 	);
 
+	@Operation(summary = "[어드민] 사용자 목록 조회 (커서 페이지네이션)")
+	ResponseEntity<CursorResponseUserDto> findUsers(
+		UserPageRequest userPageRequest
+	);
+
 	@Operation(summary = "[어드민] 권한 수정")
 	ResponseEntity<Void> updateRole(
 		UUID userId,
 		UserRoleUpdateRequest userRoleUpdateRequest
+	);
+
+	@Operation(summary = "[어드민] 계정 잠금 상태 변경", description = "[어드민 기능] 계정 잠금 상태를 변경합니다.")
+	ResponseEntity<Void> updateLocked(
+		UUID userId,
+		UserLockUpdateRequest userLockUpdateRequest
 	);
 }

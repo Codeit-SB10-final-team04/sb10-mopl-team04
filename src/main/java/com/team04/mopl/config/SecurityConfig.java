@@ -28,7 +28,6 @@ import org.springframework.security.web.savedrequest.NullRequestCache;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.team04.mopl.auth.security.csrf.SpaCsrfTokenRequestHandler;
-import com.team04.mopl.auth.security.provider.MoplAuthenticationProvider;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.auth.security.handler.AuthSessionLogoutHandler;
 import com.team04.mopl.auth.security.handler.LoginFailureHandler;
@@ -38,6 +37,7 @@ import com.team04.mopl.auth.security.handler.RestAuthenticationEntryPoint;
 import com.team04.mopl.auth.security.handler.RestLogoutSuccessHandler;
 import com.team04.mopl.auth.security.jwt.JwtExpiredTokenValidator;
 import com.team04.mopl.auth.security.jwt.JwtProperties;
+import com.team04.mopl.auth.security.provider.MoplAuthenticationProvider;
 
 @EnableMethodSecurity
 @Configuration
@@ -110,7 +110,6 @@ public class SecurityConfig {
 					"/swagger-ui/**",
 					"/v3/api-docs/**",
 					"/actuator/health",
-					"/api/sse",
 					"/thumbnails/**",
 					"/",
 					"/index.html",

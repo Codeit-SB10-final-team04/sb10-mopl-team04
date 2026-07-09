@@ -34,8 +34,15 @@ spring:
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
     producer:
+      acks: all
+      retries: 3
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        retry.backoff.ms: 1000
+        request.timeout.ms: 30000
+        delivery.timeout.ms: 120000
     consumer:
       group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
       auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}
@@ -61,11 +68,10 @@ logging:
 
 sports:
   batch:
-    season: 2024-2025
+    season: 2025-2026
 
-# 로컬 전용
-thumbnail:
-  storage:
-    type: local
-    local:
-      path: thumbnails/
+# 파일 저장소 (썸네일, 유저 프로필 등 공용)
+storage:
+  type: local
+  local:
+    path: uploads/
