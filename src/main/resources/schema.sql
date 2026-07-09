@@ -298,3 +298,16 @@ CREATE INDEX idx_users_is_locked_id
 
 CREATE INDEX idx_users_role_id
     ON users (role, id);
+
+-- direct_messages
+
+CREATE INDEX idx_direct_messages_id
+    ON direct_messages (conversation_id, created_at, id);
+
+-- conversation
+
+CREATE INDEX idx_conversation_participant_user_id
+    ON conversation_participants (user_id);
+
+CREATE INDEX idx_conversations_created_at_id
+    ON conversations (created_at, id);
