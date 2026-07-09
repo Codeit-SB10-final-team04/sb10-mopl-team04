@@ -2,6 +2,8 @@ package com.team04.mopl.directmessage.dto.request;
 
 import java.util.UUID;
 
+import org.springframework.util.StringUtils;
+
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
@@ -24,6 +26,16 @@ public record DirectMessagePagedRequest(
 ) {
 	// 기본값 설정을 위한 생성자
 	public DirectMessagePagedRequest {
+		boolean hasCursor = StringUtils.hasText(cursor);
+		boolean hasIdAfter = idAfter != null;
+
+		// 둘 중 하나만 존재할 경우 예외 발생
+		if (hasCursor ^ hasIdAfter) {
+			throw new DirectMessageException(DirectMessageErrorCode.DM_INVALID_FORMAT)
+				.addDetail("cursor", cursor)
+				.addDetail("idAfter", String.valueOf(idAfter));
+		}
+
 		// 페이지 내 요소 개수 기본값 및 유효성 검증 (1 ~ 100)
 		if (limit == null) {
 			limit = 10;
