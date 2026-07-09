@@ -162,61 +162,41 @@ class ConversationQdslRepositoryImplTest {
 	}
 
 	@Test
-	@DisplayName("성공: 커서 값만 전달되고 idAfter가 null이면 첫 페이지 조회처럼 동작한다.")
-	void searchConversation_OnlyCursorProvided_Success() {
+	@DisplayName("실패: 커서 값만 전달되고 idAfter가 null이면 DTO 생성 시 예외가 발생한다.")
+	void searchConversation_OnlyCursorProvided_Fail() {
 		// given
-		User requestUser = createUser("requestUser");
-		Conversation conv1 = em.persist(Conversation.create());
-		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
+		String validCursorTime = Instant.now().toString();
 
-		em.flush();
-		em.clear();
-
-		// cursor는 있지만 idAfter가 null인 경우
-		ConversationPageRequest request = new ConversationPageRequest(
+		// when & then (객체 생성 단계에서 XOR 유효성 검증 실패 발생)
+		assertThatThrownBy(() -> new ConversationPageRequest(
 			null,
-			conv1.getCreatedAt().toString(),
+			validCursorTime,
 			null,
 			10,
 			SortDirection.DESCENDING,
 			"createdAt"
-		);
-
-		// when
-		List<Conversation> result = conversationRepository.searchConversation(request, requestUser.getId());
-
-		// then
-		assertThat(result).hasSize(1);
-		assertThat(result.get(0).getId()).isEqualTo(conv1.getId());
+		))
+			.isInstanceOf(ConversationException.class)
+			.hasMessageContaining(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage());
 	}
 
 	@Test
-	@DisplayName("성공: idAfter만 전달되고 커서 값이 null이면 첫 페이지 조회처럼 동작한다.")
-	void searchConversation_OnlyIdAfterProvided_Success() {
+	@DisplayName("실패: idAfter만 전달되고 커서 값이 null이면 DTO 생성 시 예외가 발생한다.")
+	void searchConversation_OnlyIdAfterProvided_Fail() {
 		// given
-		User requestUser = createUser("requestUser");
-		Conversation conv1 = em.persist(Conversation.create());
-		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
+		UUID validIdAfter = UUID.randomUUID();
 
-		em.flush();
-		em.clear();
-
-		// idAfter는 있지만 cursor가 null인 경우
-		ConversationPageRequest request = new ConversationPageRequest(
+		// when & then (객체 생성 단계에서 XOR 유효성 검증 실패 발생)
+		assertThatThrownBy(() -> new ConversationPageRequest(
 			null,
 			null,
-			conv1.getId(),
+			validIdAfter,
 			10,
 			SortDirection.DESCENDING,
 			"createdAt"
-		);
-
-		// when
-		List<Conversation> result = conversationRepository.searchConversation(request, requestUser.getId());
-
-		// then
-		assertThat(result).hasSize(1);
-		assertThat(result.get(0).getId()).isEqualTo(conv1.getId());
+		))
+			.isInstanceOf(ConversationException.class)
+			.hasMessageContaining(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage());
 	}
 
 	@Test

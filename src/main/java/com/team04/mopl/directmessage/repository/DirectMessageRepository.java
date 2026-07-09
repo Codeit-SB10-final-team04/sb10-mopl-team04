@@ -10,8 +10,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.team04.mopl.directmessage.entity.DirectMessage;
+import com.team04.mopl.directmessage.repository.qdsl.DirectMessageQdslRepository;
 
-public interface DirectMessageRepository extends JpaRepository<DirectMessage, UUID> {
+public interface DirectMessageRepository extends JpaRepository<DirectMessage, UUID>, DirectMessageQdslRepository {
 
 	// 최근 메시지 단건 조회
 	Optional<DirectMessage> findTopByConversationIdOrderByCreatedAtDescIdDesc(UUID conversationId);

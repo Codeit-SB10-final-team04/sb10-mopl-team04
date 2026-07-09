@@ -1,17 +1,14 @@
-package com.team04.mopl.conversation.dto.request;
+package com.team04.mopl.directmessage.dto.request;
 
 import java.util.UUID;
 
 import org.springframework.util.StringUtils;
 
 import com.team04.mopl.common.enums.SortDirection;
-import com.team04.mopl.conversation.exception.ConversationErrorCode;
-import com.team04.mopl.conversation.exception.ConversationException;
+import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
+import com.team04.mopl.directmessage.exception.DirectMessageException;
 
-public record ConversationPageRequest(
-	// 검색 키워드: 사용자 이름, 메시지 내용
-	String keywordLike,
-
+public record DirectMessagePageRequest(
 	// 메인 커서
 	String cursor,
 
@@ -28,7 +25,7 @@ public record ConversationPageRequest(
 	String sortBy
 ) {
 	// 기본값 설정을 위한 생성자
-	public ConversationPageRequest {
+	public DirectMessagePageRequest {
 		// 유효성 검증: 입력값 필수 여부
 		validateCursorRequest(cursor, idAfter);
 
@@ -36,7 +33,7 @@ public record ConversationPageRequest(
 		if (limit == null) {
 			limit = 10;
 		} else if (limit <= 0 || limit > 100) {
-			throw new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT)
+			throw new DirectMessageException(DirectMessageErrorCode.DM_INVALID_FORMAT)
 				.addDetail("limit", String.valueOf(limit));
 		}
 
@@ -57,7 +54,7 @@ public record ConversationPageRequest(
 
 		// 둘 중 하나만 존재할 경우 예외 발생
 		if (hasCursor ^ hasIdAfter) {
-			throw new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT)
+			throw new DirectMessageException(DirectMessageErrorCode.DM_INVALID_FORMAT)
 				.addDetail("cursor", cursor != null ? cursor : "null")
 				.addDetail("idAfter", idAfter != null ? idAfter.toString() : "null");
 		}

@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import java.util.Collections;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +26,8 @@ import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
+import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
+import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.service.DirectMessageService;
@@ -204,5 +207,118 @@ class DirectMessageControllerTest {
 			.andDo(print())
 			.andExpect(status().isForbidden())
 			.andExpect(jsonPath("$.message").value(DirectMessageErrorCode.DM_ACCESS_DENIED.getMessage()));
+	}
+
+	/*
+	=========================
+	   DM 목록 조회
+	=========================
+	 */
+	@Test
+	@DisplayName("성공: 올바른 파라미터로 DM 목록을 조회하면 200 OK를 반환한다.")
+	void getDirectMessages_Success() throws Exception {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
+		CursorResponseDirectMessageDto expectedResponse = CursorResponseDirectMessageDto.builder()
+			.data(Collections.emptyList())
+			.nextCursor(null)
+			.nextIdAfter(null)
+			.hasNext(false)
+			.totalCount(0L)
+			.sortBy("createdAt")
+			.sortDirection("DESCENDING")
+			.build();
+
+		given(directMessageService.findAll(eq(conversationId), any(DirectMessagePageRequest.class), eq(requestUserId)))
+			.willReturn(expectedResponse);
+
+		// when & then
+		mockMvc.perform(get("/api/conversations/{conversationId}/direct-messages", conversationId)
+				.param("limit", "10")
+				.param("sortBy", "createdAt")
+				.param("sortDirection", "DESCENDING")
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.sortBy").value("createdAt"))
+			.andExpect(jsonPath("$.sortDirection").value("DESCENDING"))
+			.andExpect(jsonPath("$.hasNext").value(false));
+	}
+
+	@Test
+	@DisplayName("실패: limit 파라미터에 0 이하의 값이 전달되면 400 Bad Request를 반환한다 (DTO 컴팩트 생성자 검증).")
+	void findAll_Fail_InvalidLimit() throws Exception {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
+		// when & then
+		mockMvc.perform(get("/api/conversations/{conversationId}/direct-messages", conversationId)
+				.param("limit", "-5")
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("실패: cursor만 전달되고 idAfter가 없으면 400 Bad Request를 반환한다. (DTO 검증)")
+	void getDirectMessages_Fail_InvalidCursorFormat() throws Exception {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
+		// when & then
+		mockMvc.perform(get("/api/conversations/{conversationId}/direct-messages", conversationId)
+				.param("cursor", "invalid-cursor-string")
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message").value("요청 파라미터 유효성 검사에 실패했습니다."))
+			.andExpect(jsonPath("$.details._global").value("잘못된 형태의 값이 입력되었습니다."));
+	}
+
+	@Test
+	@DisplayName("실패: 지원하지 않는 sortBy 정렬 기준이 전달되면 DirectMessageException이 발생하여 400 Bad Request를 반환한다.")
+	void findAll_Fail_InvalidSortBy() throws Exception {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		UUID requestUserId = UUID.randomUUID();
+		MoplUserDetails mockUserDetails = MoplUserDetails.authenticated(
+			requestUserId,
+			"test@test.com",
+			UserRole.USER
+		);
+		mockSecurityContext(mockUserDetails);
+
+		given(directMessageService.findAll(eq(conversationId), any(DirectMessagePageRequest.class), eq(requestUserId)))
+			.willThrow(new DirectMessageException(DirectMessageErrorCode.DM_INVALID_FORMAT));
+
+		// when & then
+		mockMvc.perform(get("/api/conversations/{conversationId}/direct-messages", conversationId)
+				.param("sortBy", "unsupportedField")
+				.contentType(MediaType.APPLICATION_JSON))
+			.andDo(print())
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage()));
 	}
 }
