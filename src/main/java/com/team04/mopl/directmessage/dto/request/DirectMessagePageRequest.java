@@ -55,8 +55,8 @@ public record DirectMessagePageRequest(
 		// 둘 중 하나만 존재할 경우 예외 발생
 		if (hasCursor ^ hasIdAfter) {
 			throw new DirectMessageException(DirectMessageErrorCode.DM_INVALID_FORMAT)
-				.addDetail("cursor", cursor)
-				.addDetail("idAfter", String.valueOf(idAfter));
+				.addDetail("cursor", cursor != null ? cursor : "null")
+				.addDetail("idAfter", idAfter != null ? idAfter.toString() : "null");
 		}
 	}
 }
