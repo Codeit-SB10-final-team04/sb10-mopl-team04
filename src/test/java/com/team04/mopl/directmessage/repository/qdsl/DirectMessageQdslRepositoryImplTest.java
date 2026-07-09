@@ -31,7 +31,7 @@ import com.team04.mopl.user.entity.User;
 	"spring.jpa.hibernate.ddl-auto=none",
 	"spring.sql.init.mode=always",
 	"spring.sql.init.schema-locations=classpath:schema-h2-direct-message_querydsl-test.sql",
-	"spring.jpa.database-platform=com.team04.mopl.config.H2TestDialect"
+	"spring.jpa.properties.hibernate.dialect=com.team04.mopl.config.H2TestDialect"
 })
 @Import({QuerydslConfig.class, JpaAuditingConfig.class})
 public class DirectMessageQdslRepositoryImplTest {
