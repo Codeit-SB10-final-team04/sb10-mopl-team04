@@ -104,7 +104,7 @@ public class UserService {
 		log.info("[USER_PROFILE_UPDATE] 프로필 변경 시작: userId={}, currentUserId={}, imagePresent={}",
 			userId, currentUserId, hasImage(image));
 
-		validateProfileOwner(userId, currentUserId);
+		validateOwner(userId, currentUserId, UserErrorCode.USER_PROFILE_ACCESS_DENIED);
 
 		User user = getUserOrThrow(userId);
 		updateNameIfPresent(user, request.name());
@@ -141,7 +141,7 @@ public class UserService {
 		log.info("[USER_PASSWORD_UPDATE] 비밀번호 변경 시작: userId={}, currentUserId={}",
 			userId, currentUserId);
 
-		validatePasswordOwner(userId, currentUserId);
+		validateOwner(userId, currentUserId, UserErrorCode.USER_PASSWORD_ACCESS_DENIED);
 
 		User user = getUserOrThrow(userId);
 		String passwordHash = passwordEncoder.encode(request.password());
@@ -164,21 +164,11 @@ public class UserService {
 		return userDto;
 	}
 
-	// 프로필 변경 대상 본인 여부 검증
-	private void validateProfileOwner(UUID userId, UUID currentUserId) {
+	// 요청 대상 본인 여부 검증
+	private void validateOwner(UUID userId, UUID currentUserId, UserErrorCode errorCode) {
 		if (!userId.equals(currentUserId)) {
 			throw new UserException(
-				UserErrorCode.USER_PROFILE_ACCESS_DENIED,
-				Map.of("userId", userId, "currentUserId", String.valueOf(currentUserId))
-			);
-		}
-	}
-
-	// 비밀번호 변경 대상 본인 여부 검증
-	private void validatePasswordOwner(UUID userId, UUID currentUserId) {
-		if (!userId.equals(currentUserId)) {
-			throw new UserException(
-				UserErrorCode.USER_PASSWORD_ACCESS_DENIED,
+				errorCode,
 				Map.of("userId", userId, "currentUserId", String.valueOf(currentUserId))
 			);
 		}
