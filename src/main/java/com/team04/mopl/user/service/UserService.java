@@ -134,12 +134,12 @@ public class UserService {
 
 	// 사용자 상세 조회
 	public UserDto findById(UUID userId) {
-		log.info("[USER_FIND_BY_ID] 사용자 상세 조회 시작: userId={}", userId);
+		log.debug("[USER_FIND_BY_ID] 사용자 상세 조회 시작: userId={}", userId);
 
 		User user = getUserOrThrow(userId);
 		UserDto userDto = userMapper.toDto(user);
 
-		log.info("[USER_FIND_BY_ID] 사용자 상세 조회 완료: userId={}", userId);
+		log.debug("[USER_FIND_BY_ID] 사용자 상세 조회 완료: userId={}", userId);
 
 		return userDto;
 	}
