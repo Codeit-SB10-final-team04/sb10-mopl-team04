@@ -78,4 +78,4 @@ storage:
 
 notification:
   realtime:
-    mode: local
+    mode: redis
