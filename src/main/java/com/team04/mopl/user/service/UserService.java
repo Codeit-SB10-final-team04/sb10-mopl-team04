@@ -13,6 +13,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.team04.mopl.auth.service.TemporaryPasswordService;
+import com.team04.mopl.user.dto.request.ChangePasswordRequest;
 import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserUpdateRequest;
@@ -50,6 +52,7 @@ public class UserService {
 	private final UserMapper userMapper;
 	private final PasswordEncoder passwordEncoder;
 	private final FileStorage fileStorage;
+	private final TemporaryPasswordService temporaryPasswordService;
 
 	// 회원가입
 	@Transactional
@@ -101,7 +104,7 @@ public class UserService {
 		log.info("[USER_PROFILE_UPDATE] 프로필 변경 시작: userId={}, currentUserId={}, imagePresent={}",
 			userId, currentUserId, hasImage(image));
 
-		validateProfileOwner(userId, currentUserId);
+		validateOwner(userId, currentUserId, UserErrorCode.USER_PROFILE_ACCESS_DENIED);
 
 		User user = getUserOrThrow(userId);
 		updateNameIfPresent(user, request.name());
@@ -132,6 +135,23 @@ public class UserService {
 		}
 	}
 
+	// 비밀번호 변경
+	@Transactional
+	public void updatePassword(UUID userId, ChangePasswordRequest request, UUID currentUserId) {
+		log.info("[USER_PASSWORD_UPDATE] 비밀번호 변경 시작: userId={}, currentUserId={}",
+			userId, currentUserId);
+
+		validateOwner(userId, currentUserId, UserErrorCode.USER_PASSWORD_ACCESS_DENIED);
+
+		User user = getUserOrThrow(userId);
+		String passwordHash = passwordEncoder.encode(request.password());
+
+		user.updatePasswordHash(passwordHash);
+		temporaryPasswordService.deleteTemporaryPassword(userId);
+
+		log.info("[USER_PASSWORD_UPDATE] 비밀번호 변경 및 임시 비밀번호 삭제 완료: userId={}", userId);
+	}
+
 	// 사용자 상세 조회
 	public UserDto findById(UUID userId) {
 		log.debug("[USER_FIND_BY_ID] 사용자 상세 조회 시작: userId={}", userId);
@@ -144,11 +164,11 @@ public class UserService {
 		return userDto;
 	}
 
-	// 프로필 변경 대상 본인 여부 검증
-	private void validateProfileOwner(UUID userId, UUID currentUserId) {
+	// 요청 대상 본인 여부 검증
+	private void validateOwner(UUID userId, UUID currentUserId, UserErrorCode errorCode) {
 		if (!userId.equals(currentUserId)) {
 			throw new UserException(
-				UserErrorCode.USER_PROFILE_ACCESS_DENIED,
+				errorCode,
 				Map.of("userId", userId, "currentUserId", String.valueOf(currentUserId))
 			);
 		}

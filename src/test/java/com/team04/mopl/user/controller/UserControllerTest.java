@@ -40,6 +40,7 @@ import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.common.exception.GlobalExceptionHandler;
+import com.team04.mopl.user.dto.request.ChangePasswordRequest;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserLockUpdateRequest;
 import com.team04.mopl.user.dto.request.UserPageRequest;
@@ -512,6 +513,153 @@ class UserControllerTest {
 			.andExpect(status().isBadRequest());
 
 		verifyNoInteractions(userService);
+	}
+
+	@Test
+	@DisplayName("비밀번호 변경 요청이 유효하면 204 No Content를 반환한다")
+	void updatePassword_returnNoContent_whenRequestIsValid() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		ChangePasswordRequest request = new ChangePasswordRequest("newPassword123");
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/password", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"password": "newPassword123"
+					}
+					"""))
+			.andExpect(status().isNoContent());
+
+		verify(userService).updatePassword(userId, request, userId);
+	}
+
+	@Test
+	@DisplayName("비밀번호 변경 요청에서 비밀번호가 공백이면 400을 반환한다")
+	void updatePassword_returnBadRequest_whenPasswordIsBlank() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/password", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"password": "   "
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userService);
+	}
+
+	@Test
+	@DisplayName("비밀번호 변경 요청에서 비밀번호가 8자 미만이면 400을 반환한다")
+	void updatePassword_returnBadRequest_whenPasswordIsShorterThanEightCharacters() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/password", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"password": "1234567"
+					}
+					"""))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userService);
+	}
+
+	@Test
+	@DisplayName("비밀번호 변경 요청에서 비밀번호가 255자를 초과하면 400을 반환한다")
+	void updatePassword_returnBadRequest_whenPasswordExceedsMaxLength() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		String tooLongPassword = "a".repeat(256);
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/password", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"password": "%s"
+					}
+					""".formatted(tooLongPassword)))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userService);
+	}
+
+	@Test
+	@DisplayName("비밀번호 변경 요청에서 본인이 아니면 403을 반환한다")
+	void updatePassword_returnForbidden_whenCurrentUserIsNotOwner() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		UUID currentUserId = UUID.randomUUID();
+		ChangePasswordRequest request = new ChangePasswordRequest("newPassword123");
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(currentUserId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		willThrow(new UserException(
+				UserErrorCode.USER_PASSWORD_ACCESS_DENIED,
+				Map.of("userId", userId, "currentUserId", currentUserId.toString())
+			))
+			.given(userService)
+			.updatePassword(userId, request, currentUserId);
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/password", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"password": "newPassword123"
+					}
+					"""))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.exceptionName").value("UserException"))
+			.andExpect(jsonPath("$.message").value("본인의 비밀번호만 변경할 수 있습니다."))
+			.andExpect(jsonPath("$.details.userId").value(userId.toString()));
+	}
+
+	@Test
+	@DisplayName("비밀번호 변경 대상 사용자가 없으면 404를 반환한다")
+	void updatePassword_returnNotFound_whenUserDoesNotExist() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		ChangePasswordRequest request = new ChangePasswordRequest("newPassword123");
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		willThrow(new UserException(
+				UserErrorCode.USER_NOT_FOUND,
+				Map.of("userId", userId)
+			))
+			.given(userService)
+			.updatePassword(userId, request, userId);
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/password", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"password": "newPassword123"
+					}
+					"""))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.exceptionName").value("UserException"))
+			.andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."))
+			.andExpect(jsonPath("$.details.userId").value(userId.toString()));
 	}
 
 	@Test
