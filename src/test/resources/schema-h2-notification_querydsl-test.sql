@@ -26,5 +26,5 @@ CREATE TABLE IF NOT EXISTS notifications
 
     CONSTRAINT pk_notifications PRIMARY KEY (id),
     CONSTRAINT fk_notifications_receiver FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
-    CONSTRAINT up_notifications_source_event_receiver UNIQUE (source_event_id, receiver_id);
+    CONSTRAINT up_notifications_source_event_receiver UNIQUE (source_event_id, receiver_id)
 );
