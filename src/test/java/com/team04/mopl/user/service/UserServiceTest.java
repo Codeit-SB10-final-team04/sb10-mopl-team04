@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -24,7 +25,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserUpdateRequest;
 import com.team04.mopl.user.dto.response.UserDto;
@@ -34,7 +38,6 @@ import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.mapper.UserMapper;
 import com.team04.mopl.user.repository.UserRepository;
-import com.team04.mopl.user.storage.ProfileImageStorage;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -49,7 +52,7 @@ class UserServiceTest {
 	private PasswordEncoder passwordEncoder;
 
 	@Mock
-	private ProfileImageStorage profileImageStorage;
+	private FileStorage fileStorage;
 
 	@InjectMocks
 	private UserService userService;
@@ -263,7 +266,7 @@ class UserServiceTest {
 
 		verify(userRepository).findById(userId);
 		verify(userMapper).toDto(user);
-		verifyNoInteractions(profileImageStorage);
+		verifyNoInteractions(fileStorage);
 	}
 
 	@Test
@@ -293,7 +296,7 @@ class UserServiceTest {
 
 		given(userRepository.findById(userId))
 			.willReturn(Optional.of(user));
-		given(profileImageStorage.store(image))
+		given(fileStorage.store(image, UserService.PROFILE_IMAGE_DIRECTORY))
 			.willReturn(newProfileImageUrl);
 		given(userMapper.toDto(user))
 			.willReturn(expectedResponse);
@@ -307,8 +310,8 @@ class UserServiceTest {
 		assertThat(user.getProfileImageUrl()).isEqualTo(newProfileImageUrl);
 
 		verify(userRepository).findById(userId);
-		verify(profileImageStorage).store(image);
-		verify(profileImageStorage).delete(oldProfileImageUrl);
+		verify(fileStorage).store(image, UserService.PROFILE_IMAGE_DIRECTORY);
+		verify(fileStorage).delete(oldProfileImageUrl);
 		verify(userMapper).toDto(user);
 	}
 
@@ -330,7 +333,7 @@ class UserServiceTest {
 			);
 
 		verifyNoInteractions(userRepository);
-		verifyNoInteractions(profileImageStorage);
+		verifyNoInteractions(fileStorage);
 		verifyNoInteractions(userMapper);
 	}
 
@@ -355,16 +358,204 @@ class UserServiceTest {
 			});
 
 		verify(userRepository).findById(userId);
-		verifyNoInteractions(profileImageStorage);
+		verifyNoInteractions(fileStorage);
 		verifyNoInteractions(userMapper);
 	}
 
 	@Test
-	@DisplayName("이미지를 저장한 뒤 프로필 변경에 실패하면 새 이미지를 삭제한다")
-	void updateProfile_deleteNewImage_whenUpdateFailsAfterImageStored() {
+	@DisplayName("본인이 프로필 이미지만 변경하면 이름은 유지하고 이미지를 변경한다")
+	void updateProfile_updateImageOnly_whenNameIsNull() {
+		// given
+		UUID userId = UUID.randomUUID();
+		String oldProfileImageUrl = "http://localhost:8080/profile-images/old.png";
+		String newProfileImageUrl = "http://localhost:8080/profile-images/new.png";
+		User user = createUser(userId, "기존이름", oldProfileImageUrl);
+		UserUpdateRequest request = new UserUpdateRequest(null);
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			"image/png",
+			"image-data".getBytes()
+		);
+		UserDto expectedResponse = new UserDto(
+			userId,
+			Instant.parse("2026-07-06T00:00:00Z"),
+			"test@test.com",
+			"기존이름",
+			newProfileImageUrl,
+			UserRole.USER,
+			false
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+		given(fileStorage.store(image, UserService.PROFILE_IMAGE_DIRECTORY))
+			.willReturn(newProfileImageUrl);
+		given(userMapper.toDto(user))
+			.willReturn(expectedResponse);
+
+		// when
+		UserDto result = userService.updateProfile(userId, request, image, userId);
+
+		// then
+		assertThat(result).isEqualTo(expectedResponse);
+		assertThat(user.getName()).isEqualTo("기존이름");
+		assertThat(user.getProfileImageUrl()).isEqualTo(newProfileImageUrl);
+
+		verify(userRepository).findById(userId);
+		verify(fileStorage).store(image, UserService.PROFILE_IMAGE_DIRECTORY);
+		verify(fileStorage).delete(oldProfileImageUrl);
+		verify(userMapper).toDto(user);
+	}
+
+	@Test
+	@DisplayName("기존 프로필 이미지가 없으면 새 이미지만 저장하고 기존 이미지 삭제를 건너뛴다")
+	void updateProfile_skipOldImageDelete_whenOldProfileImageDoesNotExist() {
 		// given
 		UUID userId = UUID.randomUUID();
 		String newProfileImageUrl = "http://localhost:8080/profile-images/new.png";
+		User user = createUser(userId, "기존이름", null);
+		UserUpdateRequest request = new UserUpdateRequest(null);
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			"image/png",
+			"image-data".getBytes()
+		);
+		UserDto expectedResponse = new UserDto(
+			userId,
+			Instant.parse("2026-07-06T00:00:00Z"),
+			"test@test.com",
+			"기존이름",
+			newProfileImageUrl,
+			UserRole.USER,
+			false
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+		given(fileStorage.store(image, UserService.PROFILE_IMAGE_DIRECTORY))
+			.willReturn(newProfileImageUrl);
+		given(userMapper.toDto(user))
+			.willReturn(expectedResponse);
+
+		// when
+		UserDto result = userService.updateProfile(userId, request, image, userId);
+
+		// then
+		assertThat(result).isEqualTo(expectedResponse);
+		assertThat(user.getProfileImageUrl()).isEqualTo(newProfileImageUrl);
+
+		verify(userRepository).findById(userId);
+		verify(fileStorage).store(image, UserService.PROFILE_IMAGE_DIRECTORY);
+		verify(fileStorage, never()).delete(any());
+		verify(userMapper).toDto(user);
+	}
+
+	@Test
+	@DisplayName("트랜잭션 커밋 이후 기존 프로필 이미지를 삭제한다")
+	void updateProfile_deleteOldImageAfterCommit_whenTransactionCommits() {
+		// given
+		UUID userId = UUID.randomUUID();
+		String oldProfileImageUrl = "http://localhost:8080/profile-images/old.png";
+		String newProfileImageUrl = "http://localhost:8080/profile-images/new.png";
+		User user = createUser(userId, "기존이름", oldProfileImageUrl);
+		UserUpdateRequest request = new UserUpdateRequest("새이름");
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			"image/png",
+			"image-data".getBytes()
+		);
+		UserDto expectedResponse = new UserDto(
+			userId,
+			Instant.parse("2026-07-06T00:00:00Z"),
+			"test@test.com",
+			"새이름",
+			newProfileImageUrl,
+			UserRole.USER,
+			false
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+		given(fileStorage.store(image, UserService.PROFILE_IMAGE_DIRECTORY))
+			.willReturn(newProfileImageUrl);
+		given(userMapper.toDto(user))
+			.willReturn(expectedResponse);
+
+		TransactionSynchronizationManager.initSynchronization();
+
+		try {
+			// when
+			UserDto result = userService.updateProfile(userId, request, image, userId);
+
+			// then
+			assertThat(result).isEqualTo(expectedResponse);
+			verify(fileStorage, never()).delete(oldProfileImageUrl);
+
+			TransactionSynchronizationManager.getSynchronizations()
+				.forEach(TransactionSynchronization::afterCommit);
+
+			verify(fileStorage).delete(oldProfileImageUrl);
+		} finally {
+			TransactionSynchronizationManager.clearSynchronization();
+		}
+	}
+
+	@Test
+	@DisplayName("기존 프로필 이미지 삭제에 실패해도 프로필 변경은 성공한다")
+	void updateProfile_returnResponse_whenOldImageDeleteFails() {
+		// given
+		UUID userId = UUID.randomUUID();
+		String oldProfileImageUrl = "http://localhost:8080/profile-images/old.png";
+		String newProfileImageUrl = "http://localhost:8080/profile-images/new.png";
+		User user = createUser(userId, "기존이름", oldProfileImageUrl);
+		UserUpdateRequest request = new UserUpdateRequest("새이름");
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			"image/png",
+			"image-data".getBytes()
+		);
+		UserDto expectedResponse = new UserDto(
+			userId,
+			Instant.parse("2026-07-06T00:00:00Z"),
+			"test@test.com",
+			"새이름",
+			newProfileImageUrl,
+			UserRole.USER,
+			false
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+		given(fileStorage.store(image, UserService.PROFILE_IMAGE_DIRECTORY))
+			.willReturn(newProfileImageUrl);
+		given(userMapper.toDto(user))
+			.willReturn(expectedResponse);
+		willThrow(new RuntimeException("delete failed"))
+			.given(fileStorage)
+			.delete(oldProfileImageUrl);
+
+		// when
+		UserDto result = userService.updateProfile(userId, request, image, userId);
+
+		// then
+		assertThat(result).isEqualTo(expectedResponse);
+		assertThat(user.getProfileImageUrl()).isEqualTo(newProfileImageUrl);
+
+		verify(userRepository).findById(userId);
+		verify(fileStorage).store(image, UserService.PROFILE_IMAGE_DIRECTORY);
+		verify(fileStorage).delete(oldProfileImageUrl);
+		verify(userMapper).toDto(user);
+	}
+
+	@Test
+	@DisplayName("이름이 올바르지 않으면 프로필 이미지를 저장하지 않는다")
+	void updateProfile_throwUserExceptionAndDoesNotStoreImage_whenNameIsBlank() {
+		// given
+		UUID userId = UUID.randomUUID();
 		User user = createUser(userId, "기존이름", null);
 		UserUpdateRequest request = new UserUpdateRequest("   ");
 		MockMultipartFile image = new MockMultipartFile(
@@ -376,8 +567,6 @@ class UserServiceTest {
 
 		given(userRepository.findById(userId))
 			.willReturn(Optional.of(user));
-		given(profileImageStorage.store(image))
-			.willReturn(newProfileImageUrl);
 
 		// when
 		ThrowingCallable action = () -> userService.updateProfile(userId, request, image, userId);
@@ -389,9 +578,110 @@ class UserServiceTest {
 			);
 
 		verify(userRepository).findById(userId);
-		verify(profileImageStorage).store(image);
-		verify(profileImageStorage).delete(newProfileImageUrl);
+		verifyNoInteractions(fileStorage);
 		verifyNoInteractions(userMapper);
+	}
+
+	@Test
+	@DisplayName("허용하지 않는 이미지 형식이면 프로필 이미지를 저장하지 않는다")
+	void updateProfile_throwUserException_whenProfileImageContentTypeIsInvalid() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, "기존이름", null);
+		UserUpdateRequest request = new UserUpdateRequest(null);
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.txt",
+			"text/plain",
+			"image-data".getBytes()
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+
+		// when
+		ThrowingCallable action = () -> userService.updateProfile(userId, request, image, userId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_INVALID_PROFILE_IMAGE)
+			);
+
+		verify(userRepository).findById(userId);
+		verifyNoInteractions(fileStorage);
+		verifyNoInteractions(userMapper);
+	}
+
+	@Test
+	@DisplayName("이미지 크기가 최대 크기를 초과하면 프로필 이미지를 저장하지 않는다")
+	void updateProfile_throwUserException_whenProfileImageSizeIsTooLarge() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, "기존이름", null);
+		UserUpdateRequest request = new UserUpdateRequest(null);
+		byte[] largeImage = new byte[10 * 1024 * 1024 + 1];
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			"image/png",
+			largeImage
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+
+		// when
+		ThrowingCallable action = () -> userService.updateProfile(userId, request, image, userId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_INVALID_PROFILE_IMAGE)
+			);
+
+		verify(userRepository).findById(userId);
+		verifyNoInteractions(fileStorage);
+		verifyNoInteractions(userMapper);
+	}
+
+	@Test
+	@DisplayName("새 이미지 보상 삭제에 실패해도 원래 예외를 유지한다")
+	void updateProfile_throwOriginalException_whenNewImageDeleteFails() {
+		// given
+		UUID userId = UUID.randomUUID();
+		String newProfileImageUrl = "http://localhost:8080/profile-images/new.png";
+		User user = createUser(userId, "기존이름", null);
+		UserUpdateRequest request = new UserUpdateRequest("새이름");
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			"image/png",
+			"image-data".getBytes()
+		);
+		RuntimeException originalException = new RuntimeException("mapping failed");
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+		given(fileStorage.store(image, UserService.PROFILE_IMAGE_DIRECTORY))
+			.willReturn(newProfileImageUrl);
+		given(userMapper.toDto(user))
+			.willThrow(originalException);
+		willThrow(new RuntimeException("delete failed"))
+			.given(fileStorage)
+			.delete(newProfileImageUrl);
+
+		// when
+		ThrowingCallable action = () -> userService.updateProfile(userId, request, image, userId);
+
+		// then
+		assertThatThrownBy(action)
+			.isSameAs(originalException);
+
+		verify(userRepository).findById(userId);
+		verify(fileStorage).store(image, UserService.PROFILE_IMAGE_DIRECTORY);
+		verify(fileStorage).delete(newProfileImageUrl);
+		verify(userMapper).toDto(user);
 	}
 
 	private User createUser(UUID userId, String name, String profileImageUrl) {

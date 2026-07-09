@@ -1,14 +1,19 @@
 package com.team04.mopl.user.service;
 
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserUpdateRequest;
 import com.team04.mopl.user.dto.response.UserDto;
@@ -17,7 +22,6 @@ import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.mapper.UserMapper;
 import com.team04.mopl.user.repository.UserRepository;
-import com.team04.mopl.user.storage.ProfileImageStorage;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,10 +32,24 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional(readOnly = true)
 public class UserService {
 
+	// 프로필 이미지 저장 디렉토리
+	static final String PROFILE_IMAGE_DIRECTORY = "profile-images";
+
+	// 프로필 이미지 최대 크기
+	private static final long MAX_PROFILE_IMAGE_SIZE_BYTES = 10L * 1024 * 1024;
+
+	// 프로필 이미지 허용 Content-Type 목록
+	private static final Set<String> ALLOWED_PROFILE_IMAGE_CONTENT_TYPES = Set.of(
+		"image/jpeg",
+		"image/png",
+		"image/gif",
+		"image/webp"
+	);
+
 	private final UserRepository userRepository;
 	private final UserMapper userMapper;
 	private final PasswordEncoder passwordEncoder;
-	private final ProfileImageStorage profileImageStorage;
+	private final FileStorage fileStorage;
 
 	// 회원가입
 	@Transactional
@@ -57,7 +75,7 @@ public class UserService {
 			.build();
 
 		try {
-			// 동시 중복 가입 방어 -> users.email unique 제약 위반 시 예외 발생
+			// 동시 중복 가입 방어
 			User savedUser = userRepository.saveAndFlush(user);
 			log.info("[USER_CREATE] 회원가입 성공: userId={}, email={}", savedUser.getId(), maskedEmail);
 
@@ -65,7 +83,6 @@ public class UserService {
 		} catch (DataIntegrityViolationException exception) {
 			log.warn("[USER_CREATE] 회원가입 실패 - DB unique 제약 위반: email={}", maskedEmail);
 
-			// 이미 사용 중인 이메일 예외
 			throw new UserException(
 				UserErrorCode.USER_EMAIL_ALREADY_EXISTS,
 				Map.of("email", request.email())
@@ -87,20 +104,22 @@ public class UserService {
 		validateProfileOwner(userId, currentUserId);
 
 		User user = getUserOrThrow(userId);
+		updateNameIfPresent(user, request.name());
+
 		String oldProfileImageUrl = user.getProfileImageUrl();
 		String newProfileImageUrl = null;
 
 		if (hasImage(image)) {
-			newProfileImageUrl = profileImageStorage.store(image);
+			validateProfileImage(image);
+			newProfileImageUrl = fileStorage.store(image, PROFILE_IMAGE_DIRECTORY);
 		}
 
 		try {
-			updateNameIfPresent(user, request.name());
 			updateProfileImageIfPresent(user, newProfileImageUrl);
 
 			UserDto userDto = userMapper.toDto(user);
 
-			deleteOldProfileImageIfChanged(oldProfileImageUrl, newProfileImageUrl);
+			registerOldProfileImageDeletionAfterCommit(oldProfileImageUrl, newProfileImageUrl);
 
 			log.info("[USER_PROFILE_UPDATE] 프로필 변경 완료: userId={}, imageChanged={}",
 				userId, newProfileImageUrl != null);
@@ -149,6 +168,45 @@ public class UserService {
 		return image != null && !image.isEmpty();
 	}
 
+	// 프로필 이미지 업로드 조건 검증
+	private void validateProfileImage(MultipartFile image) {
+		validateProfileImageSize(image);
+		validateProfileImageContentType(image);
+	}
+
+	// 프로필 이미지 크기 검증
+	private void validateProfileImageSize(MultipartFile image) {
+		if (image.getSize() <= MAX_PROFILE_IMAGE_SIZE_BYTES) {
+			return;
+		}
+
+		throw new UserException(
+			UserErrorCode.USER_INVALID_PROFILE_IMAGE,
+			Map.of(
+				"maxSizeBytes", MAX_PROFILE_IMAGE_SIZE_BYTES,
+				"sizeBytes", image.getSize()
+			)
+		);
+	}
+
+	// 프로필 이미지 Content-Type 검증
+	private void validateProfileImageContentType(MultipartFile image) {
+		String contentType = image.getContentType();
+		String normalizedContentType = contentType == null ? null : contentType.toLowerCase(Locale.ROOT);
+
+		if (normalizedContentType != null && ALLOWED_PROFILE_IMAGE_CONTENT_TYPES.contains(normalizedContentType)) {
+			return;
+		}
+
+		throw new UserException(
+			UserErrorCode.USER_INVALID_PROFILE_IMAGE,
+			Map.of(
+				"contentType", String.valueOf(contentType),
+				"allowedContentTypes", ALLOWED_PROFILE_IMAGE_CONTENT_TYPES
+			)
+		);
+	}
+
 	// 이름 요청값이 있을 때만 변경
 	private void updateNameIfPresent(User user, String name) {
 		if (name != null) {
@@ -163,17 +221,42 @@ public class UserService {
 		}
 	}
 
-	// 프로필 이미지 교체 완료 후 기존 이미지 삭제
+	// 트랜잭션 커밋 이후 기존 프로필 이미지 삭제 예약
+	private void registerOldProfileImageDeletionAfterCommit(String oldProfileImageUrl, String newProfileImageUrl) {
+		if (!shouldDeleteOldProfileImage(oldProfileImageUrl, newProfileImageUrl)) {
+			return;
+		}
+
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			deleteOldProfileImageIfChanged(oldProfileImageUrl, newProfileImageUrl);
+			return;
+		}
+
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+
+			@Override
+			public void afterCommit() {
+				deleteOldProfileImageIfChanged(oldProfileImageUrl, newProfileImageUrl);
+			}
+		});
+	}
+
+	// 기존 프로필 이미지 삭제 필요 여부 확인
+	private boolean shouldDeleteOldProfileImage(String oldProfileImageUrl, String newProfileImageUrl) {
+		return newProfileImageUrl != null
+			&& oldProfileImageUrl != null
+			&& !oldProfileImageUrl.isBlank()
+			&& !oldProfileImageUrl.equals(newProfileImageUrl);
+	}
+
+	// 기존 프로필 이미지 삭제
 	private void deleteOldProfileImageIfChanged(String oldProfileImageUrl, String newProfileImageUrl) {
-		if (newProfileImageUrl == null
-			|| oldProfileImageUrl == null
-			|| oldProfileImageUrl.isBlank()
-			|| oldProfileImageUrl.equals(newProfileImageUrl)) {
+		if (!shouldDeleteOldProfileImage(oldProfileImageUrl, newProfileImageUrl)) {
 			return;
 		}
 
 		try {
-			profileImageStorage.delete(oldProfileImageUrl);
+			fileStorage.delete(oldProfileImageUrl);
 		} catch (Exception exception) {
 			log.error("[USER_PROFILE_UPDATE] 기존 프로필 이미지 삭제 실패, 배치 정리 필요: profileImageUrl={}",
 				oldProfileImageUrl, exception);
@@ -187,14 +270,14 @@ public class UserService {
 		}
 
 		try {
-			profileImageStorage.delete(newProfileImageUrl);
+			fileStorage.delete(newProfileImageUrl);
 		} catch (Exception exception) {
 			log.error("[USER_PROFILE_UPDATE] 새 프로필 이미지 삭제 실패, 배치 정리 필요: profileImageUrl={}",
 				newProfileImageUrl, exception);
 		}
 	}
 
-	// 로그 이메일 마스킹 처리용
+	// 로그 이메일 마스킹 처리
 	private static String maskEmail(String email) {
 		if (email == null || !email.contains("@")) {
 			return "invalid-email";

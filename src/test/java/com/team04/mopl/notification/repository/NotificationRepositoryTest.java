@@ -1,6 +1,7 @@
 package com.team04.mopl.notification.repository;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -96,6 +97,49 @@ class NotificationRepositoryTest {
 		assertThat(result)
 			.extracting(notification -> notification.getId())
 			.containsExactly(sameTimeAfterId);
+	}
+
+	@Test
+	@DisplayName("입력된 알림 id 목록에 해당하는 알림을 일괄 삭제한다.")
+	void deleteAllByNotificationIds_deleteNotifications_whenNotificationIdsExist() {
+		// when
+		notificationRepository.deleteAllByNotificationIds(
+			List.of(laterWithSmallerId, sameTimeBeforeId, lastNotificationId));
+
+		// then
+		assertFalse(notificationRepository.existsById(laterWithSmallerId));
+		assertFalse(notificationRepository.existsById(sameTimeBeforeId));
+		assertFalse(notificationRepository.existsById(lastNotificationId));
+		assertTrue(notificationRepository.existsById(sameTimeAfterId));
+		assertTrue(notificationRepository.existsById(readNotificationId));
+		assertEquals(4, notificationRepository.count());
+	}
+
+	@Test
+	@DisplayName("입력된 알림 id 목록에 존재하지 않는 id가 있어도 정상 동작한다.")
+	void deleteAllByNotificationIds_deleteNotifications_whenContainsNonExistingId() {
+		// when
+		notificationRepository.deleteAllByNotificationIds(
+			List.of(UUID.randomUUID(), laterWithSmallerId, sameTimeBeforeId, lastNotificationId));
+
+		// then
+		assertFalse(notificationRepository.existsById(laterWithSmallerId));
+		assertFalse(notificationRepository.existsById(sameTimeBeforeId));
+		assertFalse(notificationRepository.existsById(lastNotificationId));
+		assertTrue(notificationRepository.existsById(sameTimeAfterId));
+		assertTrue(notificationRepository.existsById(readNotificationId));
+		assertEquals(4, notificationRepository.count());
+	}
+
+	@Test
+	@DisplayName("입력된 알림 id 목록이 비어 있어도 정상 동작한다.")
+	void deleteAllByNotificationIds_doNothing_whenNotificationIdsAreEmpty() {
+		// when
+		notificationRepository.deleteAllByNotificationIds(
+			List.of());
+
+		// then
+		assertEquals(7, notificationRepository.count());
 	}
 
 	private void insertUser(UUID userId, String name) {

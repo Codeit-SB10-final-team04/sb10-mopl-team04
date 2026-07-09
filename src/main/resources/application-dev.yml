@@ -68,17 +68,10 @@ logging:
 
 sports:
   batch:
-    season: 2024-2025
+    season: 2025-2026
 
-# 로컬 전용
-thumbnail:
-  storage:
-    type: local
-    local:
-      path: thumbnails/
-
-profile-image:
-  storage:
-    type: local
-    local:
-      path: .mopl/storage/profiles/
+# 파일 저장소 (썸네일, 유저 프로필 등 공용)
+storage:
+  type: local
+  local:
+    path: uploads/
