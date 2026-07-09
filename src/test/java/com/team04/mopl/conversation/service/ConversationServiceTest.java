@@ -397,11 +397,11 @@ class ConversationServiceTest {
 		UUID requestUserId = UUID.randomUUID();
 		ConversationPageRequest request = new ConversationPageRequest(
 			null,
-			"createdAt",
+			null,
 			null,
 			2,
 			SortDirection.DESCENDING,
-			null
+			"createdAt"
 		);
 
 		Conversation conv1 = mock(Conversation.class);
@@ -461,11 +461,11 @@ class ConversationServiceTest {
 		UUID requestUserId = UUID.randomUUID();
 		ConversationPageRequest request = new ConversationPageRequest(
 			null,
-			"createdAt",
+			null,
 			null,
 			10,
 			SortDirection.DESCENDING,
-			null
+			"createdAt"
 		);
 
 		given(conversationRepository.searchConversation(request, requestUserId)).willReturn(List.of());
