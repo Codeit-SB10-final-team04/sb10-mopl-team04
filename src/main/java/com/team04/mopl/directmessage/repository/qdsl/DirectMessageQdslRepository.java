@@ -13,7 +13,7 @@ import com.team04.mopl.directmessage.entity.DirectMessage;
  */
 public interface DirectMessageQdslRepository {
 	// 정렬 + 커서 페이지네이션이 적용된 DM 목록 조회
-	List<DirectMessage> findDirectMessageByCursor(
+	List<DirectMessage> findDirectMessagesByCursor(
 		UUID conversationId,
 		DirectMessagePagedRequest directMessagePagedRequest,
 		UUID requestId
