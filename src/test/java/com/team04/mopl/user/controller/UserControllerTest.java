@@ -580,6 +580,28 @@ class UserControllerTest {
 	}
 
 	@Test
+	@DisplayName("비밀번호 변경 요청에서 비밀번호가 255자를 초과하면 400을 반환한다")
+	void updatePassword_returnBadRequest_whenPasswordExceedsMaxLength() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		String tooLongPassword = "a".repeat(256);
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(userId, "test@test.com", UserRole.USER);
+		mockSecurityContext(userDetails);
+
+		// when & then
+		mockMvc.perform(patch("/api/users/{userId}/password", userId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"password": "%s"
+					}
+					""".formatted(tooLongPassword)))
+			.andExpect(status().isBadRequest());
+
+		verifyNoInteractions(userService);
+	}
+
+	@Test
 	@DisplayName("비밀번호 변경 요청에서 본인이 아니면 403을 반환한다")
 	void updatePassword_returnForbidden_whenCurrentUserIsNotOwner() throws Exception {
 		// given
