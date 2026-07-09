@@ -35,6 +35,7 @@ public class DirectMessageQdslRepositoryImpl implements DirectMessageQdslReposit
 	) {
 		return jpaQueryFactory
 			.selectFrom(directMessage)
+			.leftJoin(directMessage.conversation).fetchJoin()
 			.leftJoin(directMessage.sender).fetchJoin()
 			.leftJoin(directMessage.receiver).fetchJoin()
 			.where(

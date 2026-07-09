@@ -73,21 +73,21 @@ public class DirectMessageService {
 		DirectMessagePagedRequest directMessagePagedRequest,
 		UUID requestUserId
 	) {
-		log.debug("[DM_FIND_ALL] 대화 목록 조회 시작");
+		log.debug("[DM_FIND_ALL] DM 목록 조회 시작");
 
 		// 1. 유효성 검증: 대화 존재 유무
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
-		// 2. 유효성 검증: 특정 대화방 참가자 여부
+		// 2. 유성 검증: 특정 대화방 참가자 여부
 		validateParticipant(conversation.getId(), requestUserId);
 
-		// 3. 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
+		// 3. 정렬 + 커서 기반 페이지네이션이 적용된 DM 리스트
 		List<DirectMessage> directMessages = directMessageRepository.findDirectMessagesByCursor(
 			conversation.getId(),
 			directMessagePagedRequest
 		);
 
-		// 4. 대화 전체 개수 조회
+		// 4. DM 전체 개수 조회
 		Long totalCount = directMessageRepository.countDirectMessage(
 			conversation.getId(),
 			directMessagePagedRequest
@@ -115,7 +115,7 @@ public class DirectMessageService {
 		// 7. DirectMessage -> DirectMessageDto
 		List<DirectMessageDto> data = directMessageMapper.toDtoList(pagedDirectMessages);
 
-		log.debug("[DM_FIND_ALL] 대화 목록 조회 완료");
+		log.debug("[DM_FIND_ALL] DM 목록 조회 완료");
 
 		// 8. CursorResponseDirectMessageDto 전환
 		return directMessageMapper.toCursorPageResponse(
