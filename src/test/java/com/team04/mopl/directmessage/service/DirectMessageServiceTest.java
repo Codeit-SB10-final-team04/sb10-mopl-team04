@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.conversation.entity.Conversation;
@@ -28,12 +29,11 @@ import com.team04.mopl.directmessage.dto.request.DirectMessageSendRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
+import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
 import com.team04.mopl.directmessage.repository.DirectMessageRepository;
-import com.team04.mopl.sse.event.SseEventNames;
-import com.team04.mopl.sse.service.SseService;
 import com.team04.mopl.user.entity.User;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,7 +52,7 @@ class DirectMessageServiceTest {
 	private DirectMessageMapper directMessageMapper;
 
 	@Mock
-	private SseService sseService;
+	private ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
 	private DirectMessageService directMessageService;
@@ -105,8 +105,7 @@ class DirectMessageServiceTest {
 		assertThat(result).isEqualTo(expectedDto);
 		verify(directMessageRepository).save(directMessage);
 
-		// 💡 수신자에게 지정된 이벤트명으로 SSE 알림이 발송되었는지 검증
-		verify(sseService).sendToReceiver(receiverId, directMessageId, SseEventNames.DIRECT_MESSAGES, expectedDto);
+		verify(eventPublisher).publishEvent(any(DirectMessageCreatedEvent.class));
 	}
 
 	@Test
