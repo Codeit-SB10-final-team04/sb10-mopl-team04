@@ -7,11 +7,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.conversation.entity.Conversation;
+import com.team04.mopl.conversation.entity.ConversationParticipant;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
 import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
+import com.team04.mopl.directmessage.dto.request.DirectMessageSendRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
@@ -19,6 +21,9 @@ import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
 import com.team04.mopl.directmessage.repository.DirectMessageRepository;
+import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +39,56 @@ public class DirectMessageService {
 	private final ConversationParticipantRepository conversationParticipantRepository;
 
 	private final DirectMessageMapper directMessageMapper;
+
+	// DM 생성
+	@Transactional
+	public DirectMessageDto create(
+		UUID conversationId,
+		DirectMessageSendRequest directMessageSendRequest,
+		UUID senderId
+	) {
+		// 1. 유효성 검증: 대화 존재 여부
+		Conversation conversation = getConversationEntityOrThrow(conversationId);
+
+		// 2. 대화 참여자 목록 조회
+		List<ConversationParticipant> participants = getParticipants(conversationId);
+
+		// 3. 송신자 조회
+		User sender = extractSenderOrThrow(participants, senderId);
+
+		// 4. 수신자 조회
+		User receiver = extractReceiverOrThrow(participants, senderId);
+
+		// 5. DM 엔티티 생성 및 저장
+		DirectMessage newDirectMessage = directMessageMapper.toEntity(
+			conversation,
+			sender,
+			receiver,
+			directMessageSendRequest
+		);
+		directMessageRepository.save(newDirectMessage);
+
+		return directMessageMapper.toDto(newDirectMessage);
+	}
+
+	// 송신자 추출 및 검증
+	private User extractSenderOrThrow(List<ConversationParticipant> participants, UUID senderId) {
+		return participants.stream()
+			.map(ConversationParticipant::getUser)
+			.filter(user -> user.getId().equals(senderId))
+			.findFirst()
+			// 대화 참여자 목록에 송신자가 없을 경우, 예외 처리
+			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_ACCESS_DENIED));
+	}
+
+	// 수신자 추출 및 검증
+	private User extractReceiverOrThrow(List<ConversationParticipant> participants, UUID senderId) {
+		return participants.stream()
+			.map(ConversationParticipant::getUser)
+			.filter(user -> !user.getId().equals(senderId))
+			.findFirst()
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+	}
 
 	// DM 읽음 상태 생성
 	@Transactional
@@ -156,12 +211,19 @@ public class DirectMessageService {
 	// DM 엔티티 반환
 	private DirectMessage getDirectMessageEntityOrThrow(UUID directMessageId) {
 		return directMessageRepository.findById(directMessageId)
-			.orElseThrow(() -> new DirectMessageException(DirectMessageErrorCode.DM_NOT_FOUND));
+			.orElseThrow(() -> new DirectMessageException(DirectMessageErrorCode.DM_NOT_FOUND)
+				.addDetail("directMessageId", directMessageId));
 	}
 
 	// 대화 엔티티 반환
 	private Conversation getConversationEntityOrThrow(UUID conversationId) {
 		return conversationRepository.findById(conversationId)
-			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
+			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND)
+				.addDetail("conversationId", conversationId));
+	}
+
+	// 대화 참여자 목록 반환
+	private List<ConversationParticipant> getParticipants(UUID conversationId) {
+		return conversationParticipantRepository.findByConversationId(conversationId);
 	}
 }
