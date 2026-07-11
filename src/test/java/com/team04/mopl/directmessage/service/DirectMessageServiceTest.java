@@ -32,6 +32,8 @@ import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
 import com.team04.mopl.directmessage.repository.DirectMessageRepository;
+import com.team04.mopl.sse.event.SseEventNames;
+import com.team04.mopl.sse.service.SseService;
 import com.team04.mopl.user.entity.User;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +50,9 @@ class DirectMessageServiceTest {
 
 	@Mock
 	private DirectMessageMapper directMessageMapper;
+
+	@Mock
+	private SseService sseService;
 
 	@InjectMocks
 	private DirectMessageService directMessageService;
@@ -79,7 +84,12 @@ class DirectMessageServiceTest {
 		given(receiverParticipant.getUser()).willReturn(receiver);
 
 		DirectMessageSendRequest request = new DirectMessageSendRequest("안녕하세요!");
+
+		// 💡 SSE 이벤트 발송에 사용될 DM ID 설정 추가
+		UUID directMessageId = UUID.randomUUID();
 		DirectMessage directMessage = mock(DirectMessage.class);
+		given(directMessage.getId()).willReturn(directMessageId);
+
 		DirectMessageDto expectedDto = mock(DirectMessageDto.class);
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
@@ -94,6 +104,9 @@ class DirectMessageServiceTest {
 		// then
 		assertThat(result).isEqualTo(expectedDto);
 		verify(directMessageRepository).save(directMessage);
+
+		// 💡 수신자에게 지정된 이벤트명으로 SSE 알림이 발송되었는지 검증
+		verify(sseService).sendToReceiver(receiverId, directMessageId, SseEventNames.DIRECT_MESSAGES, expectedDto);
 	}
 
 	@Test
