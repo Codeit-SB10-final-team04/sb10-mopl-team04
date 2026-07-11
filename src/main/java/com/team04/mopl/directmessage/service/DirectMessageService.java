@@ -22,8 +22,6 @@ import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
 import com.team04.mopl.directmessage.repository.DirectMessageRepository;
 import com.team04.mopl.user.entity.User;
-import com.team04.mopl.user.exception.UserErrorCode;
-import com.team04.mopl.user.exception.UserException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -92,7 +90,7 @@ public class DirectMessageService {
 			.map(ConversationParticipant::getUser)
 			.filter(user -> !user.getId().equals(senderId))
 			.findFirst()
-			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_PARTICIPANT_NOT_FOUND));
 	}
 
 	// DM 읽음 상태 생성
