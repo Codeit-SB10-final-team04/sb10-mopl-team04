@@ -8,6 +8,8 @@ import org.mapstruct.Mapping;
 
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.config.MapStructConfig;
+import com.team04.mopl.conversation.entity.Conversation;
+import com.team04.mopl.directmessage.dto.request.DirectMessageSendRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
@@ -15,6 +17,15 @@ import com.team04.mopl.user.entity.User;
 
 @Mapper(config = MapStructConfig.class)
 public interface DirectMessageMapper {
+
+	// DirectMessageRequest -> DirectMessage
+	@Mapping(target = "content", source = "directMessageSendRequest.content")
+	DirectMessage toEntity(
+		Conversation conversation,
+		User sender,
+		User receiver,
+		DirectMessageSendRequest directMessageSendRequest
+	);
 
 	// DirectMessage -> DirectMessageDto
 	@Mapping(target = "conversationId", source = "conversation.id")
