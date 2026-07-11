@@ -21,6 +21,8 @@ import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
 import com.team04.mopl.directmessage.repository.DirectMessageRepository;
+import com.team04.mopl.sse.event.SseEventNames;
+import com.team04.mopl.sse.service.SseService;
 import com.team04.mopl.user.entity.User;
 
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,8 @@ public class DirectMessageService {
 	private final ConversationParticipantRepository conversationParticipantRepository;
 
 	private final DirectMessageMapper directMessageMapper;
+
+	private final SseService sseService;
 
 	// DM 생성
 	@Transactional
@@ -68,10 +72,21 @@ public class DirectMessageService {
 		);
 		directMessageRepository.save(newDirectMessage);
 
+		// 6. DTO 전환
+		DirectMessageDto directMessageDto = directMessageMapper.toDto(newDirectMessage);
+
+		// 7. SSE를 통한 수신자 실시간 알림 전송
+		sseService.sendToReceiver(
+			receiver.getId(),
+			newDirectMessage.getId(),
+			SseEventNames.DIRECT_MESSAGES,
+			directMessageDto
+		);
+
 		log.info("[DM_CREATE] DM 생성 완료: conversationId={}, senderId={}, dmId={}",
 			conversationId, senderId, newDirectMessage.getId());
 
-		return directMessageMapper.toDto(newDirectMessage);
+		return directMessageDto;
 	}
 
 	// 송신자 추출 및 검증
