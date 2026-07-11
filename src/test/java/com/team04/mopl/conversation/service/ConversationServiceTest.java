@@ -290,7 +290,7 @@ class ConversationServiceTest {
 	}
 
 	@Test
-	@DisplayName("실패: 대화 참여자 목록에 상대방 유저가 존재하지 않으면 UserException이 발생한다.")
+	@DisplayName("실패: 대화 참여자 목록에 상대방 유저가 존재하지 않으면 ConversationException이 발생한다.")
 	void findConversationById_WithUserNotFound_ThrowException() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -310,7 +310,7 @@ class ConversationServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> conversationService.findConversationById(conversationId, requestUserId))
-			.isInstanceOf(UserException.class);
+			.isInstanceOf(ConversationException.class);
 	}
 
 	/*
