@@ -47,6 +47,8 @@ public class DirectMessageService {
 		DirectMessageSendRequest directMessageSendRequest,
 		UUID senderId
 	) {
+		log.info("[DM_CREATE] DM 생성 시작: conversationId={}, senderId={}", conversationId, senderId);
+
 		// 1. 유효성 검증: 대화 존재 여부
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
@@ -67,6 +69,9 @@ public class DirectMessageService {
 			directMessageSendRequest
 		);
 		directMessageRepository.save(newDirectMessage);
+
+		log.info("[DM_CREATE] DM 생성 완료: conversationId={}, senderId={}, dmId={}",
+			conversationId, senderId, newDirectMessage.getId());
 
 		return directMessageMapper.toDto(newDirectMessage);
 	}
