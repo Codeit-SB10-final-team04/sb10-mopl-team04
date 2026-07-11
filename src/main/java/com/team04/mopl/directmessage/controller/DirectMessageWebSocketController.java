@@ -4,8 +4,10 @@ import java.security.Principal;
 import java.util.UUID;
 
 import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Controller;
@@ -15,6 +17,8 @@ import com.team04.mopl.auth.exception.AuthException;
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.directmessage.dto.request.DirectMessageSendRequest;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
+import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
+import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.service.DirectMessageService;
 
 import jakarta.validation.Valid;
@@ -61,5 +65,12 @@ public class DirectMessageWebSocketController {
 			}
 		}
 		throw new AuthException(AuthErrorCode.AUTH_SESSION_INVALID);
+	}
+
+	// @Valid 검증 실패 시 발생하는 예외를 잡아서 MoplException으로 변환
+	@MessageExceptionHandler(MethodArgumentNotValidException.class)
+	public void handleValidationException(MethodArgumentNotValidException ex) {
+		// MoplException으로 래핑하여 StompErrorHandler가 ErrorResponse로 변환하도록 위임
+		throw new DirectMessageException(DirectMessageErrorCode.DM_BLANK);
 	}
 }
