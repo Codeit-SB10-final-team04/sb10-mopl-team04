@@ -24,6 +24,7 @@ import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
 import com.team04.mopl.directmessage.dto.request.DirectMessagePageRequest;
+import com.team04.mopl.directmessage.dto.request.DirectMessageSendRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
@@ -50,6 +51,121 @@ class DirectMessageServiceTest {
 
 	@InjectMocks
 	private DirectMessageService directMessageService;
+
+	/*
+    =========================
+       DM 생성 (전송)
+    =========================
+     */
+	@Test
+	@DisplayName("성공: 조건이 모두 맞으면 DM을 생성하고 저장한 후 DTO를 반환한다.")
+	void create_Success() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		Conversation conversation = mock(Conversation.class);
+
+		UUID senderId = UUID.randomUUID();
+		User sender = mock(User.class);
+		given(sender.getId()).willReturn(senderId);
+
+		ConversationParticipant senderParticipant = mock(ConversationParticipant.class);
+		given(senderParticipant.getUser()).willReturn(sender);
+
+		UUID receiverId = UUID.randomUUID();
+		User receiver = mock(User.class);
+		given(receiver.getId()).willReturn(receiverId);
+
+		ConversationParticipant receiverParticipant = mock(ConversationParticipant.class);
+		given(receiverParticipant.getUser()).willReturn(receiver);
+
+		DirectMessageSendRequest request = new DirectMessageSendRequest("안녕하세요!");
+		DirectMessage directMessage = mock(DirectMessage.class);
+		DirectMessageDto expectedDto = mock(DirectMessageDto.class);
+
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+		given(conversationParticipantRepository.findByConversationId(conversationId))
+			.willReturn(List.of(senderParticipant, receiverParticipant));
+		given(directMessageMapper.toEntity(conversation, sender, receiver, request)).willReturn(directMessage);
+		given(directMessageMapper.toDto(directMessage)).willReturn(expectedDto);
+
+		// when
+		DirectMessageDto result = directMessageService.create(conversationId, request, senderId);
+
+		// then
+		assertThat(result).isEqualTo(expectedDto);
+		verify(directMessageRepository).save(directMessage);
+	}
+
+	@Test
+	@DisplayName("실패: 대화방이 존재하지 않으면 DM 생성 시 예외가 발생한다.")
+	void create_Fail_ConversationNotFound() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		UUID senderId = UUID.randomUUID();
+		DirectMessageSendRequest request = new DirectMessageSendRequest("안녕하세요!");
+
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> directMessageService.create(conversationId, request, senderId))
+			.isInstanceOf(ConversationException.class)
+			.hasMessageContaining(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage());
+	}
+
+	@Test
+	@DisplayName("실패: 송신자가 해당 대화방의 참여자가 아니면 예외가 발생한다.")
+	void create_Fail_SenderNotInParticipants() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		Conversation conversation = mock(Conversation.class);
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+		UUID senderId = UUID.randomUUID();
+
+		UUID receiverId = UUID.randomUUID();
+		User receiver = mock(User.class);
+		given(receiver.getId()).willReturn(receiverId);
+
+		ConversationParticipant receiverParticipant = mock(ConversationParticipant.class);
+		given(receiverParticipant.getUser()).willReturn(receiver);
+
+		DirectMessageSendRequest request = new DirectMessageSendRequest("안녕하세요!");
+
+		// 참여자 목록에 송신자가 없는 경우
+		given(conversationParticipantRepository.findByConversationId(conversationId))
+			.willReturn(List.of(receiverParticipant));
+
+		// when & then
+		assertThatThrownBy(() -> directMessageService.create(conversationId, request, senderId))
+			.isInstanceOf(ConversationException.class)
+			.hasMessageContaining(ConversationErrorCode.CONVERSATION_ACCESS_DENIED.getMessage());
+	}
+
+	@Test
+	@DisplayName("실패: 수신자가 존재하지 않으면(나홀로 방인 경우) 예외가 발생한다.")
+	void create_Fail_ReceiverNotInParticipants() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		Conversation conversation = mock(Conversation.class);
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+
+		UUID senderId = UUID.randomUUID();
+		User sender = mock(User.class);
+		given(sender.getId()).willReturn(senderId);
+		ConversationParticipant senderParticipant = mock(ConversationParticipant.class);
+		given(senderParticipant.getUser()).willReturn(sender);
+
+		DirectMessageSendRequest request = new DirectMessageSendRequest("안녕하세요!");
+
+		// 참여자 목록에 송신자만 존재하는 경우
+		given(conversationParticipantRepository.findByConversationId(conversationId))
+			.willReturn(List.of(senderParticipant));
+
+		// when & then
+		assertThatThrownBy(() -> directMessageService.create(conversationId, request, senderId))
+			.isInstanceOf(ConversationException.class)
+			.hasMessageContaining(ConversationErrorCode.CONVERSATION_PARTICIPANT_NOT_FOUND.getMessage());
+	}
 
 	/*
 	=========================
