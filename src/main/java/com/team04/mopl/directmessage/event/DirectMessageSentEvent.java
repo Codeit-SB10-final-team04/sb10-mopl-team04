@@ -9,6 +9,7 @@ import java.util.UUID;
  */
 public record DirectMessageSentEvent(
 	UUID conversationId,
+	UUID messageId,
 	String content
 ) {
 }

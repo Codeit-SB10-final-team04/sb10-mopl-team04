@@ -56,10 +56,11 @@ public class ConversationEsSyncListener {
 			// 3. 쿼리 전송
 			elasticsearchOperations.update(updateQuery, IndexCoordinates.of("conversations"));
 
-			log.debug("[ES_SYNC] 대화방 ID: {} 메시지 동기화 완료", event.conversationId());
+			log.debug("[ES_SYNC] 메시지 동기화 완료: conversationId={}, messageId={}",
+				event.conversationId(), event.messageId());
 		} catch (Exception e) {
-			log.error("[ES_SYNC] 대화방 ID: {} 메시지 동기화 실패", event.conversationId(), e);
-
+			log.error("[ES_SYNC] 메시지 동기화 실패: conversationId={}, messageId={}",
+				event.conversationId(), event.messageId(), e);
 			throw e;
 		}
 	}
@@ -67,7 +68,8 @@ public class ConversationEsSyncListener {
 	// 동기화 실패 처리
 	@Recover
 	public void recoverSyncFailure(Exception e, DirectMessageSentEvent event) {
-		log.error("[ES_SYNC_DEAD_LETTER] 대화방 ID: {} 메시지 ES 동기화 최종 실패.", event.conversationId(), e);
+		log.error("[ES_SYNC] 메시지 동기화 최종 실패: conversationId={}, messageId={}",
+			event.conversationId(), event.messageId(), e);
 
 		// TODO: 실패한 이벤트 데이터를 RDB의 'dlq_events' 테이블에 저장하여 추후 배치 스케줄러로 재처리하도록 구현
 	}
