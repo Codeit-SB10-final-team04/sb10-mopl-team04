@@ -65,7 +65,7 @@ class DirectMessageRestoreServiceTest {
 	}
 
 	@Test
-	@DisplayName("성공: lastEventId에 해당하는 쪽지를 찾을 수 없으면 전체 미읽음 쪽지를 폴백(Fallback) 조회하여 반환한다.")
+	@DisplayName("성공: lastEventId에 해당하는 쪽지를 찾을 수 없으면 10분 이내의 전체 미읽음 쪽지를 폴백(Fallback) 조회하여 반환한다.")
 	void findUnreadMessagesAfter_Fallback_WhenLastMessageNotFound() {
 		// given
 		UUID receiverId = UUID.randomUUID();
@@ -76,8 +76,10 @@ class DirectMessageRestoreServiceTest {
 
 		given(directMessageRepository.findByIdAndReceiverId(lastEventId, receiverId))
 			.willReturn(Optional.empty());
-		given(directMessageRepository.findUnreadMessages(eq(receiverId), any(Pageable.class)))
+
+		given(directMessageRepository.findRecentUnreadMessages(eq(receiverId), any(Instant.class), any(Pageable.class)))
 			.willReturn(List.of(unreadMessage));
+
 		given(directMessageMapper.toDto(unreadMessage)).willReturn(expectedDto);
 
 		// when
@@ -87,7 +89,8 @@ class DirectMessageRestoreServiceTest {
 		assertThat(result).hasSize(1);
 		assertThat(result.get(0)).isEqualTo(expectedDto);
 
-		verify(directMessageRepository).findUnreadMessages(eq(receiverId), any(Pageable.class));
+		verify(directMessageRepository).findRecentUnreadMessages(eq(receiverId), any(Instant.class),
+			any(Pageable.class));
 		verify(directMessageRepository, never()).findUnreadMessagesAfter(any(), any(), any(), any());
 	}
 }
