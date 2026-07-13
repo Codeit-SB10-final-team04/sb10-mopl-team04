@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -85,7 +86,6 @@ class DirectMessageServiceTest {
 
 		DirectMessageSendRequest request = new DirectMessageSendRequest("안녕하세요!");
 
-		// 💡 SSE 이벤트 발송에 사용될 DM ID 설정 추가
 		UUID directMessageId = UUID.randomUUID();
 		DirectMessage directMessage = mock(DirectMessage.class);
 		given(directMessage.getId()).willReturn(directMessageId);
@@ -101,11 +101,18 @@ class DirectMessageServiceTest {
 		// when
 		DirectMessageDto result = directMessageService.create(conversationId, request, senderId);
 
+		ArgumentCaptor<DirectMessageCreatedEvent> captor = ArgumentCaptor.forClass(DirectMessageCreatedEvent.class);
+		verify(eventPublisher).publishEvent(captor.capture());
+		
+		DirectMessageCreatedEvent published = captor.getValue();
+
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(directMessageRepository).save(directMessage);
+		assertThat(published.receiverId()).isEqualTo(receiverId);
+		assertThat(published.directMessageId()).isEqualTo(directMessageId);
+		assertThat(published.directMessageDto()).isEqualTo(expectedDto);
 
-		verify(eventPublisher).publishEvent(any(DirectMessageCreatedEvent.class));
+		verify(directMessageRepository).save(directMessage);
 	}
 
 	@Test
