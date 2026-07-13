@@ -152,7 +152,7 @@ public class ConversationService {
 			// 요청자가 아닌 대화 상대 필터링
 			.filter(user -> !user.getId().equals(requestUserId))
 			.findFirst()
-			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_PARTICIPANT_NOT_FOUND));
 	}
 
 	/*
