@@ -13,9 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
+import com.team04.mopl.directmessage.service.DirectMessageRestoreService;
+import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.service.NotificationRestoreService;
 import com.team04.mopl.sse.event.SseEventNames;
 import com.team04.mopl.sse.repository.SseEmitterRepository;
@@ -28,6 +32,9 @@ class SseServiceTest {
 
 	@Mock
 	private NotificationRestoreService notificationRestoreService;
+
+	@Mock
+	private DirectMessageRestoreService directMessageRestoreService;
 
 	@InjectMocks
 	private SseService sseService;
@@ -48,11 +55,14 @@ class SseServiceTest {
 	}
 
 	@Test
-	@DisplayName("lastEventId가 있으면 누락 이벤트 조회를 시도한다.")
-	void connect_restoreLastEvents_whenLastEventIdIsExists() {
+	@DisplayName("lastEventId가 있으면 유실된 데이터가 없어도 조회를 시도한다.")
+	void connect_restoreLastEvents_whenLastEventIdIsExists_EmptyData() {
 		// given
 		UUID receiverId = UUID.randomUUID();
 		UUID lastEventId = UUID.randomUUID();
+
+		when(directMessageRestoreService.findUnreadMessagesAfter(receiverId, lastEventId))
+			.thenReturn(List.of());
 
 		when(notificationRestoreService.findUnreadNotificationsAfter(receiverId, lastEventId))
 			.thenReturn(List.of());
@@ -64,7 +74,69 @@ class SseServiceTest {
 		assertNotNull(result);
 
 		verify(sseEmitterRepository).add(eq(receiverId), any(SseEmitter.class));
+		verify(directMessageRestoreService).findUnreadMessagesAfter(receiverId, lastEventId);
 		verify(notificationRestoreService).findUnreadNotificationsAfter(receiverId, lastEventId);
+	}
+
+	@Test
+	@DisplayName("lastEventId가 존재하고 유실된 DM과 알림이 있을 경우 모두 정상 복원한다.")
+	void connect_restoreLastEvents_withActualData() {
+		// given
+		UUID receiverId = UUID.randomUUID();
+		UUID lastEventId = UUID.randomUUID();
+
+		DirectMessageDto dmDto = mock(DirectMessageDto.class);
+		when(dmDto.id()).thenReturn(UUID.randomUUID());
+
+		NotificationDto notiDto = mock(NotificationDto.class);
+		when(notiDto.id()).thenReturn(UUID.randomUUID());
+
+		when(directMessageRestoreService.findUnreadMessagesAfter(receiverId, lastEventId))
+			.thenReturn(List.of(dmDto));
+		when(notificationRestoreService.findUnreadNotificationsAfter(receiverId, lastEventId))
+			.thenReturn(List.of(notiDto));
+
+		// when
+		SseEmitter result = sseService.connect(receiverId, lastEventId);
+
+		// then
+		assertNotNull(result);
+		verify(sseEmitterRepository).add(eq(receiverId), any(SseEmitter.class));
+		verify(directMessageRestoreService).findUnreadMessagesAfter(receiverId, lastEventId);
+		verify(notificationRestoreService).findUnreadNotificationsAfter(receiverId, lastEventId);
+	}
+
+	@Test
+	@DisplayName("DM 복원 중 예외(전송 실패)가 발생하면 알림 복원은 시도하지 않고 즉시 종료한다.")
+	void connect_stopRestoration_whenDmRestoreFails() throws Exception {
+		// given
+		UUID receiverId = UUID.randomUUID();
+		UUID lastEventId = UUID.randomUUID();
+
+		DirectMessageDto dmDto = mock(DirectMessageDto.class);
+		when(dmDto.id()).thenReturn(UUID.randomUUID());
+
+		when(directMessageRestoreService.findUnreadMessagesAfter(receiverId, lastEventId))
+			.thenReturn(List.of(dmDto));
+
+		// SseEmitter 객체가 생성될 때 send() 동작을 가로채서 모킹
+		try (MockedConstruction<SseEmitter> mocked = mockConstruction(SseEmitter.class,
+			(mock, context) -> {
+				// 1번째 send 호출(ping)은 정상 통과하고, 2번째 send 호출(DM 전송)에서 예외 발생
+				doNothing()
+					.doThrow(new IOException("SSE DM Send Failed"))
+					.when(mock).send(any(SseEmitter.SseEventBuilder.class));
+			})) {
+
+			// when
+			sseService.connect(receiverId, lastEventId);
+
+			// then
+			verify(directMessageRestoreService).findUnreadMessagesAfter(receiverId, lastEventId);
+
+			// 핵심 검증: DM 전송 실패로 인해 알림 복원 서비스는 단 한 번도 호출되지 않아야 함!
+			verify(notificationRestoreService, never()).findUnreadNotificationsAfter(any(), any());
+		}
 	}
 
 	@Test

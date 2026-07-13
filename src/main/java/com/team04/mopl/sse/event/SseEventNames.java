@@ -6,6 +6,7 @@ package com.team04.mopl.sse.event;
 public final class SseEventNames {
 
 	public static final String NOTIFICATIONS = "notifications";
+	public static final String DIRECT_MESSAGES = "direct-messages";
 
 	private SseEventNames() {
 	}

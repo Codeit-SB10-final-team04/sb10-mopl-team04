@@ -3,6 +3,7 @@ package com.team04.mopl.directmessage.service;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ import com.team04.mopl.directmessage.dto.request.DirectMessageSendRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
+import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
@@ -37,6 +39,8 @@ public class DirectMessageService {
 	private final ConversationParticipantRepository conversationParticipantRepository;
 
 	private final DirectMessageMapper directMessageMapper;
+
+	private final ApplicationEventPublisher eventPublisher;
 
 	// DM 생성
 	@Transactional
@@ -68,10 +72,20 @@ public class DirectMessageService {
 		);
 		directMessageRepository.save(newDirectMessage);
 
+		// 6. DTO 전환
+		DirectMessageDto directMessageDto = directMessageMapper.toDto(newDirectMessage);
+
+		// 7. SSE를 통한 수신자 실시간 알림 전송
+		eventPublisher.publishEvent(new DirectMessageCreatedEvent(
+			receiver.getId(),
+			newDirectMessage.getId(),
+			directMessageDto
+		));
+
 		log.info("[DM_CREATE] DM 생성 완료: conversationId={}, senderId={}, dmId={}",
 			conversationId, senderId, newDirectMessage.getId());
 
-		return directMessageMapper.toDto(newDirectMessage);
+		return directMessageDto;
 	}
 
 	// 송신자 추출 및 검증

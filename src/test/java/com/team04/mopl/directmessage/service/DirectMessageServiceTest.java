@@ -12,9 +12,11 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.conversation.entity.Conversation;
@@ -28,6 +30,7 @@ import com.team04.mopl.directmessage.dto.request.DirectMessageSendRequest;
 import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
+import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
@@ -48,6 +51,9 @@ class DirectMessageServiceTest {
 
 	@Mock
 	private DirectMessageMapper directMessageMapper;
+
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
 	private DirectMessageService directMessageService;
@@ -79,7 +85,11 @@ class DirectMessageServiceTest {
 		given(receiverParticipant.getUser()).willReturn(receiver);
 
 		DirectMessageSendRequest request = new DirectMessageSendRequest("안녕하세요!");
+
+		UUID directMessageId = UUID.randomUUID();
 		DirectMessage directMessage = mock(DirectMessage.class);
+		given(directMessage.getId()).willReturn(directMessageId);
+
 		DirectMessageDto expectedDto = mock(DirectMessageDto.class);
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
@@ -91,8 +101,17 @@ class DirectMessageServiceTest {
 		// when
 		DirectMessageDto result = directMessageService.create(conversationId, request, senderId);
 
+		ArgumentCaptor<DirectMessageCreatedEvent> captor = ArgumentCaptor.forClass(DirectMessageCreatedEvent.class);
+		verify(eventPublisher).publishEvent(captor.capture());
+
+		DirectMessageCreatedEvent published = captor.getValue();
+
 		// then
 		assertThat(result).isEqualTo(expectedDto);
+		assertThat(published.receiverId()).isEqualTo(receiverId);
+		assertThat(published.directMessageId()).isEqualTo(directMessageId);
+		assertThat(published.directMessageDto()).isEqualTo(expectedDto);
+
 		verify(directMessageRepository).save(directMessage);
 	}
 
