@@ -12,4 +12,9 @@ public record AuthTokenIssueResult(
 	JwtDto jwtDto,
 	String refreshToken
 ) {
+
+	@Override
+	public String toString() {
+		return "AuthTokenIssueResult[jwtDto=" + jwtDto + ", refreshToken=****]";
+	}
 }
