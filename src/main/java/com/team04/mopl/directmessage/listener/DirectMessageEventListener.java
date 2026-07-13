@@ -1,9 +1,10 @@
-package com.team04.mopl.directmessage.event;
+package com.team04.mopl.directmessage.listener;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.sse.event.SseEventNames;
 import com.team04.mopl.sse.service.SseService;
 
