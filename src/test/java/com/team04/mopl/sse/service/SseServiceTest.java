@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.team04.mopl.directmessage.service.DirectMessageRestoreService;
 import com.team04.mopl.notification.service.NotificationRestoreService;
 import com.team04.mopl.sse.event.SseEventNames;
 import com.team04.mopl.sse.repository.SseEmitterRepository;
@@ -28,6 +29,9 @@ class SseServiceTest {
 
 	@Mock
 	private NotificationRestoreService notificationRestoreService;
+
+	@Mock
+	private DirectMessageRestoreService directMessageRestoreService;
 
 	@InjectMocks
 	private SseService sseService;
@@ -53,6 +57,9 @@ class SseServiceTest {
 		// given
 		UUID receiverId = UUID.randomUUID();
 		UUID lastEventId = UUID.randomUUID();
+
+		when(directMessageRestoreService.findUnreadMessagesAfter(receiverId, lastEventId))
+			.thenReturn(List.of());
 
 		when(notificationRestoreService.findUnreadNotificationsAfter(receiverId, lastEventId))
 			.thenReturn(List.of());
