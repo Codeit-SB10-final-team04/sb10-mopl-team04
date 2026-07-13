@@ -1,5 +1,6 @@
 package com.team04.mopl.user.service;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.stereotype.Service;
@@ -45,10 +46,7 @@ public class SocialAccountService {
 	private User createSocialUser(OAuth2UserInfo userInfo) {
 		// 동일 이메일 기존 계정 존재 여부 확인
 		if (userRepository.existsByEmail(userInfo.email())) {
-			throw oauthException(
-				"email_already_exists",
-				"동일한 이메일을 사용하는 계정이 이미 존재합니다."
-			);
+			throw emailAlreadyExistsException();
 		}
 
 		// 소셜 사용자 정보 기반 MOPL 사용자 생성
@@ -60,7 +58,7 @@ public class SocialAccountService {
 			.build();
 
 		// 사용자 우선 저장
-		User savedUser = userRepository.saveAndFlush(user);
+		User savedUser = saveUser(user);
 
 		// 저장된 사용자 기준 소셜 계정 연결 정보 생성
 		SocialAccount socialAccount = SocialAccount.builder()
@@ -84,6 +82,17 @@ public class SocialAccountService {
 		return savedUser;
 	}
 
+	// 신규 사용자 저장 및 이메일 유니크 제약 충돌 변환
+	private User saveUser(User user) {
+		try {
+			// 사용자 저장 후 즉시 flush하여 이메일 중복을 현재 흐름에서 감지
+			return userRepository.saveAndFlush(user);
+		} catch (DataIntegrityViolationException exception) {
+			// 동시 가입 요청에서 발생한 이메일 중복 충돌 변환
+			throw emailAlreadyExistsException();
+		}
+	}
+
 	// 소셜 로그인 가능한 사용자 상태 검증
 	private User validateUserCanLogin(User user) {
 		if (!user.isLocked()) {
@@ -98,5 +107,13 @@ public class SocialAccountService {
 	// 소셜 로그인 실패 핸들러로 전달할 OAuth2 예외 생성
 	private OAuth2AuthenticationException oauthException(String errorCode, String message) {
 		return new OAuth2AuthenticationException(new OAuth2Error(errorCode), message);
+	}
+
+	// 이메일 중복 OAuth2 예외 생성
+	private OAuth2AuthenticationException emailAlreadyExistsException() {
+		return oauthException(
+			"email_already_exists",
+			"동일한 이메일을 사용하는 계정이 이미 존재합니다."
+		);
 	}
 }
