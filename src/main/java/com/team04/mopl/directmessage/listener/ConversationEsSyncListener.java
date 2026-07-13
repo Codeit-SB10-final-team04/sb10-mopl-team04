@@ -20,20 +20,32 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ConversationEsSyncListener {
 
+	private static final int MAX_MESSAGE_HISTORY_SIZE = 100;
+
 	private final ElasticsearchOperations elasticsearchOperations;
 
 	@Async("eventTaskExecutor")
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	public void syncMessageToElasticsearch(DirectMessageSentEvent event) {
 		try {
-			// 1. 쿼리 작성
+			// 1. 자바 스크립트 작성: Document 내 메시지 목록(messageContents)에 원소 추가 및 LRU 정책 적용
+			String script = """
+				ctx._source.messageContents.add(params.newMessage);
+				if (ctx._source.messageContents.size() > params.maxSize) {
+				    ctx._source.messageContents.remove(0);
+				}
+				""";
+
+			// 2. 쿼리 작성
 			UpdateQuery updateQuery = UpdateQuery.builder(event.conversationId().toString())
-				// Conversation Document 내 메시지 목록(messageContents)에 원소 추가
-				.withScript("ctx._source.messageContents.add(params.newMessage)")
-				.withParams(Map.of("newMessage", event.content()))
+				.withScript(script)
+				.withParams(Map.of(
+					"newMessage", event.content(),
+					"maxSize", MAX_MESSAGE_HISTORY_SIZE
+				))
 				.build();
 
-			// 2. 쿼리 전송
+			// 3. 쿼리 전송
 			elasticsearchOperations.update(updateQuery, IndexCoordinates.of("conversations"));
 
 			log.debug("[ES_SYNC] 대화방 ID: {} 메시지 동기화 완료", event.conversationId());
