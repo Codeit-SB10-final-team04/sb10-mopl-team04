@@ -251,7 +251,9 @@ public class ConversationService {
 
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 완료: keyword={}", conversationPageRequest.keywordLike());
 
-		// 8. CursorResponseConversationDto 전환 (Mapper 활용)
+		// 8. 유효성 검증: 정렬 기준
+		validateSortField(conversationPageRequest.sortBy());
+
 		return conversationMapper.toCursorPageResponse(
 			data,
 			nextCursor,
@@ -266,16 +268,19 @@ public class ConversationService {
 	// 빈 페이지 응답 객체 반환
 	private CursorResponseConversationDto createEmptyPageResponse(
 		Long totalCount,
-		ConversationPageRequest request
+		ConversationPageRequest conversationPageRequest
 	) {
+		// 유효성 검증: 정렬 기준
+		validateSortField(conversationPageRequest.sortBy());
+
 		return conversationMapper.toCursorPageResponse(
 			Collections.emptyList(),
 			null,
 			null,
 			false,
 			totalCount,
-			request.sortBy(),
-			request.sortDirection().name()
+			conversationPageRequest.sortBy(),
+			conversationPageRequest.sortDirection().name()
 		);
 	}
 
@@ -324,6 +329,14 @@ public class ConversationService {
 	private void validateSelfReadConversation(UUID requestUserId, UUID withUserId) {
 		if (requestUserId.equals(withUserId)) {
 			throw new ConversationException(ConversationErrorCode.CONVERSATION_SELF_SELECT_MOT_ALLOWED);
+		}
+	}
+
+	// 유효성 검증: 정렬 기준
+	private void validateSortField(String sortBy) {
+		if (!"createdAt".equals(sortBy)) {
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT)
+				.addDetail("sortBy", sortBy);
 		}
 	}
 
