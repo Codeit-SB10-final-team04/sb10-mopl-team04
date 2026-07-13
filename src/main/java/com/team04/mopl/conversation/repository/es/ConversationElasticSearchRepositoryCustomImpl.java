@@ -27,7 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-public class ConversationElasticSearchRepositoryImpl implements ConversationElasticSearchRepository {
+public class ConversationElasticSearchRepositoryCustomImpl implements ConversationElasticSearchRepositoryCustom {
 
 	private final ElasticsearchOperations elasticsearchOperations;
 

@@ -87,7 +87,11 @@ public class ConversationService {
 			conversationRepository.save(newConversation);
 
 			// 대화 참여자 생성 및 저장
-			createConversationParticipant(newConversation, requestUser, withUser);
+			List<ConversationParticipant> participants = createConversationParticipant(newConversation, requestUser,
+				withUser);
+
+			// 대화 인덱스 생성 및 저장 (ES)
+			createConversationDocument(newConversation, participants);
 
 			log.info("[CONVERSATION_CREATE] 대화 생성 완료: conversationId={}",
 				newConversation.getId());
@@ -105,8 +109,8 @@ public class ConversationService {
 		}
 	}
 
-	// 대화 참여자 생성 및 저장
-	private void createConversationParticipant(
+	// 대화 참여자 생성 및 저장 (ES 저장을 위해 생성된 목록 반환하도록 수정)
+	private List<ConversationParticipant> createConversationParticipant(
 		Conversation conversation,
 		User requestUser,
 		User withUser
@@ -116,7 +120,27 @@ public class ConversationService {
 			conversationParticipantMapper.toEntity(conversation, withUser)
 		);
 
-		conversationParticipantRepository.saveAll(participants);
+		return conversationParticipantRepository.saveAll(participants);
+	}
+
+	// 대화 인덱스 초기 생성 및 저장 (버그 수정 완료)
+	private void createConversationDocument(
+		Conversation conversation,
+		List<ConversationParticipant> participants
+	) {
+		// 엔티티 리스트에서 User ID(UUID)만 추출
+		List<UUID> participantIds = participants.stream()
+			.map(participant -> participant.getUser().getId())
+			.toList();
+
+		ConversationDocument initialDocument = ConversationDocument.builder()
+			.id(conversation.getId())
+			.participantIds(participantIds)
+			.messageContents(Collections.emptyList())
+			.createdAt(conversation.getCreatedAt())
+			.build();
+
+		conversationElasticSearchRepository.save(initialDocument);
 	}
 
 	/*
