@@ -103,7 +103,7 @@ class DirectMessageServiceTest {
 
 		ArgumentCaptor<DirectMessageCreatedEvent> captor = ArgumentCaptor.forClass(DirectMessageCreatedEvent.class);
 		verify(eventPublisher).publishEvent(captor.capture());
-		
+
 		DirectMessageCreatedEvent published = captor.getValue();
 
 		// then
