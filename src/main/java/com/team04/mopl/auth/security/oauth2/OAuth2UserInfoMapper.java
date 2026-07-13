@@ -131,7 +131,7 @@ public final class OAuth2UserInfoMapper {
 		);
 
 		// Kakao 이메일 미제공 정책 대응용 가상 이메일 생성
-		String virtualEmail = createKakaoVirtualEmail(nickname, providerUserId);
+		String virtualEmail = createKakaoVirtualEmail(providerUserId);
 
 		// MOPL 공통 소셜 사용자 정보 생성
 		return new OAuth2UserInfo(
@@ -222,19 +222,9 @@ public final class OAuth2UserInfoMapper {
 	}
 
 	// Kakao 계정용 가상 이메일 생성
-	private static String createKakaoVirtualEmail(String nickname, String providerUserId) {
-		// 이메일 local part에 사용할 수 있는 닉네임 정규화
-		String normalizedNickname = nickname
-			.toLowerCase(Locale.ROOT)
-			.replaceAll("[^\\p{L}\\p{N}._-]", "_");
-
-		// 정규화 결과가 비어 있을 때 기본 local part 사용
-		if (normalizedNickname.isBlank()) {
-			normalizedNickname = "kakao_user";
-		}
-
-		// 닉네임과 제공자 사용자 ID 기반 가상 이메일 조립
-		return normalizedNickname + "_" + providerUserId + "@kakao.com";
+	private static String createKakaoVirtualEmail(String providerUserId) {
+		// 제공자 사용자 ID 기반 ASCII 가상 이메일 조립
+		return "kakao_" + providerUserId + "@kakao.com";
 	}
 
 	// OAuth2 인증 실패로 전달할 제공자 오류 생성
