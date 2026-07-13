@@ -1,5 +1,6 @@
 package com.team04.mopl.auth.security.oauth2;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
@@ -29,6 +30,7 @@ public class MoplOidcUserService implements OAuth2UserService<OidcUserRequest, O
 	// Google OIDC 사용자 정보 조회 및 검증 위임 서비스
 	private final OAuth2UserService<OidcUserRequest, OidcUser> delegate;
 
+	@Autowired
 	public MoplOidcUserService(SocialAccountService socialAccountService) {
 		// 운영 코드에서 사용할 기본 OIDC 서비스 구성
 		this(socialAccountService, new OidcUserService());
