@@ -282,7 +282,7 @@ public class ConversationService {
 	// 실제 대화 목록 조회
 	private List<Conversation> fetchAndSortFromRdb(List<UUID> conversationIds) {
 		// 1. 대화 목록 조회
-		List<Conversation> rdbConversations = conversationRepository.findByIdIn(conversationIds);
+		List<Conversation> rdbConversations = conversationRepository.findAllByIdIn(conversationIds);
 
 		// 2. 데이터 정렬을 위한 Map 변환
 		Map<UUID, Conversation> conversationMap = rdbConversations.stream()

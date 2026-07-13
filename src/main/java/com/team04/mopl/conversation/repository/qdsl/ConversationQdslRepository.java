@@ -12,5 +12,5 @@ import com.team04.mopl.conversation.entity.Conversation;
  */
 public interface ConversationQdslRepository {
 	// 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 목록 조회
-	List<Conversation> findByIdIn(List<UUID> conversationIds);
+	List<Conversation> findAllByIdIn(List<UUID> conversationIds);
 }
