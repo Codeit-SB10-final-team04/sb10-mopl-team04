@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
 import com.team04.mopl.auth.security.oauth2.OAuth2UserInfo;
@@ -111,6 +112,47 @@ class SocialAccountServiceTest {
 				assertThat(exception.getError().getErrorCode()).isEqualTo("account_locked")
 			);
 		verify(userRepository, never()).existsByEmail(any(String.class));
+	}
+
+	@Test
+	@DisplayName("동일 이메일 사용자가 이미 있으면 소셜 로그인을 거부한다")
+	void loginOrCreate_throwEmailAlreadyExists_whenEmailAlreadyInUse() {
+		// given
+		OAuth2UserInfo userInfo = googleUserInfo();
+		given(socialAccountRepository.findByProviderAndProviderUserId(
+			SocialProvider.GOOGLE,
+			"google-user-id"
+		)).willReturn(Optional.empty());
+		given(userRepository.existsByEmail(userInfo.email())).willReturn(true);
+
+		// when & then
+		assertThatThrownBy(() -> socialAccountService.loginOrCreate(userInfo))
+			.isInstanceOfSatisfying(OAuth2AuthenticationException.class, exception ->
+				assertThat(exception.getError().getErrorCode()).isEqualTo("email_already_exists")
+			);
+		verify(userRepository, never()).saveAndFlush(any(User.class));
+		verify(socialAccountRepository, never()).saveAndFlush(any(SocialAccount.class));
+	}
+
+	@Test
+	@DisplayName("사용자 저장 중 이메일 유니크 제약이 충돌하면 소셜 로그인을 거부한다")
+	void loginOrCreate_throwEmailAlreadyExists_whenUserSaveConflictsByEmail() {
+		// given
+		OAuth2UserInfo userInfo = googleUserInfo();
+		given(socialAccountRepository.findByProviderAndProviderUserId(
+			SocialProvider.GOOGLE,
+			"google-user-id"
+		)).willReturn(Optional.empty());
+		given(userRepository.existsByEmail(userInfo.email())).willReturn(false);
+		given(userRepository.saveAndFlush(any(User.class)))
+			.willThrow(new DataIntegrityViolationException("duplicate email"));
+
+		// when & then
+		assertThatThrownBy(() -> socialAccountService.loginOrCreate(userInfo))
+			.isInstanceOfSatisfying(OAuth2AuthenticationException.class, exception ->
+				assertThat(exception.getError().getErrorCode()).isEqualTo("email_already_exists")
+			);
+		verify(socialAccountRepository, never()).saveAndFlush(any(SocialAccount.class));
 	}
 
 	private OAuth2UserInfo googleUserInfo() {

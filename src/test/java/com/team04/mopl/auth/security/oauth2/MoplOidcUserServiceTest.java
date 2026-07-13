@@ -1,6 +1,7 @@
 package com.team04.mopl.auth.security.oauth2;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -24,6 +25,8 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -88,6 +91,46 @@ class MoplOidcUserServiceTest {
 		assertThat(result).isInstanceOf(MoplOidcUser.class);
 		assertThat(result.getIdToken()).isSameAs(idToken);
 		assertThat(((MoplOidcUser)result).getUserDetails().getUserId()).isEqualTo(userId);
+	}
+
+	@Test
+	@DisplayName("OIDC 사용자 정보 조회에 실패하면 예외를 그대로 전파한다")
+	void loadUser_throwOAuth2AuthenticationException_whenDelegateFails() {
+		// given
+		OidcIdToken idToken = googleIdToken();
+		OidcUserRequest userRequest = googleUserRequest(idToken);
+		OAuth2AuthenticationException exception = new OAuth2AuthenticationException(
+			new OAuth2Error("provider_error"),
+			"제공자 사용자 정보를 조회할 수 없습니다."
+		);
+
+		given(delegate.loadUser(userRequest)).willThrow(exception);
+
+		// when & then
+		assertThatThrownBy(() -> moplOidcUserService.loadUser(userRequest))
+			.isSameAs(exception);
+	}
+
+	@Test
+	@DisplayName("소셜 계정 연결 중 잠금 계정이면 예외 코드를 유지해 전파한다")
+	void loadUser_throwAccountLocked_whenSocialAccountServiceRejectsLogin() {
+		// given
+		OidcIdToken idToken = googleIdToken();
+		OidcUser oidcUser = new DefaultOidcUser(List.of(), idToken);
+		OidcUserRequest userRequest = googleUserRequest(idToken);
+		OAuth2AuthenticationException exception = new OAuth2AuthenticationException(
+			new OAuth2Error("account_locked"),
+			"잠긴 계정은 로그인할 수 없습니다."
+		);
+
+		given(delegate.loadUser(userRequest)).willReturn(oidcUser);
+		given(socialAccountService.loginOrCreate(any(OAuth2UserInfo.class))).willThrow(exception);
+
+		// when & then
+		assertThatThrownBy(() -> moplOidcUserService.loadUser(userRequest))
+			.isInstanceOfSatisfying(OAuth2AuthenticationException.class, actual ->
+				assertThat(actual.getError().getErrorCode()).isEqualTo("account_locked")
+			);
 	}
 
 	private OidcUserRequest googleUserRequest(OidcIdToken idToken) {

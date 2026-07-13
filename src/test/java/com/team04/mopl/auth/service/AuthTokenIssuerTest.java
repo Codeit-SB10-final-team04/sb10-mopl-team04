@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -78,6 +79,8 @@ class AuthTokenIssuerTest {
 		)).willReturn("access-token");
 		given(refreshTokenGenerator.generate()).willReturn("refresh-token");
 		given(tokenHasher.hash("refresh-token")).willReturn("refresh-token-hash");
+		ArgumentCaptor<UUID> tokenSessionIdCaptor = ArgumentCaptor.forClass(UUID.class);
+		ArgumentCaptor<UUID> storedSessionIdCaptor = ArgumentCaptor.forClass(UUID.class);
 
 		// when
 		AuthTokenIssueResult result = authTokenIssuer.issue(userDetails);
@@ -85,13 +88,22 @@ class AuthTokenIssuerTest {
 		// then
 		assertThat(result.jwtDto()).isEqualTo(new JwtDto(userDto, "access-token"));
 		assertThat(result.refreshToken()).isEqualTo("refresh-token");
+		assertThat(result.toString()).doesNotContain("refresh-token");
+		assertThat(result.toString()).contains("refreshToken=****");
+		verify(jwtTokenProvider).generateAccessToken(
+			eq(userDetails),
+			tokenSessionIdCaptor.capture(),
+			any(Instant.class),
+			eq(accessExpiresAt)
+		);
 		verify(authSessionStore).replace(
 			eq(userId),
-			any(UUID.class),
+			storedSessionIdCaptor.capture(),
 			eq("refresh-token-hash"),
 			eq(accessExpiresAt),
 			eq(refreshExpiresAt),
 			any(Instant.class)
 		);
+		assertThat(storedSessionIdCaptor.getValue()).isEqualTo(tokenSessionIdCaptor.getValue());
 	}
 }

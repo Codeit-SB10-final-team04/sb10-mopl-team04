@@ -1,7 +1,11 @@
 package com.team04.mopl.auth.security.handler;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -22,6 +26,8 @@ import com.team04.mopl.auth.service.AuthTokenIssuer;
 import com.team04.mopl.auth.service.dto.AuthTokenIssueResult;
 import com.team04.mopl.user.dto.response.UserDto;
 import com.team04.mopl.user.entity.UserRole;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 class LoginSuccessHandlerTest {
 
@@ -71,5 +77,26 @@ class LoginSuccessHandlerTest {
 			HttpStatus.OK,
 			new JwtDto(userDto, accessToken)
 		);
+	}
+
+	@Test
+	@DisplayName("토큰 발급에 실패하면 쿠키와 JSON 응답을 작성하지 않고 예외를 전파한다")
+	void onAuthenticationSuccess_throwException_whenTokenIssuanceFails() {
+		// given
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		Authentication authentication = mock(Authentication.class);
+		MoplUserDetails userDetails = mock(MoplUserDetails.class);
+		IllegalStateException exception = new IllegalStateException("token issue failed");
+
+		when(authentication.getPrincipal()).thenReturn(userDetails);
+		when(authTokenIssuer.issue(userDetails)).thenThrow(exception);
+
+		// when & then
+		assertThatThrownBy(() -> loginSuccessHandler.onAuthenticationSuccess(request, response, authentication))
+			.isSameAs(exception);
+		verify(authTokenIssuer).issue(userDetails);
+		verify(refreshTokenCookieWriter, never()).write(any(HttpServletResponse.class), any(String.class));
+		verifyNoInteractions(authResponseWriter);
 	}
 }
