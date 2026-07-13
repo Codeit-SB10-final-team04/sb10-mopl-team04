@@ -44,7 +44,17 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
 		@Param("receiverId") UUID receiverId
 	);
 
-	// 안 읽은 메시지 다건 조회: 커서 기반 특정 메시지 이후에 수신된 미읽음 메시지 목록 조회
+	// 안 읽은 메시지 다건 조회: 특정 메시지 이후에 수신된 미읽음 메시지 목록 조회 (커서 X)
+	@Query("SELECT dm FROM DirectMessage dm "
+		+ "WHERE dm.receiver.id = :receiverId "
+		+ "AND dm.read = false "
+		+ "ORDER BY dm.createdAt ASC")
+	List<DirectMessage> findUnreadMessages(
+		@Param("receiverId") UUID receiverId,
+		Pageable pageable
+	);
+
+	// 안 읽은 메시지 다건 조회: 특정 메시지 이후에 수신된 미읽음 메시지 목록 조회 (커서 O)
 	@Query("SELECT dm FROM DirectMessage dm "
 		+ "WHERE dm.receiver.id = :receiverId "
 		+ "AND dm.read = false "

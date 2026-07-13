@@ -35,28 +35,21 @@ public class DirectMessageRestoreService {
 		log.debug("[DM_RESTORE_FIND_UNREAD_AFTER] 미읽음 쪽지 복구 조회 시작: receiverId={}, lastEventId={}, limit={}",
 			receiverId, lastEventId, RECOVERY_LIMIT);
 
-		// 1. 유효성 검증: 메시지 존재 여부 및 수신자 일치 확인
-		DirectMessage lastMessage = directMessageRepository.findByIdAndReceiverId(lastEventId, receiverId).orElse(null);
-
-		// 특정 수신인의 메시지가 없을 경우, 빈 리스트 반환
-		if (lastMessage == null) {
-			log.warn("[SSE_LAST_EVENT_NOT_FOUND] lastEventId 기준 쪽지를 찾을 수 없거나 수신자 불일치: receiverId={}, lastEventId={}",
-				receiverId, lastEventId);
-
-			return List.of();
-		}
+		// 1. 유효성 검증: 마지막 메시지 존재 여부 및 수신자 일치 확인
+		DirectMessage message = directMessageRepository.findByIdAndReceiverId(lastEventId, receiverId).orElse(null);
 
 		// 2. 미읽음 메시지 조회
-		List<DirectMessage> afterMessageList =
-			directMessageRepository.findUnreadMessagesAfter(
-				receiverId,
-				lastMessage.getId(),
-				lastMessage.getCreatedAt(),
-				PageRequest.of(0, RECOVERY_LIMIT)
-			);
+		PageRequest pageRequest = PageRequest.of(0, RECOVERY_LIMIT);
+
+		List<DirectMessage> messages = message == null
+			// 단순 조회
+			? directMessageRepository.findUnreadMessages(receiverId, pageRequest)
+			// 커서 기반 조회
+			: directMessageRepository.findUnreadMessagesAfter(receiverId, message.getId(), message.getCreatedAt(),
+			pageRequest);
 
 		// 3. DTO로 변환
-		List<DirectMessageDto> restoredMessages = afterMessageList.stream()
+		List<DirectMessageDto> restoredMessages = messages.stream()
 			.map(directMessageMapper::toDto)
 			.toList();
 
