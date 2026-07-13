@@ -48,9 +48,11 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
 	@Query("SELECT dm FROM DirectMessage dm "
 		+ "WHERE dm.receiver.id = :receiverId "
 		+ "AND dm.read = false "
+		+ "AND dm.createdAt >= :timeLimit "
 		+ "ORDER BY dm.createdAt ASC, dm.id ASC")
-	List<DirectMessage> findUnreadMessages(
+	List<DirectMessage> findRecentUnreadMessages(
 		@Param("receiverId") UUID receiverId,
+		@Param("timeLimit") Instant timeLimit,
 		Pageable pageable
 	);
 
