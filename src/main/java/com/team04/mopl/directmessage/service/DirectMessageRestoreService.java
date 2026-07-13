@@ -24,6 +24,7 @@ public class DirectMessageRestoreService {
 
 	// 복구 최대 개수 제한
 	private static final int RECOVERY_LIMIT = 500;
+	private static final int RECOVERY_MINUTES = 10;
 
 	private final DirectMessageRepository directMessageRepository;
 
@@ -42,7 +43,7 @@ public class DirectMessageRestoreService {
 
 		// 2. 미읽음 메시지 조회
 		PageRequest pageRequest = PageRequest.of(0, RECOVERY_LIMIT);
-		Instant timeLimit = Instant.now().minus(10, ChronoUnit.MINUTES);
+		Instant timeLimit = Instant.now().minus(RECOVERY_MINUTES, ChronoUnit.MINUTES);
 
 		List<DirectMessage> messages = message == null
 			// 단순 조회
