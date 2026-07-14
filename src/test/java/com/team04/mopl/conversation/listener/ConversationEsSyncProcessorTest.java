@@ -6,7 +6,6 @@ import static org.mockito.BDDMockito.*;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -19,6 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.document.Document;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -26,7 +26,6 @@ import org.springframework.kafka.support.SendResult;
 
 import com.team04.mopl.conversation.document.ConversationDocument;
 import com.team04.mopl.conversation.event.ConversationCreatedEvent;
-import com.team04.mopl.conversation.repository.es.ConversationElasticSearchRepository;
 import com.team04.mopl.directmessage.event.DirectMessageSentEvent;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,21 +37,57 @@ class ConversationEsSyncProcessorTest {
 	@Mock
 	private KafkaTemplate<String, Object> kafkaTemplate;
 
-	@Mock
-	private ConversationElasticSearchRepository conversationElasticSearchRepository;
-
 	@Captor
 	private ArgumentCaptor<UpdateQuery> updateQueryCaptor;
-
-	@Captor
-	private ArgumentCaptor<ConversationDocument> documentCaptor;
 
 	@InjectMocks
 	private ConversationEsSyncProcessor processor;
 
 	@Test
-	@DisplayName("성공: 대화방 생성 이벤트 수신 시 ES에 초기 문서를 정상적으로 생성한다.")
+	@DisplayName("성공: 대화방 생성 이벤트 수신 시 ES에 부분 업데이트(Upsert 포함) 쿼리를 정상적으로 전송한다.")
 	void createConversationDocument_Success() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		List<UUID> participantIds = List.of(UUID.randomUUID());
+		Instant createdAt = Instant.now();
+
+		ConversationCreatedEvent event = new ConversationCreatedEvent(
+			conversationId,
+			participantIds,
+			createdAt
+		);
+
+		given(elasticsearchOperations.getIndexCoordinatesFor(ConversationDocument.class))
+			.willReturn(IndexCoordinates.of("conversations"));
+
+		// when
+		processor.createConversationDocument(event);
+
+		// then
+		verify(elasticsearchOperations).update(updateQueryCaptor.capture(), eq(IndexCoordinates.of("conversations")));
+		UpdateQuery capturedQuery = updateQueryCaptor.getValue();
+
+		assertThat(capturedQuery.getId()).isEqualTo(conversationId.toString());
+
+		// Update Document 검증
+		Document updateDoc = capturedQuery.getDocument();
+		assertThat(updateDoc).isNotNull();
+		assertThat(updateDoc.get("participantIds")).isEqualTo(participantIds);
+		assertThat(updateDoc.get("createdAt")).isEqualTo(createdAt.toString());
+		assertThat(updateDoc.containsKey("messageContents")).isFalse();
+
+		// Upsert Document 검증
+		Document upsertDoc = capturedQuery.getUpsert();
+		assertThat(upsertDoc).isNotNull();
+		assertThat(upsertDoc.get("id")).isEqualTo(conversationId.toString());
+		assertThat(upsertDoc.get("participantIds")).isEqualTo(participantIds);
+		assertThat(upsertDoc.get("createdAt")).isEqualTo(createdAt.toString());
+		assertThat((List<?>)upsertDoc.get("messageContents")).isEmpty();
+	}
+
+	@Test
+	@DisplayName("성공: 기존에 메시지가 존재하더라도(순서 역전), 업데이트 시 messageContents는 덮어쓰지 않는 쿼리가 생성된다.")
+	void createConversationDocument_MergesExistingMessages_Success() {
 		// given
 		UUID conversationId = UUID.randomUUID();
 		ConversationCreatedEvent event = new ConversationCreatedEvent(
@@ -61,19 +96,17 @@ class ConversationEsSyncProcessorTest {
 			Instant.now()
 		);
 
-		given(conversationElasticSearchRepository.findById(conversationId)).willReturn(Optional.empty());
+		given(elasticsearchOperations.getIndexCoordinatesFor(ConversationDocument.class))
+			.willReturn(IndexCoordinates.of("conversations"));
 
 		// when
 		processor.createConversationDocument(event);
 
 		// then
-		verify(conversationElasticSearchRepository).save(documentCaptor.capture());
-		ConversationDocument saved = documentCaptor.getValue();
+		verify(elasticsearchOperations).update(updateQueryCaptor.capture(), eq(IndexCoordinates.of("conversations")));
 
-		assertThat(saved).isNotNull();
-		assertThat(saved.getId()).isEqualTo(conversationId);
-		assertThat(saved.getParticipantIds()).isEqualTo(event.participantIds());
-		assertThat(saved.getMessageContents()).isEmpty();
+		Document updateDoc = updateQueryCaptor.getValue().getDocument();
+		assertThat(updateDoc.containsKey("messageContents")).isFalse();
 	}
 
 	@Test
@@ -87,15 +120,16 @@ class ConversationEsSyncProcessorTest {
 			Instant.now()
 		);
 
-		given(conversationElasticSearchRepository.findById(conversationId)).willReturn(Optional.empty());
+		given(elasticsearchOperations.getIndexCoordinatesFor(ConversationDocument.class))
+			.willReturn(IndexCoordinates.of("conversations"));
 
-		willThrow(new RuntimeException("ES Save Failed"))
-			.given(conversationElasticSearchRepository).save(any(ConversationDocument.class));
+		willThrow(new RuntimeException("ES Update Failed"))
+			.given(elasticsearchOperations).update(any(UpdateQuery.class), any(IndexCoordinates.class));
 
 		// when & then
 		assertThatThrownBy(() -> processor.createConversationDocument(event))
 			.isInstanceOf(RuntimeException.class)
-			.hasMessageContaining("ES Save Failed");
+			.hasMessageContaining("ES Update Failed");
 	}
 
 	@Test
