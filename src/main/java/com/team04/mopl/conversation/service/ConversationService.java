@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import com.team04.mopl.conversation.dto.response.ConversationDto;
 import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 import com.team04.mopl.conversation.entity.Conversation;
 import com.team04.mopl.conversation.entity.ConversationParticipant;
+import com.team04.mopl.conversation.event.ConversationCreatedEvent;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.mapper.ConversationMapper;
@@ -57,6 +59,8 @@ public class ConversationService {
 	private final ConversationParticipantMapper conversationParticipantMapper;
 	private final DirectMessageMapper directMessageMapper;
 
+	private final ApplicationEventPublisher applicationEventPublisher;
+
 	/*
 	=========================
 	   대화 생성
@@ -90,8 +94,17 @@ public class ConversationService {
 			List<ConversationParticipant> participants = createConversationParticipant(newConversation, requestUser,
 				withUser);
 
-			// 대화 인덱스 생성 및 저장 (ES)
-			createConversationDocument(newConversation, participants);
+			// 대화 인덱스 생성 및 저장을 위한 이벤트 발행
+			List<UUID> participantIds = participants.stream()
+				.map(p -> p.getUser().getId())
+				.toList();
+
+			applicationEventPublisher.publishEvent(
+				new ConversationCreatedEvent(
+					newConversation.getId(),
+					participantIds,
+					newConversation.getCreatedAt())
+			);
 
 			log.info("[CONVERSATION_CREATE] 대화 생성 완료: conversationId={}",
 				newConversation.getId());
@@ -121,34 +134,6 @@ public class ConversationService {
 		);
 
 		return conversationParticipantRepository.saveAll(participants);
-	}
-
-	// 대화 인덱스 초기 생성 및 저장 (버그 수정 완료)
-	private void createConversationDocument(
-		Conversation conversation,
-		List<ConversationParticipant> participants
-	) {
-		try {
-			// 대화 참여자 ID 추출
-			List<UUID> participantIds = participants.stream()
-				.map(participant -> participant.getUser().getId())
-				.toList();
-
-			ConversationDocument initialDocument = ConversationDocument.builder()
-				.id(conversation.getId())
-				.participantIds(participantIds)
-				.messageContents(Collections.emptyList())
-				.createdAt(conversation.getCreatedAt())
-				.build();
-
-			conversationElasticSearchRepository.save(initialDocument);
-
-		} catch (Exception e) {
-			log.error("[CONVERSATION_CREATE] ES 초기 문서 색인 실패: conversationId={}",
-				conversation.getId(), e);
-
-			throw new ConversationException(ConversationErrorCode.CONVERSATION_SEARCH_FAILED, e);
-		}
 	}
 
 	/*

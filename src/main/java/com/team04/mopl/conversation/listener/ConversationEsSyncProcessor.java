@@ -1,5 +1,6 @@
 package com.team04.mopl.conversation.listener;
 
+import java.util.Collections;
 import java.util.Map;
 
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -12,6 +13,9 @@ import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 
+import com.team04.mopl.conversation.document.ConversationDocument;
+import com.team04.mopl.conversation.event.ConversationCreatedEvent;
+import com.team04.mopl.conversation.repository.es.ConversationElasticSearchRepository;
 import com.team04.mopl.directmessage.event.DirectMessageSentEvent;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +31,31 @@ public class ConversationEsSyncProcessor {
 
 	private final ElasticsearchOperations elasticsearchOperations;
 	private final KafkaTemplate<String, Object> kafkaTemplate;
+
+	private final ConversationElasticSearchRepository conversationElasticSearchRepository;
+
+	@Retryable(
+		value = Exception.class,
+		maxAttempts = 3,
+		backoff = @Backoff(delay = 1000, multiplier = 2)
+	)
+	public void createConversationDocument(ConversationCreatedEvent event) {
+		try {
+			ConversationDocument conversationDocument = ConversationDocument.builder()
+				.id(event.conversationId())
+				.participantIds(event.participantIds())
+				.messageContents(Collections.emptyList())
+				.createdAt(event.createdAt())
+				.build();
+
+			conversationElasticSearchRepository.save(conversationDocument);
+
+			log.info("[ES_SYNC] 대화방 초기 문서 생성 완료: conversationId={}", event.conversationId());
+		} catch (Exception e) {
+			log.error("[ES_SYNC] 대화방 초기 문서 생성 실패: conversationId={}", event.conversationId(), e);
+			throw e;
+		}
+	}
 
 	@Retryable(
 		value = Exception.class,
