@@ -1,5 +1,6 @@
 package com.team04.mopl.content.service;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -103,8 +104,14 @@ public class MatchCollectService {
 	 태그가 없으면 신규 생성, 있으면 기존 태그 재사용
 	 */
 	private void linkTag(Content content, String tagName) {
-		Tag tag = tagRepository.findByName(tagName)
-			.orElseGet(() -> tagRepository.save(new Tag(tagName)));
+		Tag tag;
+		try {
+			tag = tagRepository.findByName(tagName)
+				.orElseGet(() -> tagRepository.save(new Tag(tagName)));
+		} catch (DataIntegrityViolationException e) {
+			tag = tagRepository.findByName(tagName)
+				.orElseThrow(() -> new IllegalStateException("태그 생성 실패: " + tagName, e));
+		}
 
 		contentTagRepository.save(ContentTag.builder()
 			.content(content)
