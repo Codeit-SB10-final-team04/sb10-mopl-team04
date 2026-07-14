@@ -43,20 +43,29 @@ public class ConversationEsSyncProcessor {
 	)
 	public void createConversationDocument(ConversationCreatedEvent event) {
 		try {
-			// 1. 기존 문서가 있으면 메시지를 가져오고, 없거나 null이면 빈 리스트 할당
-			var messageContents = conversationElasticSearchRepository.findById(event.conversationId())
-				.map(ConversationDocument::getMessageContents)
-				.orElseGet(ArrayList::new);
+			// 1. 기존 문서가 있을 경우 업데이트할 부분 문서
+			Document updateDoc = Document.create();
+			updateDoc.put("participantIds", event.participantIds());
+			updateDoc.put("createdAt", event.createdAt().toString());
 
-			// 2. 대화 문서 생성 및 저장
-			ConversationDocument document = ConversationDocument.builder()
-				.id(event.conversationId())
-				.participantIds(event.participantIds())
-				.messageContents(messageContents)
-				.createdAt(event.createdAt())
+			// 2. 기존 문서가 없을 경우 생성할 초기 문서
+			Document upsertDoc = Document.create();
+			upsertDoc.put("id", event.conversationId().toString());
+			upsertDoc.put("participantIds", event.participantIds());
+			upsertDoc.put("createdAt", event.createdAt().toString());
+			upsertDoc.put("messageContents", new ArrayList<>());
+
+			// 3. 부분 업데이트 쿼리 구성
+			UpdateQuery updateQuery = UpdateQuery.builder(event.conversationId().toString())
+				.withDocument(updateDoc)  // 문서가 있으면 updateDoc 내용만 병합
+				.withUpsert(upsertDoc)    // 문서가 없으면 upsertDoc 생성
 				.build();
 
-			conversationElasticSearchRepository.save(document);
+			// 4. 업데이트
+			elasticsearchOperations.update(
+				updateQuery,
+				elasticsearchOperations.getIndexCoordinatesFor(ConversationDocument.class)
+			);
 
 			log.info("[ES_SYNC] 대화방 초기 문서 생성 완료: conversationId={}", event.conversationId());
 		} catch (Exception e) {
