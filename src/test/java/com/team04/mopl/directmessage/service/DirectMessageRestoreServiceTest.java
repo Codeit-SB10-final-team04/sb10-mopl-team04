@@ -4,15 +4,18 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.*;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
@@ -25,8 +28,8 @@ import com.team04.mopl.directmessage.repository.DirectMessageRepository;
 @ExtendWith(MockitoExtension.class)
 class DirectMessageRestoreServiceTest {
 
-	@InjectMocks
-	private DirectMessageRestoreService directMessageRestoreService;
+	private final Instant FIXED_TIME = Instant.parse("2026-06-24T00:00:00Z");
+	private final Clock fixedClock = Clock.fixed(FIXED_TIME, ZoneId.of("UTC"));
 
 	@Mock
 	private DirectMessageRepository directMessageRepository;
@@ -34,13 +37,24 @@ class DirectMessageRestoreServiceTest {
 	@Mock
 	private DirectMessageMapper directMessageMapper;
 
+	private DirectMessageRestoreService directMessageRestoreService;
+
+	@BeforeEach
+	void setUp() {
+		directMessageRestoreService = new DirectMessageRestoreService(
+			directMessageRepository,
+			directMessageMapper,
+			fixedClock
+		);
+	}
+
 	@Test
 	@DisplayName("성공: lastEventId가 존재하면 해당 메시지 이후의 커서 기반 미읽음 쪽지를 반환한다.")
 	void findUnreadMessagesAfter_Success_WithCursor() {
 		// given
 		UUID receiverId = UUID.randomUUID();
 		UUID lastEventId = UUID.randomUUID();
-		Instant lastCreatedAt = Instant.now().minusSeconds(60);
+		Instant lastCreatedAt = FIXED_TIME.minusSeconds(60);
 
 		DirectMessage lastMessage = mock(DirectMessage.class);
 		given(lastMessage.getId()).willReturn(lastEventId);
@@ -77,7 +91,10 @@ class DirectMessageRestoreServiceTest {
 		given(directMessageRepository.findByIdAndReceiverId(lastEventId, receiverId))
 			.willReturn(Optional.empty());
 
-		given(directMessageRepository.findRecentUnreadMessages(eq(receiverId), any(Instant.class), any(Pageable.class)))
+		Instant expectedTimeLimit = FIXED_TIME.minus(10, ChronoUnit.MINUTES);
+
+		given(directMessageRepository.findRecentUnreadMessages(
+			eq(receiverId), eq(expectedTimeLimit), any(Pageable.class)))
 			.willReturn(List.of(unreadMessage));
 
 		given(directMessageMapper.toDto(unreadMessage)).willReturn(expectedDto);
@@ -89,8 +106,8 @@ class DirectMessageRestoreServiceTest {
 		assertThat(result).hasSize(1);
 		assertThat(result.get(0)).isEqualTo(expectedDto);
 
-		verify(directMessageRepository).findRecentUnreadMessages(eq(receiverId), any(Instant.class),
-			any(Pageable.class));
+		verify(directMessageRepository).findRecentUnreadMessages(
+			eq(receiverId), eq(expectedTimeLimit), any(Pageable.class));
 		verify(directMessageRepository, never()).findUnreadMessagesAfter(any(), any(), any(), any());
 	}
 }
