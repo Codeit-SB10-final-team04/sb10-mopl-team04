@@ -4,6 +4,7 @@ import java.util.Map;
 
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.core.query.ScriptType;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.retry.annotation.Backoff;
@@ -54,6 +55,8 @@ public class ConversationEsSyncListener {
 			// 2. 쿼리 작성
 			UpdateQuery updateQuery = UpdateQuery.builder(event.conversationId().toString())
 				.withScript(script)
+				.withScriptType(ScriptType.INLINE)
+				.withLang("painless")
 				.withParams(Map.of(
 					"newMessage", event.content(),
 					"maxSize", MAX_MESSAGE_HISTORY_SIZE
