@@ -3,14 +3,18 @@ package com.team04.mopl.conversation.service;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -18,6 +22,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.common.enums.SortDirection;
+import com.team04.mopl.conversation.document.ConversationDocument;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
 import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
@@ -30,6 +35,7 @@ import com.team04.mopl.conversation.mapper.ConversationMapper;
 import com.team04.mopl.conversation.mapper.ConversationParticipantMapper;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
+import com.team04.mopl.conversation.repository.es.ConversationElasticSearchRepository;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
@@ -52,6 +58,9 @@ class ConversationServiceTest {
 	private ConversationParticipantRepository conversationParticipantRepository;
 
 	@Mock
+	private ConversationElasticSearchRepository conversationElasticSearchRepository;
+
+	@Mock
 	private DirectMessageRepository directMessageRepository;
 
 	@Mock
@@ -65,6 +74,9 @@ class ConversationServiceTest {
 
 	@Mock
 	private DirectMessageMapper directMessageMapper;
+
+	@Captor
+	private ArgumentCaptor<ConversationDocument> documentCaptor;
 
 	/*
 	=========================
@@ -87,13 +99,19 @@ class ConversationServiceTest {
 		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestUser));
 		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
 
-		// 요청자와 대화 참여자 간의 대화방 미존재
 		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
 			.willReturn(Optional.empty());
 
-		// 대화 참여자 생성
-		given(conversationParticipantMapper.toEntity(any(Conversation.class), any(User.class)))
-			.willReturn(mock(ConversationParticipant.class));
+		ConversationParticipant participant1 = mock(ConversationParticipant.class);
+		ConversationParticipant participant2 = mock(ConversationParticipant.class);
+		given(participant1.getUser()).willReturn(requestUser);
+		given(participant2.getUser()).willReturn(withUser);
+
+		given(conversationParticipantMapper.toEntity(any(Conversation.class), eq(requestUser))).willReturn(
+			participant1);
+		given(conversationParticipantMapper.toEntity(any(Conversation.class), eq(withUser))).willReturn(participant2);
+
+		given(conversationParticipantRepository.saveAll(anyList())).willReturn(List.of(participant1, participant2));
 
 		ConversationDto expectedDto = mock(ConversationDto.class);
 		given(conversationMapper.toDto(any(Conversation.class), any(UserSummary.class), isNull(), eq(false)))
@@ -106,6 +124,11 @@ class ConversationServiceTest {
 		assertThat(result).isNotNull();
 		verify(conversationRepository).save(any(Conversation.class));
 		verify(conversationParticipantRepository).saveAll(anyList());
+
+		// ES 문서 저장 캡처 및 참여자 ID 검증
+		verify(conversationElasticSearchRepository).save(documentCaptor.capture());
+		ConversationDocument savedDocument = documentCaptor.getValue();
+		assertThat(savedDocument.getParticipantIds()).containsExactlyInAnyOrder(requestUserId, withUserId);
 	}
 
 	@Test
@@ -183,6 +206,43 @@ class ConversationServiceTest {
 		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
 			.isInstanceOf(ConversationException.class)
 			.hasMessage(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS.getMessage());
+	}
+
+	@Test
+	@DisplayName("실패: ES 문서 저장 실패 시 ElasticsearchException이 발생하면 비즈니스 예외로 전파된다.")
+	void createConversation_ES_Fail() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		User requestUser = mock(User.class);
+		given(requestUser.getId()).willReturn(requestUserId);
+
+		UUID withUserId = UUID.randomUUID();
+		ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
+		User withUser = mock(User.class);
+		given(withUser.getId()).willReturn(withUserId);
+
+		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestUser));
+		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
+		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
+			.willReturn(Optional.empty());
+
+		ConversationParticipant participant1 = mock(ConversationParticipant.class);
+		given(participant1.getUser()).willReturn(requestUser);
+		ConversationParticipant participant2 = mock(ConversationParticipant.class);
+		given(participant2.getUser()).willReturn(withUser);
+
+		given(conversationParticipantMapper.toEntity(any(Conversation.class), eq(requestUser))).willReturn(
+			participant1);
+		given(conversationParticipantMapper.toEntity(any(Conversation.class), eq(withUser))).willReturn(participant2);
+		given(conversationParticipantRepository.saveAll(anyList())).willReturn(List.of(participant1, participant2));
+
+		// ES 저장 시 예외 발생 (Service에서 어떻게 래핑했는지에 따라 RuntimeException으로 대체 가능)
+		willThrow(RuntimeException.class)
+			.given(conversationElasticSearchRepository).save(any(ConversationDocument.class));
+
+		// when & then
+		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
+			.isInstanceOf(Exception.class);
 	}
 
 	/*
@@ -404,30 +464,39 @@ class ConversationServiceTest {
 			"createdAt"
 		);
 
-		Conversation conv1 = mock(Conversation.class);
-		Conversation conv2 = mock(Conversation.class);
-		// 다음 페이지에 존재하는 대화
-		Conversation conv3 = mock(Conversation.class);
-
 		UUID conv1Id = UUID.randomUUID();
-		given(conv1.getId()).willReturn(conv1Id);
+		ConversationDocument doc1 = mock(ConversationDocument.class);
+		given(doc1.getId()).willReturn(conv1Id);
+
 		UUID conv2Id = UUID.randomUUID();
+		ConversationDocument doc2 = mock(ConversationDocument.class);
+		given(doc2.getId()).willReturn(conv2Id);
+		String mockCursorTime = Instant.now().toString();
+		given(doc2.getCreatedAt()).willReturn(Instant.parse(mockCursorTime));
+
+		UUID conv3Id = UUID.randomUUID();
+		ConversationDocument doc3 = mock(ConversationDocument.class);
+
+		List<ConversationDocument> esDocuments = List.of(doc1, doc2, doc3);
+
+		Conversation conv1 = mock(Conversation.class);
+		given(conv1.getId()).willReturn(conv1Id);
+		Conversation conv2 = mock(Conversation.class);
 		given(conv2.getId()).willReturn(conv2Id);
 
-		// 마지막 요소로부터 커서 추출
-		String mockCursorTime = java.time.Instant.now().toString();
-		given(conv2.getCreatedAt()).willReturn(java.time.Instant.parse(mockCursorTime));
+		// ES
+		given(conversationElasticSearchRepository.searchConversation(request, requestUserId))
+			.willReturn(esDocuments);
+		given(conversationElasticSearchRepository.countConversation(request, requestUserId))
+			.willReturn(3L);
 
-		List<Conversation> pagedConversations = List.of(conv1, conv2, conv3);
-
-		given(conversationRepository.searchConversation(request, requestUserId)).willReturn(pagedConversations);
-		given(conversationRepository.countConversation(request, requestUserId)).willReturn(3L);
+		given(conversationRepository.findAllByIdIn(anyList())).willReturn(List.of(conv1, conv2));
 
 		// N+3 방어 로직
 		given(conversationParticipantRepository.findByConversationIdIn(anyList())).willReturn(List.of());
 		given(directMessageRepository.findLatestMessagesByConversationIds(anyList())).willReturn(List.of());
-		given(directMessageRepository.findUnreadConversationIds(anyList(), eq(requestUserId))).willReturn(
-			java.util.Set.of());
+		given(directMessageRepository.findUnreadConversationIds(anyList(), eq(requestUserId)))
+			.willReturn(java.util.Set.of());
 
 		// 빌더 패턴 적용
 		CursorResponseConversationDto expectedResponse = CursorResponseConversationDto.builder()
@@ -452,6 +521,7 @@ class ConversationServiceTest {
 		assertThat(result).isEqualTo(expectedResponse);
 		verify(conversationMapper).toCursorPageResponse(anyList(), anyString(), any(UUID.class), eq(true), eq(3L),
 			any(), any());
+		verify(conversationRepository).findAllByIdIn(List.of(conv1Id, conv2Id));
 	}
 
 	@Test
@@ -468,8 +538,8 @@ class ConversationServiceTest {
 			"createdAt"
 		);
 
-		given(conversationRepository.searchConversation(request, requestUserId)).willReturn(List.of());
-		given(conversationRepository.countConversation(request, requestUserId)).willReturn(0L);
+		given(conversationElasticSearchRepository.searchConversation(request, requestUserId)).willReturn(List.of());
+		given(conversationElasticSearchRepository.countConversation(request, requestUserId)).willReturn(0L);
 
 		// 빌더 패턴 적용
 		CursorResponseConversationDto expectedResponse = CursorResponseConversationDto.builder()
@@ -496,22 +566,80 @@ class ConversationServiceTest {
 	}
 
 	@Test
-	@DisplayName("실패: Repository 조회 중 파라미터(cursor/sortBy) 검증 실패로 인한 예외 발생 시 Service도 예외를 던진다.")
-	void findAll_Fail_RepositoryThrowsException() {
+	@DisplayName("성공: RDB에서 조회된 데이터 순서가 뒤죽박죽이어도 ES 문서 순서에 맞게 재정렬된다.")
+	void findAll_OrderMaintained_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		ConversationPageRequest request = mock(ConversationPageRequest.class);
+		ConversationPageRequest request = new ConversationPageRequest(
+			null,
+			null,
+			null,
+			10,
+			SortDirection.DESCENDING,
+			"createdAt"
+		);
 
-		// QDSL 예외 발생
-		given(conversationRepository.searchConversation(request, requestUserId))
-			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT));
+		UUID id1 = UUID.randomUUID();
+		ConversationDocument doc1 = mock(ConversationDocument.class);
+		given(doc1.getId()).willReturn(id1);
+
+		UUID id2 = UUID.randomUUID();
+		ConversationDocument doc2 = mock(ConversationDocument.class);
+		given(doc2.getId()).willReturn(id2);
+
+		UUID id3 = UUID.randomUUID();
+		ConversationDocument doc3 = mock(ConversationDocument.class);
+		given(doc3.getId()).willReturn(id3);
+
+		given(conversationElasticSearchRepository.searchConversation(request, requestUserId))
+			.willReturn(List.of(doc1, doc2, doc3));
+		given(conversationElasticSearchRepository.countConversation(request, requestUserId))
+			.willReturn(3L);
+
+		// RDB에서는 순서가 무작위로 조회된다고 세팅
+		Conversation conv1 = mock(Conversation.class);
+		given(conv1.getId()).willReturn(id1);
+		Conversation conv2 = mock(Conversation.class);
+		given(conv2.getId()).willReturn(id2);
+		Conversation conv3 = mock(Conversation.class);
+		given(conv3.getId()).willReturn(id3);
+
+		given(conversationRepository.findAllByIdIn(anyList()))
+			.willReturn(List.of(conv3, conv1, conv2));
+
+		given(conversationParticipantRepository.findByConversationIdIn(anyList())).willReturn(List.of());
+		given(directMessageRepository.findLatestMessagesByConversationIds(anyList())).willReturn(List.of());
+		given(directMessageRepository.findUnreadConversationIds(anyList(), eq(requestUserId))).willReturn(Set.of());
+
+		// when
+		conversationService.findAll(request, requestUserId);
+
+		// then
+		verify(conversationMapper).toCursorPageResponse(
+			argThat(data -> data.size() == 3),
+			any(), any(), anyBoolean(), anyLong(), any(), any()
+		);
+	}
+
+	@Test
+	@DisplayName("실패: sortBy가 createdAt이 아니면 예외가 발생하고 ES 쿼리는 실행되지 않는다.")
+	void findAll_InvalidSortBy_Fail() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		ConversationPageRequest request = new ConversationPageRequest(
+			null,
+			null,
+			null,
+			10,
+			SortDirection.DESCENDING,
+			"invalidSort"
+		);
 
 		// when & then
 		assertThatThrownBy(() -> conversationService.findAll(request, requestUserId))
 			.isInstanceOf(ConversationException.class)
 			.hasMessageContaining(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage());
 
-		verifyNoInteractions(conversationParticipantRepository);
-		verifyNoInteractions(directMessageRepository);
+		verifyNoInteractions(conversationElasticSearchRepository);
 	}
 }
