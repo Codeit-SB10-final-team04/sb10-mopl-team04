@@ -8,7 +8,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -239,28 +238,20 @@ public class ContentService {
 		log.info("[콘텐츠 삭제 완료] contentId={}, 연관 리뷰 {}건 삭제", contentId, reviews.size());
 	}
 
-	// 태그명 목록으로 태그 조회 or 생성 (동시성 안전)
+	// 태그명 목록으로 태그 조회 or 생성 (동시성 안전 - ON CONFLICT DO NOTHING)
 	private List<Tag> findOrCreateTags(List<String> tagNames) {
+		// 없는 태그는 INSERT (중복 시 무시)
 		List<Tag> existingTags = tagRepository.findAllByNameIn(tagNames);
 		Set<String> existingNames = existingTags.stream()
 			.map(Tag::getName)
 			.collect(Collectors.toSet());
 
-		List<Tag> newTags = tagNames.stream()
+		tagNames.stream()
 			.filter(name -> !existingNames.contains(name))
-			.map(name -> {
-				try {
-					return tagRepository.save(Tag.builder().name(name).build());
-				} catch (DataIntegrityViolationException e) {
-					return tagRepository.findByName(name)
-						.orElseThrow(() -> new ContentException(ContentErrorCode.CONTENT_NOT_FOUND));
-				}
-			})
-			.toList();
+			.forEach(name -> tagRepository.insertIgnore(UUID.randomUUID(), name));
 
-		List<Tag> allTags = new ArrayList<>(existingTags);
-		allTags.addAll(newTags);
-		return allTags;
+		// 전체 재조회 (INSERT된 것 포함)
+		return tagRepository.findAllByNameIn(tagNames);
 	}
 
 	// contentIds로 태그명 조회 메서드

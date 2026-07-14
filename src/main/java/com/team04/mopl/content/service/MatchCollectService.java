@@ -1,6 +1,5 @@
 package com.team04.mopl.content.service;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -11,6 +10,8 @@ import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentTag;
 import com.team04.mopl.content.entity.ContentType;
 import com.team04.mopl.content.entity.Tag;
+import com.team04.mopl.content.exception.ContentErrorCode;
+import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
@@ -104,14 +105,9 @@ public class MatchCollectService {
 	 태그가 없으면 신규 생성, 있으면 기존 태그 재사용
 	 */
 	private void linkTag(Content content, String tagName) {
-		Tag tag;
-		try {
-			tag = tagRepository.findByName(tagName)
-				.orElseGet(() -> tagRepository.save(new Tag(tagName)));
-		} catch (DataIntegrityViolationException e) {
-			tag = tagRepository.findByName(tagName)
-				.orElseThrow(() -> new IllegalStateException("태그 생성 실패: " + tagName, e));
-		}
+		tagRepository.insertIgnore(java.util.UUID.randomUUID(), tagName);
+		Tag tag = tagRepository.findByName(tagName)
+			.orElseThrow(() -> new ContentException(ContentErrorCode.TAG_CREATION_FAILED));
 
 		contentTagRepository.save(ContentTag.builder()
 			.content(content)

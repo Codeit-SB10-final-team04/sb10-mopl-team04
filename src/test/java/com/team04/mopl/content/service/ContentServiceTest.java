@@ -148,8 +148,9 @@ class ContentServiceTest {
 
 		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
-		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(tag1)); // 액션만 기존 존재
-		when(tagRepository.save(any(Tag.class))).thenReturn(tag2);
+		when(tagRepository.findAllByNameIn(List.of("액션", "SF")))
+			.thenReturn(List.of(tag1))        // 첫 호출: 액션만 존재
+			.thenReturn(List.of(tag1, tag2));  // 두 번째 호출: 전체 재조회
 		when(contentMapper.toDto(any(Content.class), eq(List.of("액션", "SF")), anyLong())).thenReturn(expectedDto);
 
 		// when
@@ -157,8 +158,8 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(tagRepository).findAllByNameIn(List.of("액션", "SF"));
-		verify(tagRepository).save(any(Tag.class)); // SF는 새로 생성
+		verify(tagRepository, times(2)).findAllByNameIn(List.of("액션", "SF"));
+		verify(tagRepository).insertIgnore(any(UUID.class), eq("SF"));
 		verify(contentTagRepository).saveAll(any());
 	}
 
@@ -429,8 +430,9 @@ class ContentServiceTest {
 		ContentDto expectedDto = mock(ContentDto.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
-		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(existingTag)); // 액션만 기존 존재
-		when(tagRepository.save(any(Tag.class))).thenReturn(newTag);
+		when(tagRepository.findAllByNameIn(List.of("액션", "SF")))
+			.thenReturn(List.of(existingTag))       // 첫 호출: 액션만 존재
+			.thenReturn(List.of(existingTag, newTag)); // 두 번째 호출: 전체 재조회
 		when(contentMapper.toDto(eq(content), eq(List.of("액션", "SF")), anyLong())).thenReturn(expectedDto);
 
 		// when
@@ -439,8 +441,8 @@ class ContentServiceTest {
 		// then
 		assertThat(result).isEqualTo(expectedDto);
 		verify(contentTagRepository).deleteAllByContent(content);
-		verify(tagRepository).findAllByNameIn(List.of("액션", "SF"));
-		verify(tagRepository).save(any(Tag.class));
+		verify(tagRepository, times(2)).findAllByNameIn(List.of("액션", "SF"));
+		verify(tagRepository).insertIgnore(any(UUID.class), eq("SF"));
 		verify(contentTagRepository).saveAll(any());
 	}
 
