@@ -30,6 +30,8 @@ import com.team04.mopl.content.mapper.ContentMapper;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
+import com.team04.mopl.review.entity.Review;
+import com.team04.mopl.review.repository.ReviewRepository;
 import com.team04.mopl.watching.service.WatchingSessionService;
 
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,7 @@ public class ContentService {
 	private final ContentRepository contentRepository;
 	private final ContentTagRepository contentTagRepository;
 	private final TagRepository tagRepository;
+	private final ReviewRepository reviewRepository;
 	// 썸네일이 저장될 디렉토리 (FileStorage는 도메인 공용이므로 용도별 디렉토리로 구분)
 	private static final String THUMBNAIL_DIRECTORY = "thumbnails";
 
@@ -225,11 +228,15 @@ public class ContentService {
 	@Transactional
 	public void deleteContent(UUID contentId) {
 		log.info("[콘텐츠 삭제 시작] contentId={}", contentId);
-		// 삭제되지 않은 콘텐츠 조회
 		Content content = getNotDeletedContentEntityOrThrow(contentId);
 
-		content.markDeleted(Instant.now());
-		log.info("[콘텐츠 삭제 완료] contentId={}", contentId);
+		Instant now = Instant.now();
+		content.markDeleted(now);
+
+		// 연관 리뷰도 논리 삭제
+		List<Review> reviews = reviewRepository.findAllByContentIdAndDeletedAtIsNull(contentId);
+		reviews.forEach(review -> review.markDeleted(now));
+		log.info("[콘텐츠 삭제 완료] contentId={}, 연관 리뷰 {}건 삭제", contentId, reviews.size());
 	}
 
 	// 태그명 목록으로 태그 조회 or 생성 (동시성 안전)

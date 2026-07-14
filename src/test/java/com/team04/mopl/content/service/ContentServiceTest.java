@@ -53,6 +53,9 @@ class ContentServiceTest {
 	@Mock
 	private WatchingSessionService watchingSessionService;
 
+	@Mock
+	private com.team04.mopl.review.repository.ReviewRepository reviewRepository;
+
 	@InjectMocks
 	private ContentService contentService;
 
@@ -523,6 +526,7 @@ class ContentServiceTest {
 		Content content = mock(Content.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(reviewRepository.findAllByContentIdAndDeletedAtIsNull(contentId)).thenReturn(List.of());
 
 		// when
 		contentService.deleteContent(contentId);
