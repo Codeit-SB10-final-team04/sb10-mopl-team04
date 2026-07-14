@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -161,9 +162,13 @@ public class ContentService {
 		}
 
 		try {
-			// 콘텐츠 업데이트 - title, description, thumbnailUrl
-			content.updateTitle(contentUpdateRequest.title());
-			content.updateDescription(contentUpdateRequest.description());
+			// 콘텐츠 업데이트 - title, description, thumbnailUrl (null이면 변경 안 함)
+			if (contentUpdateRequest.title() != null) {
+				content.updateTitle(contentUpdateRequest.title());
+			}
+			if (contentUpdateRequest.description() != null) {
+				content.updateDescription(contentUpdateRequest.description());
+			}
 			if (newThumbnailUrl != null) {
 				content.updateThumbnailUrl(newThumbnailUrl);
 			}
@@ -176,6 +181,7 @@ public class ContentService {
 
 				// 기존 태그 연결 전부 삭제 후 교체
 				contentTagRepository.deleteAllByContent(content);
+				contentTagRepository.flush();
 
 				List<Tag> tags = findOrCreateTags(contentUpdateRequest.tags());
 
@@ -226,7 +232,7 @@ public class ContentService {
 		log.info("[콘텐츠 삭제 완료] contentId={}", contentId);
 	}
 
-	// 태그명 목록으로 태그 조회 or 생성 (N+1 방지)
+	// 태그명 목록으로 태그 조회 or 생성 (동시성 안전)
 	private List<Tag> findOrCreateTags(List<String> tagNames) {
 		List<Tag> existingTags = tagRepository.findAllByNameIn(tagNames);
 		Set<String> existingNames = existingTags.stream()
@@ -235,7 +241,14 @@ public class ContentService {
 
 		List<Tag> newTags = tagNames.stream()
 			.filter(name -> !existingNames.contains(name))
-			.map(name -> tagRepository.save(Tag.builder().name(name).build()))
+			.map(name -> {
+				try {
+					return tagRepository.save(Tag.builder().name(name).build());
+				} catch (DataIntegrityViolationException e) {
+					return tagRepository.findByName(name)
+						.orElseThrow(() -> new ContentException(ContentErrorCode.CONTENT_NOT_FOUND));
+				}
+			})
 			.toList();
 
 		List<Tag> allTags = new ArrayList<>(existingTags);
