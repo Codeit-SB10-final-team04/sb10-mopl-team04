@@ -54,13 +54,13 @@ class StompWatchingInterceptorTest {
 		accessor.setSubscriptionId("sub-0");
 		Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
 
-		when(watchingSessionService.join(contentId, userId)).thenReturn(Optional.of(change));
+		when(watchingSessionService.join(eq(contentId), eq(userId), anyString())).thenReturn(Optional.of(change));
 
 		// when
 		interceptor.preSend(message, channel);
 
 		// then
-		verify(watchingSessionService).join(contentId, userId);
+		verify(watchingSessionService).join(eq(contentId), eq(userId), anyString());
 		verify(eventPublisher).publishEvent(any(WatchingSessionEvent.class));
 		verify(subscriptionStore).register(anyString(), eq("sub-0"), eq("/sub/contents/" + contentId + "/watch"));
 	}
@@ -123,13 +123,13 @@ class StompWatchingInterceptorTest {
 		when(subscriptionStore.getDestination(sessionId, "sub-0"))
 			.thenReturn(Optional.of("/sub/contents/" + contentId + "/watch"));
 		when(webSocketSessionStore.getUserId(sessionId)).thenReturn(Optional.of(userId));
-		when(watchingSessionService.leave(contentId, userId)).thenReturn(Optional.of(change));
+		when(watchingSessionService.leave(eq(contentId), eq(userId), anyString())).thenReturn(Optional.of(change));
 
 		// when
 		interceptor.preSend(message, channel);
 
 		// then
-		verify(watchingSessionService).leave(contentId, userId);
+		verify(watchingSessionService).leave(eq(contentId), eq(userId), anyString());
 		verify(eventPublisher).publishEvent(any(WatchingSessionEvent.class));
 		verify(subscriptionStore).remove(sessionId, "sub-0");
 	}
@@ -154,7 +154,7 @@ class StompWatchingInterceptorTest {
 		interceptor.preSend(message, channel);
 
 		// then
-		verify(watchingSessionService, never()).leave(any(), any());
+		verify(watchingSessionService, never()).leave(any(), any(), anyString());
 		verify(subscriptionStore).remove(sessionId, "sub-1");
 	}
 
@@ -174,13 +174,13 @@ class StompWatchingInterceptorTest {
 
 		when(webSocketSessionStore.getUserId(sessionId)).thenReturn(Optional.of(userId));
 		when(watchingSessionService.getWatchingContentIds(userId)).thenReturn(Set.of(contentId));
-		when(watchingSessionService.leave(contentId, userId)).thenReturn(Optional.of(change));
+		when(watchingSessionService.leave(eq(contentId), eq(userId), anyString())).thenReturn(Optional.of(change));
 
 		// when
 		interceptor.preSend(message, channel);
 
 		// then
-		verify(watchingSessionService).leave(contentId, userId);
+		verify(watchingSessionService).leave(eq(contentId), eq(userId), anyString());
 		verify(eventPublisher).publishEvent(any(WatchingSessionEvent.class));
 		verify(subscriptionStore).removeAllBySession(sessionId);
 		verify(webSocketSessionStore).remove(sessionId);

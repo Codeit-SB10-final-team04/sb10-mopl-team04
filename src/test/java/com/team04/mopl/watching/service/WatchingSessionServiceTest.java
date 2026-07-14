@@ -58,7 +58,7 @@ class WatchingSessionServiceTest {
 		UUID userId = UUID.randomUUID();
 		WatchingSessionInfo info = new WatchingSessionInfo(UUID.randomUUID(), Instant.now());
 
-		when(watchingSessionStore.addWatcher(contentId, userId)).thenReturn(Optional.of(info));
+		when(watchingSessionStore.addWatcher(contentId, userId, "test-session")).thenReturn(Optional.of(info));
 		when(watchingSessionStore.getWatcherCount(contentId)).thenReturn(1L);
 		User user = mockUser(userId);
 		when(userRepository.findByIdAndLockedFalse(userId)).thenReturn(Optional.of(user));
@@ -66,7 +66,7 @@ class WatchingSessionServiceTest {
 		when(contentRepository.findById(contentId)).thenReturn(Optional.of(content));
 
 		// when
-		Optional<WatchingSessionChange> result = watchingSessionService.join(contentId, userId);
+		Optional<WatchingSessionChange> result = watchingSessionService.join(contentId, userId, "test-session");
 
 		// then
 		assertThat(result).isPresent();
@@ -90,10 +90,10 @@ class WatchingSessionServiceTest {
 		Content content = mockContent(contentId);
 		when(contentRepository.findById(contentId)).thenReturn(Optional.of(content));
 
-		when(watchingSessionStore.addWatcher(contentId, userId)).thenReturn(Optional.empty());
+		when(watchingSessionStore.addWatcher(contentId, userId, "test-session")).thenReturn(Optional.empty());
 
 		// when
-		Optional<WatchingSessionChange> result = watchingSessionService.join(contentId, userId);
+		Optional<WatchingSessionChange> result = watchingSessionService.join(contentId, userId, "test-session");
 
 		// then
 		assertThat(result).isEmpty();
@@ -107,7 +107,7 @@ class WatchingSessionServiceTest {
 		UUID userId = UUID.randomUUID();
 		WatchingSessionInfo info = new WatchingSessionInfo(UUID.randomUUID(), Instant.now());
 
-		when(watchingSessionStore.removeWatcher(contentId, userId)).thenReturn(Optional.of(info));
+		when(watchingSessionStore.removeWatcher(contentId, userId, "test-session")).thenReturn(Optional.of(info));
 		when(watchingSessionStore.getWatcherCount(contentId)).thenReturn(0L);
 		User user = mockUser(userId);
 		when(userRepository.findByIdAndLockedFalse(userId)).thenReturn(Optional.of(user));
@@ -115,7 +115,7 @@ class WatchingSessionServiceTest {
 		when(contentRepository.findById(contentId)).thenReturn(Optional.of(content));
 
 		// when
-		Optional<WatchingSessionChange> result = watchingSessionService.leave(contentId, userId);
+		Optional<WatchingSessionChange> result = watchingSessionService.leave(contentId, userId, "test-session");
 
 		// then
 		assertThat(result).isPresent();
@@ -136,10 +136,10 @@ class WatchingSessionServiceTest {
 		Content content = mockContent(contentId);
 		when(contentRepository.findById(contentId)).thenReturn(Optional.of(content));
 
-		when(watchingSessionStore.removeWatcher(contentId, userId)).thenReturn(Optional.empty());
+		when(watchingSessionStore.removeWatcher(contentId, userId, "test-session")).thenReturn(Optional.empty());
 
 		// when
-		Optional<WatchingSessionChange> result = watchingSessionService.leave(contentId, userId);
+		Optional<WatchingSessionChange> result = watchingSessionService.leave(contentId, userId, "test-session");
 
 		// then
 		assertThat(result).isEmpty();
@@ -155,7 +155,7 @@ class WatchingSessionServiceTest {
 		when(userRepository.findByIdAndLockedFalse(userId)).thenReturn(Optional.empty());
 
 		// when & then
-		assertThatThrownBy(() -> watchingSessionService.join(contentId, userId))
+		assertThatThrownBy(() -> watchingSessionService.join(contentId, userId, "test-session"))
 			.isInstanceOf(UserException.class);
 
 		// 검증 실패 시 Store에 좀비 시청자가 추가되지 않아야 함
