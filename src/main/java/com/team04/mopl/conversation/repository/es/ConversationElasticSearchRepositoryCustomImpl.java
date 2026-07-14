@@ -2,7 +2,6 @@ package com.team04.mopl.conversation.repository.es;
 
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,7 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-public class ConversationElasticSearchRepositoryImpl implements ConversationElasticSearchRepository {
+public class ConversationElasticSearchRepositoryCustomImpl implements ConversationElasticSearchRepositoryCustom {
 
 	private final ElasticsearchOperations elasticsearchOperations;
 
@@ -49,15 +48,10 @@ public class ConversationElasticSearchRepositoryImpl implements ConversationElas
 				.toList();
 
 		} catch (ElasticsearchException e) {
-			//  ES 서버 장애, 네트워크 오류 등 인프라 예외 발생 시, 빈 리스트 반환
-			log.error("[CONVERSATION_ES_ERROR] 대화 목록 검색 실패 - requestUserId: {}, Keyword: {}",
+			log.error("[CONVERSATION_ES] 대화 목록 검색 실패 - requestUserId: {}, Keyword: {}",
 				requestUserId, request.keywordLike(), e);
 
-			return Collections.emptyList();
-		} catch (Exception e) {
-			log.error("[CONVERSATION_ES_ERROR] 대화 목록 검색 중 알 수 없는 오류 발생", e);
-
-			return Collections.emptyList();
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_SEARCH_FAILED, e);
 		}
 	}
 
@@ -74,9 +68,9 @@ public class ConversationElasticSearchRepositoryImpl implements ConversationElas
 
 		} catch (ElasticsearchException e) {
 			// 예외 발생 시, 0 반환
-			log.error("[CONVERSATION_ES_ERROR] 대화 목록 개수 조회 실패 - requestUserId: {}", requestUserId, e);
+			log.error("[CONVERSATION_ES] 대화 목록 개수 조회 실패 - requestUserId: {}", requestUserId, e);
 
-			return 0L;
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_SEARCH_FAILED, e);
 		}
 	}
 

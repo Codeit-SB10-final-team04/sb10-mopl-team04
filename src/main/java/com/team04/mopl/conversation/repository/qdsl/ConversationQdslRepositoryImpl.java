@@ -17,7 +17,7 @@ public class ConversationQdslRepositoryImpl implements ConversationQdslRepositor
 
 	// 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 목록 조회
 	@Override
-	public List<Conversation> findByIdIn(List<UUID> ids) {
+	public List<Conversation> findAllByIdIn(List<UUID> ids) {
 		// [CQRS] ES에서 넘겨준 ID 목록으로 RDB에서 상세 데이터 추출
 		return queryFactory
 			.selectFrom(conversation)

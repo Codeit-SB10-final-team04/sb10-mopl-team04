@@ -23,6 +23,7 @@ import org.springframework.test.context.TestPropertySource;
 import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationType;
 import com.team04.mopl.notification.repository.NotificationRepository;
+import com.team04.mopl.support.ElasticsearchMockingSupport;
 
 @SpringBootTest
 @TestPropertySource(properties = {
@@ -33,7 +34,7 @@ import com.team04.mopl.notification.repository.NotificationRepository;
 	"spring.batch.jdbc.initialize-schema=always",
 	"spring.batch.job.enabled=false"
 })
-public class NotificationHardDeleteBatchTest {
+public class NotificationHardDeleteBatchTest extends ElasticsearchMockingSupport {
 
 	@Autowired
 	private JobLauncher jobLauncher;

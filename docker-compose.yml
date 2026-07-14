@@ -18,7 +18,7 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
       SPRING_KAFKA_CONSUMER_GROUP_ID: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
       SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}
-      
+
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
 
       MOPL_JWT_ISSUER: ${MOPL_JWT_ISSUER}
@@ -148,8 +148,8 @@ services:
     environment:
       # 단일 노드 실행
       - discovery.type=single-node
-      # 비밀번호 비활성화
-      - xpack.security.enabled=false
+      # 보안 설정 (개발: false, 프로덕션: true)
+      - xpack.security.enabled=${ES_SECURITY_ENABLED:-false}
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
       - "9200:9200"

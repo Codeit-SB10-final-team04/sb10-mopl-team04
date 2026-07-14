@@ -86,6 +86,7 @@ public class DirectMessageService {
 		// 8. ES 서버 동기화
 		eventPublisher.publishEvent(new DirectMessageSentEvent(
 			conversationId,
+			newDirectMessage.getId(),
 			newDirectMessage.getContent())
 		);
 
