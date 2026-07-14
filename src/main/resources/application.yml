@@ -62,3 +62,6 @@ mopl:
     email: ${MOPL_ADMIN_EMAIL:}
     password: ${MOPL_ADMIN_PASSWORD:}
     name: ${MOPL_ADMIN_NAME:ADMIN}
+  oauth2:
+    success-redirect-uri: ${MOPL_OAUTH2_SUCCESS_REDIRECT_URI:http://localhost:8080/#/contents}
+    failure-redirect-uri: ${MOPL_OAUTH2_FAILURE_REDIRECT_URI:http://localhost:8080/#/sign-in}
