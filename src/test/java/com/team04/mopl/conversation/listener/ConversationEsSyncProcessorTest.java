@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.*;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -21,6 +23,9 @@ import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
+import com.team04.mopl.conversation.document.ConversationDocument;
+import com.team04.mopl.conversation.event.ConversationCreatedEvent;
+import com.team04.mopl.conversation.repository.es.ConversationElasticSearchRepository;
 import com.team04.mopl.directmessage.event.DirectMessageSentEvent;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,12 +37,99 @@ class ConversationEsSyncProcessorTest {
 	@Mock
 	private KafkaTemplate<String, Object> kafkaTemplate;
 
+	@Mock
+	private ConversationElasticSearchRepository conversationElasticSearchRepository;
+
 	@Captor
 	private ArgumentCaptor<UpdateQuery> updateQueryCaptor;
 
-	// 🚀 [수정] 테스트 대상이 Listener에서 Processor로 변경되었습니다.
 	@InjectMocks
 	private ConversationEsSyncProcessor processor;
+
+	@Test
+	@DisplayName("성공: 대화방 생성 이벤트 수신 시 ES에 초기 문서를 정상적으로 생성한다.")
+	void createConversationDocument_Success() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		ConversationCreatedEvent event = new ConversationCreatedEvent(
+			conversationId,
+			List.of(UUID.randomUUID()),
+			Instant.now()
+		);
+
+		// when
+		processor.createConversationDocument(event);
+
+		// then
+		verify(conversationElasticSearchRepository).save(any(ConversationDocument.class));
+	}
+
+	@Test
+	@DisplayName("실패: 대화방 문서 생성 중 예외가 발생하면 예외를 다시 던져서 @Retryable이 작동하도록 한다.")
+	void createConversationDocument_Fail_ThrowsException() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		ConversationCreatedEvent event = new ConversationCreatedEvent(
+			conversationId,
+			List.of(UUID.randomUUID()),
+			Instant.now()
+		);
+
+		willThrow(new RuntimeException("ES Save Failed"))
+			.given(conversationElasticSearchRepository).save(any(ConversationDocument.class));
+
+		// when & then
+		assertThatThrownBy(() -> processor.createConversationDocument(event))
+			.isInstanceOf(RuntimeException.class)
+			.hasMessageContaining("ES Save Failed");
+	}
+
+	@Test
+	@DisplayName("성공: 대화방 생성 재시도 마저 최종 실패 시(@Recover), Kafka DLQ 토픽으로 이벤트를 동기적으로 발행한다.")
+	void recoverCreateFailure_Success() throws Exception {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		ConversationCreatedEvent event = new ConversationCreatedEvent(
+			conversationId,
+			List.of(UUID.randomUUID()),
+			Instant.now()
+		);
+
+		Exception syncException = new RuntimeException("최종 실패 예외");
+
+		SendResult<String, Object> sendResult = mock(SendResult.class);
+		CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(sendResult);
+
+		given(kafkaTemplate.send(eq("conversation-es-sync-dlq"), eq(conversationId.toString()), eq(event)))
+			.willReturn(future);
+
+		// when
+		processor.recoverCreateFailure(syncException, event);
+
+		// then
+		verify(kafkaTemplate).send("conversation-es-sync-dlq", conversationId.toString(), event);
+	}
+
+	@Test
+	@DisplayName("실패: 대화방 생성 DLQ 발행 중 예외가 발생해도 스레드가 종료되지 않는다.")
+	void recoverCreateFailure_KafkaFail_HandledSafely() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		ConversationCreatedEvent event = new ConversationCreatedEvent(
+			conversationId,
+			List.of(UUID.randomUUID()),
+			Instant.now()
+		);
+
+		Exception syncException = new RuntimeException("최종 실패 예외");
+
+		willThrow(new RuntimeException("Kafka Broker Down"))
+			.given(kafkaTemplate).send(anyString(), anyString(), any());
+
+		// when & then
+		assertThatCode(() -> processor.recoverCreateFailure(syncException, event))
+			.doesNotThrowAnyException();
+	}
 
 	@Test
 	@DisplayName("성공: 메시지 이벤트 수신 시 ES에 업데이트 쿼리를 정상적으로 전송한다.")

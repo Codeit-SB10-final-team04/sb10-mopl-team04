@@ -26,19 +26,6 @@ class ConversationEsSyncListenerTest {
 	private ConversationEsSyncListener listener;
 
 	@Test
-	@DisplayName("성공: 다이렉트 메시지 전송 이벤트 수신 시 프로세서의 동기화 메서드를 호출한다.")
-	void onMessageSent_DelegatesToProcessor() {
-		// given
-		DirectMessageSentEvent event = new DirectMessageSentEvent(UUID.randomUUID(), UUID.randomUUID(), "테스트");
-
-		// when
-		listener.onMessageSent(event);
-
-		// then
-		verify(processor, times(1)).syncMessageToElasticsearch(event);
-	}
-
-	@Test
 	@DisplayName("성공: 대화방 생성 이벤트 수신 시 프로세서의 초기 문서 생성 메서드를 호출한다.")
 	void onConversationCreated_DelegatesToProcessor() {
 		// given
@@ -51,4 +38,18 @@ class ConversationEsSyncListenerTest {
 		// then
 		verify(processor, times(1)).createConversationDocument(event);
 	}
+
+	@Test
+	@DisplayName("성공: 다이렉트 메시지 전송 이벤트 수신 시 프로세서의 동기화 메서드를 호출한다.")
+	void onMessageSent_DelegatesToProcessor() {
+		// given
+		DirectMessageSentEvent event = new DirectMessageSentEvent(UUID.randomUUID(), UUID.randomUUID(), "테스트");
+
+		// when
+		listener.onMessageSent(event);
+
+		// then
+		verify(processor, times(1)).syncMessageToElasticsearch(event);
+	}
+
 }
