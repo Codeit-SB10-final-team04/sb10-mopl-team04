@@ -229,13 +229,16 @@ public class ConversationService {
 	) {
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 시작: keyword={}", conversationPageRequest.keywordLike());
 
-		// 1. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
+		// 1. 유효성 검증: 정렬 기준
+		validateSortField(conversationPageRequest.sortBy());
+
+		// 2. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
 		List<ConversationDocument> documents = conversationElasticSearchRepository.searchConversation(
 			conversationPageRequest,
 			requestUserId
 		);
 
-		// 2. 대화 전체 개수 조회
+		// 3. 대화 전체 개수 조회
 		Long totalCount = conversationElasticSearchRepository.countConversation(conversationPageRequest, requestUserId);
 
 		// 조회 결과가 없을 경우, 불필요한 DB 조회 방지를 위해 빈 응답 객체 반환
@@ -243,13 +246,13 @@ public class ConversationService {
 			return createEmptyPageResponse(totalCount, conversationPageRequest);
 		}
 
-		// 3. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기
+		// 4. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기
 		boolean hasNext = documents.size() > conversationPageRequest.limit();
 		List<ConversationDocument> pagedDocuments = hasNext
 			? documents.subList(0, conversationPageRequest.limit())
 			: documents;
 
-		// 4. 다음 커서 값 계산 (메인 커서, 보조 커서)
+		// 5. 다음 커서 값 계산 (메인 커서, 보조 커서)
 		String nextCursor = null;
 		UUID nextIdAfter = null;
 
@@ -262,21 +265,18 @@ public class ConversationService {
 			nextIdAfter = lastConversation.getId();
 		}
 
-		// 5. 문서에서 ID 목록만 추출
+		// 6. 문서에서 ID 목록만 추출
 		List<UUID> conversationIds = pagedDocuments.stream()
 			.map(ConversationDocument::getId)
 			.toList();
 
-		// 6. 실제 대화 목록 조회
+		// 7. 실제 대화 목록 조회
 		List<Conversation> sortedConversations = fetchAndSortFromRdb(conversationIds);
 
-		// 7. Conversation -> ConversationDto 변환
+		// 8. Conversation -> ConversationDto 변환
 		List<ConversationDto> data = mapToConversationDtoList(sortedConversations, requestUserId);
 
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 완료: keyword={}", conversationPageRequest.keywordLike());
-
-		// 8. 유효성 검증: 정렬 기준
-		validateSortField(conversationPageRequest.sortBy());
 
 		return conversationMapper.toCursorPageResponse(
 			data,
