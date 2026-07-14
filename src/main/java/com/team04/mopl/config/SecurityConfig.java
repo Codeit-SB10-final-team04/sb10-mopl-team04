@@ -115,7 +115,9 @@ public class SecurityConfig {
 					"/",
 					"/index.html",
 					"/favicon.svg",
-					"/assets/**"
+					"/assets/**",
+					"/static/**",
+					"/placeholder-movie.png"
 				).permitAll()
 				.anyRequest().authenticated())
 
