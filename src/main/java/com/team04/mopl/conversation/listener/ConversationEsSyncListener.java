@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
@@ -24,8 +25,11 @@ import lombok.extern.slf4j.Slf4j;
 public class ConversationEsSyncListener {
 
 	private static final int MAX_MESSAGE_HISTORY_SIZE = 100;
+	private static final String DLQ_TOPIC = "conversation-es-sync-dlq";
 
 	private final ElasticsearchOperations elasticsearchOperations;
+
+	private final KafkaTemplate<String, Object> kafkaTemplate;
 
 	@Async("eventTaskExecutor")
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -71,9 +75,23 @@ public class ConversationEsSyncListener {
 	// 동기화 실패 처리
 	@Recover
 	public void recoverSyncFailure(Exception e, DirectMessageSentEvent event) {
-		log.error("[ES_SYNC] 메시지 동기화 최종 실패: conversationId={}, messageId={}",
-			event.conversationId(), event.messageId(), e);
+		try {
+			String errorMessage = e.getMessage() != null
+				? e.getMessage()
+				: "Unknown Error";
 
-		// TODO: 실패한 이벤트 데이터를 RDB의 'dlq_events' 테이블에 저장하여 추후 배치 스케줄러로 재처리하도록 구현
+			log.error("[ES_SYNC] 메시지 동기화 최종 실패: conversationId={}, messageId={}, 실패 원인={}",
+				event.conversationId(), event.messageId(), errorMessage);
+
+			// DLQ 토픽으로 원본 이벤트를 그대로 전송
+			kafkaTemplate.send(DLQ_TOPIC, event.conversationId().toString(), event);
+
+			log.info("[ES_SYNC_DLQ_PUBLISHED] Kafka DLQ 발행 완료: messageId={}, topic={}",
+				event.messageId(), DLQ_TOPIC);
+
+		} catch (Exception kafkaException) {
+			log.error("[ES_SYNC] Kafka DLQ 발행 실패: messageId={}",
+				event.messageId(), kafkaException);
+		}
 	}
 }
