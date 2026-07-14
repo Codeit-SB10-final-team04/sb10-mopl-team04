@@ -10,17 +10,21 @@ import org.springframework.stereotype.Component;
 import lombok.RequiredArgsConstructor;
 
 // 구독 ID ↔ destination 매핑을 관리하는 Redis 저장소
-// UNSUBSCRIBE 프레임에는 destination이 없고 구독 ID만 오므로, 어떤 콘텐츠인지 역추적하기 위해 필요
-// 키: stomp:sub:{sessionId}:{subscriptionId} → destination (TTL 24시간)
+// 키 구조:
+//   stomp:sub:{sessionId}:{subscriptionId} → destination (TTL 24시간)
+//   stomp:sub-index:{sessionId} → Set<subscriptionId> (KEYS 대신 역인덱스)
 @Component
 @RequiredArgsConstructor
 public class SubscriptionStore {
 
 	private final StringRedisTemplate redisTemplate;
 	private static final String KEY_PREFIX = "stomp:sub:";
+	private static final String INDEX_PREFIX = "stomp:sub-index:";
 
 	public void register(String sessionId, String subscriptionId, String destination) {
 		redisTemplate.opsForValue().set(toKey(sessionId, subscriptionId), destination, 24, TimeUnit.HOURS);
+		redisTemplate.opsForSet().add(INDEX_PREFIX + sessionId, subscriptionId);
+		redisTemplate.expire(INDEX_PREFIX + sessionId, 24, TimeUnit.HOURS);
 	}
 
 	public Optional<String> getDestination(String sessionId, String subscriptionId) {
@@ -29,13 +33,18 @@ public class SubscriptionStore {
 
 	public void remove(String sessionId, String subscriptionId) {
 		redisTemplate.delete(toKey(sessionId, subscriptionId));
+		redisTemplate.opsForSet().remove(INDEX_PREFIX + sessionId, subscriptionId);
 	}
 
+	// KEYS 명령 대신 역인덱스 Set으로 세션의 모든 구독 제거
 	public void removeAllBySession(String sessionId) {
-		Set<String> keys = redisTemplate.keys(KEY_PREFIX + sessionId + ":*");
-		if (keys != null && !keys.isEmpty()) {
-			redisTemplate.delete(keys);
+		Set<String> subscriptionIds = redisTemplate.opsForSet().members(INDEX_PREFIX + sessionId);
+		if (subscriptionIds != null) {
+			for (String subId : subscriptionIds) {
+				redisTemplate.delete(toKey(sessionId, subId));
+			}
 		}
+		redisTemplate.delete(INDEX_PREFIX + sessionId);
 	}
 
 	private String toKey(String sessionId, String subscriptionId) {
