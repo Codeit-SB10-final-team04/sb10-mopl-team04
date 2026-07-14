@@ -19,6 +19,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import com.team04.mopl.common.dto.UserSummary;
@@ -30,6 +31,7 @@ import com.team04.mopl.conversation.dto.response.ConversationDto;
 import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 import com.team04.mopl.conversation.entity.Conversation;
 import com.team04.mopl.conversation.entity.ConversationParticipant;
+import com.team04.mopl.conversation.event.ConversationCreatedEvent;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.mapper.ConversationMapper;
@@ -76,8 +78,11 @@ class ConversationServiceTest {
 	@Mock
 	private DirectMessageMapper directMessageMapper;
 
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
+
 	@Captor
-	private ArgumentCaptor<ConversationDocument> documentCaptor;
+	private ArgumentCaptor<ConversationCreatedEvent> eventCaptor;
 
 	/*
 	=========================
@@ -85,7 +90,7 @@ class ConversationServiceTest {
 	=========================
 	 */
 	@Test
-	@DisplayName("성공: 유효한 요청일 경우 대화방을 생성하고 DTO를 반환한다.")
+	@DisplayName("성공: 유효한 요청일 경우 대화방을 생성하고 ES 동기화 이벤트를 발행한 뒤 DTO를 반환한다.")
 	void createConversation_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -126,10 +131,9 @@ class ConversationServiceTest {
 		verify(conversationRepository).save(any(Conversation.class));
 		verify(conversationParticipantRepository).saveAll(anyList());
 
-		// ES 문서 저장 캡처 및 참여자 ID 검증
-		verify(conversationElasticSearchRepository).save(documentCaptor.capture());
-		ConversationDocument savedDocument = documentCaptor.getValue();
-		assertThat(savedDocument.getParticipantIds()).containsExactlyInAnyOrder(requestUserId, withUserId);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		ConversationCreatedEvent publishedEvent = eventCaptor.getValue();
+		assertThat(publishedEvent.participantIds()).containsExactlyInAnyOrder(requestUserId, withUserId);
 	}
 
 	@Test
@@ -150,6 +154,9 @@ class ConversationServiceTest {
 		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
 			.isInstanceOf(UserException.class)
 			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
+
+		// 이벤트가 발행되지 않아야 함
+		verifyNoInteractions(eventPublisher);
 	}
 
 	@Test
@@ -178,6 +185,9 @@ class ConversationServiceTest {
 		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
 			.isInstanceOf(ConversationException.class)
 			.hasMessage(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS.getMessage());
+
+		// 이벤트가 발행되지 않아야 함
+		verifyNoInteractions(eventPublisher);
 	}
 
 	@Test
@@ -207,45 +217,9 @@ class ConversationServiceTest {
 		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
 			.isInstanceOf(ConversationException.class)
 			.hasMessage(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS.getMessage());
-	}
 
-	@Test
-	@DisplayName("실패: ES 문서 저장 실패 시 ConversationException으로 래핑되어 전파된다.")
-	void createConversation_ES_Fail() {
-		// given
-		UUID requestUserId = UUID.randomUUID();
-		User requestUser = mock(User.class);
-		given(requestUser.getId()).willReturn(requestUserId);
-
-		UUID withUserId = UUID.randomUUID();
-		ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
-		User withUser = mock(User.class);
-		given(withUser.getId()).willReturn(withUserId);
-
-		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestUser));
-		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
-		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
-			.willReturn(Optional.empty());
-
-		ConversationParticipant participant1 = mock(ConversationParticipant.class);
-		given(participant1.getUser()).willReturn(requestUser);
-		ConversationParticipant participant2 = mock(ConversationParticipant.class);
-		given(participant2.getUser()).willReturn(withUser);
-
-		given(conversationParticipantMapper.toEntity(any(Conversation.class), eq(requestUser))).willReturn(
-			participant1);
-		given(conversationParticipantMapper.toEntity(any(Conversation.class), eq(withUser))).willReturn(participant2);
-		given(conversationParticipantRepository.saveAll(anyList())).willReturn(List.of(participant1, participant2));
-
-		// ES 저장 시 일반적인 런타임 예외 발생 시뮬레이션
-		willThrow(new RuntimeException("ES Connection Refused"))
-			.given(conversationElasticSearchRepository).save(any(ConversationDocument.class));
-
-		// when & then
-		// [리뷰 반영] Exception.class 대신 구체적인 예외와 에러 코드(메시지)를 검증
-		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
-			.isInstanceOf(ConversationException.class)
-			.hasMessageContaining(ConversationErrorCode.CONVERSATION_SEARCH_FAILED.getMessage());
+		// 이벤트가 발행되지 않아야 함
+		verifyNoInteractions(eventPublisher);
 	}
 
 	/*

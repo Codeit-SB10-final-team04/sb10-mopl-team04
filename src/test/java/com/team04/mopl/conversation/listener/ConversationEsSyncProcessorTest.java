@@ -24,7 +24,7 @@ import org.springframework.kafka.support.SendResult;
 import com.team04.mopl.directmessage.event.DirectMessageSentEvent;
 
 @ExtendWith(MockitoExtension.class)
-class ConversationEsSyncListenerTest {
+class ConversationEsSyncProcessorTest {
 
 	@Mock
 	private ElasticsearchOperations elasticsearchOperations;
@@ -35,8 +35,9 @@ class ConversationEsSyncListenerTest {
 	@Captor
 	private ArgumentCaptor<UpdateQuery> updateQueryCaptor;
 
+	// 🚀 [수정] 테스트 대상이 Listener에서 Processor로 변경되었습니다.
 	@InjectMocks
-	private ConversationEsSyncListener listener;
+	private ConversationEsSyncProcessor processor;
 
 	@Test
 	@DisplayName("성공: 메시지 이벤트 수신 시 ES에 업데이트 쿼리를 정상적으로 전송한다.")
@@ -47,7 +48,7 @@ class ConversationEsSyncListenerTest {
 		DirectMessageSentEvent event = new DirectMessageSentEvent(conversationId, messageId, "테스트 메시지");
 
 		// when
-		listener.syncMessageToElasticsearch(event);
+		processor.syncMessageToElasticsearch(event);
 
 		// then
 		verify(elasticsearchOperations).update(updateQueryCaptor.capture(), eq(IndexCoordinates.of("conversations")));
@@ -67,7 +68,7 @@ class ConversationEsSyncListenerTest {
 			.given(elasticsearchOperations).update(any(UpdateQuery.class), any(IndexCoordinates.class));
 
 		// when & then
-		assertThatThrownBy(() -> listener.syncMessageToElasticsearch(event))
+		assertThatThrownBy(() -> processor.syncMessageToElasticsearch(event))
 			.isInstanceOf(RuntimeException.class)
 			.hasMessageContaining("ES Update Failed");
 	}
@@ -92,7 +93,7 @@ class ConversationEsSyncListenerTest {
 			.willReturn(future);
 
 		// when
-		listener.recoverSyncFailure(syncException, event);
+		processor.recoverSyncFailure(syncException, event);
 
 		// then
 		verify(kafkaTemplate).send("conversation-es-sync-dlq", conversationId.toString(), event);
@@ -110,12 +111,11 @@ class ConversationEsSyncListenerTest {
 
 		Exception syncException = new RuntimeException("최종 실패 예외");
 
-		// Kafka 전송 자체에서 예외 발생 시뮬레이션
 		willThrow(new RuntimeException("Kafka Broker Down"))
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
-		// when
-		assertThatCode(() -> listener.recoverSyncFailure(syncException, event))
+		// when & then
+		assertThatCode(() -> processor.recoverSyncFailure(syncException, event))
 			.doesNotThrowAnyException();
 	}
 }
