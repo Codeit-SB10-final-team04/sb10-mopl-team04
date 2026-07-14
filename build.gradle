@@ -69,6 +69,9 @@ dependencies {
     // spotbugs
     compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.6'
 
+    // Elastic Search
+    implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
@@ -162,12 +165,12 @@ jacocoTestReport {
     afterEvaluate {
         classDirectories.setFrom(files(classDirectories.files.collect {
             fileTree(dir: it, exclude: [
-                '**/Q*.class',               // QueryDSL 자동 생성 QClass
-                '**/*MapperImpl.class',      // MapStruct 자동 생성 구현체
-                '**/MoplApplication.class',  // 메인 애플리케이션 클래스
-                '**/config/**',              // 설정 클래스
-                '**/dto/**',                 // DTO (record, 로직 없음)
-                '**/exception/**'            // ErrorCode enum 상수
+                    '**/Q*.class',               // QueryDSL 자동 생성 QClass
+                    '**/*MapperImpl.class',      // MapStruct 자동 생성 구현체
+                    '**/MoplApplication.class',  // 메인 애플리케이션 클래스
+                    '**/config/**',              // 설정 클래스
+                    '**/dto/**',                 // DTO (record, 로직 없음)
+                    '**/exception/**'            // ErrorCode enum 상수
             ])
         }))
     }

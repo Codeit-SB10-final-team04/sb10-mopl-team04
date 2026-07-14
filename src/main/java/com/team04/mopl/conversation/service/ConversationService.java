@@ -3,29 +3,34 @@ package com.team04.mopl.conversation.service;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team04.mopl.common.dto.UserSummary;
+import com.team04.mopl.conversation.document.ConversationDocument;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
 import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
 import com.team04.mopl.conversation.dto.response.CursorResponseConversationDto;
 import com.team04.mopl.conversation.entity.Conversation;
 import com.team04.mopl.conversation.entity.ConversationParticipant;
+import com.team04.mopl.conversation.event.ConversationCreatedEvent;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.mapper.ConversationMapper;
 import com.team04.mopl.conversation.mapper.ConversationParticipantMapper;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
+import com.team04.mopl.conversation.repository.es.ConversationElasticSearchRepository;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
@@ -46,12 +51,15 @@ public class ConversationService {
 
 	private final ConversationRepository conversationRepository;
 	private final ConversationParticipantRepository conversationParticipantRepository;
+	private final ConversationElasticSearchRepository conversationElasticSearchRepository;
 	private final DirectMessageRepository directMessageRepository;
 	private final UserRepository userRepository;
 
 	private final ConversationMapper conversationMapper;
 	private final ConversationParticipantMapper conversationParticipantMapper;
 	private final DirectMessageMapper directMessageMapper;
+
+	private final ApplicationEventPublisher applicationEventPublisher;
 
 	/*
 	=========================
@@ -83,7 +91,20 @@ public class ConversationService {
 			conversationRepository.save(newConversation);
 
 			// 대화 참여자 생성 및 저장
-			createConversationParticipant(newConversation, requestUser, withUser);
+			List<ConversationParticipant> participants = createConversationParticipant(newConversation, requestUser,
+				withUser);
+
+			// 대화 인덱스 생성 및 저장을 위한 이벤트 발행
+			List<UUID> participantIds = participants.stream()
+				.map(p -> p.getUser().getId())
+				.toList();
+
+			applicationEventPublisher.publishEvent(
+				new ConversationCreatedEvent(
+					newConversation.getId(),
+					participantIds,
+					newConversation.getCreatedAt())
+			);
 
 			log.info("[CONVERSATION_CREATE] 대화 생성 완료: conversationId={}",
 				newConversation.getId());
@@ -101,8 +122,8 @@ public class ConversationService {
 		}
 	}
 
-	// 대화 참여자 생성 및 저장
-	private void createConversationParticipant(
+	// 대화 참여자 생성 및 저장 (ES 저장을 위해 생성된 목록 반환하도록 수정)
+	private List<ConversationParticipant> createConversationParticipant(
 		Conversation conversation,
 		User requestUser,
 		User withUser
@@ -112,7 +133,7 @@ public class ConversationService {
 			conversationParticipantMapper.toEntity(conversation, withUser)
 		);
 
-		conversationParticipantRepository.saveAll(participants);
+		return conversationParticipantRepository.saveAll(participants);
 	}
 
 	/*
@@ -201,40 +222,55 @@ public class ConversationService {
 	) {
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 시작: keyword={}", conversationPageRequest.keywordLike());
 
-		// 1. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
-		List<Conversation> conversations = conversationRepository.searchConversation(
+		// 1. 유효성 검증: 정렬 기준
+		validateSortField(conversationPageRequest.sortBy());
+
+		// 2. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
+		List<ConversationDocument> documents = conversationElasticSearchRepository.searchConversation(
 			conversationPageRequest,
 			requestUserId
 		);
 
-		// 2. 대화 전체 개수 조회
-		Long totalCount = conversationRepository.countConversation(conversationPageRequest, requestUserId);
+		// 3. 대화 전체 개수 조회
+		Long totalCount = conversationElasticSearchRepository.countConversation(conversationPageRequest, requestUserId);
 
-		// 3. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기
-		boolean hasNext = conversations.size() > conversationPageRequest.limit();
-		List<Conversation> pagedConversations = hasNext
-			? conversations.subList(0, conversationPageRequest.limit())
-			: conversations;
+		// 조회 결과가 없을 경우, 불필요한 DB 조회 방지를 위해 빈 응답 객체 반환
+		if (documents.isEmpty()) {
+			return createEmptyPageResponse(totalCount, conversationPageRequest);
+		}
 
-		// 4. 다음 커서 값 계산 (메인 커서, 보조 커서)
+		// 4. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기
+		boolean hasNext = documents.size() > conversationPageRequest.limit();
+		List<ConversationDocument> pagedDocuments = hasNext
+			? documents.subList(0, conversationPageRequest.limit())
+			: documents;
+
+		// 5. 다음 커서 값 계산 (메인 커서, 보조 커서)
 		String nextCursor = null;
 		UUID nextIdAfter = null;
 
 		// 조회 결과로 대화 목록이 존재하고, 다음 페이지가 존재할 경우에만 다음 커서 값 지정
-		if (!pagedConversations.isEmpty() && hasNext) {
+		if (hasNext) {
 			// 마지막 요소
-			Conversation lastConversation = pagedConversations.get(pagedConversations.size() - 1);
+			ConversationDocument lastConversation = pagedDocuments.get(pagedDocuments.size() - 1);
 
 			nextCursor = lastConversation.getCreatedAt().toString();
 			nextIdAfter = lastConversation.getId();
 		}
 
-		// 5. Conversation -> ConversationDto
-		List<ConversationDto> data = mapToConversationDtoList(pagedConversations, requestUserId);
+		// 6. 문서에서 ID 목록만 추출
+		List<UUID> conversationIds = pagedDocuments.stream()
+			.map(ConversationDocument::getId)
+			.toList();
+
+		// 7. 실제 대화 목록 조회
+		List<Conversation> sortedConversations = fetchAndSortFromRdb(conversationIds);
+
+		// 8. Conversation -> ConversationDto 변환
+		List<ConversationDto> data = mapToConversationDtoList(sortedConversations, requestUserId);
 
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 완료: keyword={}", conversationPageRequest.keywordLike());
 
-		// 6. CursorResponseConversationDto 전환 (Mapper 활용)
 		return conversationMapper.toCursorPageResponse(
 			data,
 			nextCursor,
@@ -244,6 +280,38 @@ public class ConversationService {
 			conversationPageRequest.sortBy(),
 			conversationPageRequest.sortDirection().name()
 		);
+	}
+
+	// 빈 페이지 응답 객체 반환
+	private CursorResponseConversationDto createEmptyPageResponse(
+		Long totalCount,
+		ConversationPageRequest conversationPageRequest
+	) {
+		return conversationMapper.toCursorPageResponse(
+			Collections.emptyList(),
+			null,
+			null,
+			false,
+			totalCount,
+			conversationPageRequest.sortBy(),
+			conversationPageRequest.sortDirection().name()
+		);
+	}
+
+	// 실제 대화 목록 조회
+	private List<Conversation> fetchAndSortFromRdb(List<UUID> conversationIds) {
+		// 1. 대화 목록 조회
+		List<Conversation> rdbConversations = conversationRepository.findAllByIdIn(conversationIds);
+
+		// 2. 데이터 정렬을 위한 Map 변환
+		Map<UUID, Conversation> conversationMap = rdbConversations.stream()
+			.collect(Collectors.toMap(Conversation::getId, conv -> conv));
+
+		// 3. 데이터 정렬
+		return conversationIds.stream()
+			.map(conversationMap::get)
+			.filter(Objects::nonNull)
+			.toList();
 	}
 
 	/*
@@ -275,6 +343,14 @@ public class ConversationService {
 	private void validateSelfReadConversation(UUID requestUserId, UUID withUserId) {
 		if (requestUserId.equals(withUserId)) {
 			throw new ConversationException(ConversationErrorCode.CONVERSATION_SELF_SELECT_MOT_ALLOWED);
+		}
+	}
+
+	// 유효성 검증: 정렬 기준
+	private void validateSortField(String sortBy) {
+		if (!"createdAt".equals(sortBy)) {
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT)
+				.addDetail("sortBy", sortBy);
 		}
 	}
 
