@@ -83,8 +83,8 @@ public class ConversationEsSyncListener {
 			log.error("[ES_SYNC] 메시지 동기화 최종 실패: conversationId={}, messageId={}, 실패 원인={}",
 				event.conversationId(), event.messageId(), errorMessage);
 
-			// DLQ 토픽으로 원본 이벤트를 그대로 전송
-			kafkaTemplate.send(DLQ_TOPIC, event.conversationId().toString(), event);
+			// DLQ 토픽으로 원본 이벤트 전송 및 대기
+			kafkaTemplate.send(DLQ_TOPIC, event.conversationId().toString(), event).get();
 
 			log.info("[ES_SYNC_DLQ_PUBLISHED] Kafka DLQ 발행 완료: messageId={}, topic={}",
 				event.messageId(), DLQ_TOPIC);
