@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -43,6 +44,9 @@ class ConversationEsSyncProcessorTest {
 	@Captor
 	private ArgumentCaptor<UpdateQuery> updateQueryCaptor;
 
+	@Captor
+	private ArgumentCaptor<ConversationDocument> documentCaptor;
+
 	@InjectMocks
 	private ConversationEsSyncProcessor processor;
 
@@ -57,11 +61,19 @@ class ConversationEsSyncProcessorTest {
 			Instant.now()
 		);
 
+		given(conversationElasticSearchRepository.findById(conversationId)).willReturn(Optional.empty());
+
 		// when
 		processor.createConversationDocument(event);
 
 		// then
-		verify(conversationElasticSearchRepository).save(any(ConversationDocument.class));
+		verify(conversationElasticSearchRepository).save(documentCaptor.capture());
+		ConversationDocument saved = documentCaptor.getValue();
+
+		assertThat(saved).isNotNull();
+		assertThat(saved.getId()).isEqualTo(conversationId);
+		assertThat(saved.getParticipantIds()).isEqualTo(event.participantIds());
+		assertThat(saved.getMessageContents()).isEmpty();
 	}
 
 	@Test
@@ -74,6 +86,8 @@ class ConversationEsSyncProcessorTest {
 			List.of(UUID.randomUUID()),
 			Instant.now()
 		);
+
+		given(conversationElasticSearchRepository.findById(conversationId)).willReturn(Optional.empty());
 
 		willThrow(new RuntimeException("ES Save Failed"))
 			.given(conversationElasticSearchRepository).save(any(ConversationDocument.class));
@@ -137,7 +151,14 @@ class ConversationEsSyncProcessorTest {
 		// given
 		UUID conversationId = UUID.randomUUID();
 		UUID messageId = UUID.randomUUID();
-		DirectMessageSentEvent event = new DirectMessageSentEvent(conversationId, messageId, "테스트 메시지");
+		DirectMessageSentEvent event = new DirectMessageSentEvent(
+			conversationId,
+			messageId,
+			"테스트 메시지"
+		);
+
+		given(elasticsearchOperations.getIndexCoordinatesFor(ConversationDocument.class))
+			.willReturn(IndexCoordinates.of("conversations"));
 
 		// when
 		processor.syncMessageToElasticsearch(event);
@@ -148,6 +169,7 @@ class ConversationEsSyncProcessorTest {
 		UpdateQuery capturedQuery = updateQueryCaptor.getValue();
 		assertThat(capturedQuery.getId()).isEqualTo(conversationId.toString());
 		assertThat(capturedQuery.getScript()).contains("ctx._source.messageContents.add(params.newMessage)");
+		assertThat(capturedQuery.getScriptedUpsert()).isTrue();
 	}
 
 	@Test
@@ -155,6 +177,9 @@ class ConversationEsSyncProcessorTest {
 	void syncMessageToElasticsearch_Fail_ThrowsException() {
 		// given
 		DirectMessageSentEvent event = new DirectMessageSentEvent(UUID.randomUUID(), UUID.randomUUID(), "테스트 메시지");
+
+		given(elasticsearchOperations.getIndexCoordinatesFor(ConversationDocument.class))
+			.willReturn(IndexCoordinates.of("conversations"));
 
 		willThrow(new RuntimeException("ES Update Failed"))
 			.given(elasticsearchOperations).update(any(UpdateQuery.class), any(IndexCoordinates.class));
