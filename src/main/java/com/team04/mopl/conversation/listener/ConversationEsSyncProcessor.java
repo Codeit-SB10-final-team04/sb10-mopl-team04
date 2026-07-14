@@ -57,6 +57,21 @@ public class ConversationEsSyncProcessor {
 		}
 	}
 
+	@Recover
+	public void recoverCreateFailure(Exception e, ConversationCreatedEvent event) {
+		try {
+			log.error("[ES_SYNC] 대화방 초기 문서 생성 최종 실패: conversationId={}",
+				event.conversationId(), e);
+
+			kafkaTemplate.send(DLQ_TOPIC, event.conversationId().toString(), event).get();
+
+			log.info("[ES_SYNC] Kafka DLQ 발행 실패: conversationId={}",
+				event.conversationId());
+		} catch (Exception kafkaException) {
+			log.error("[ES_SYNC] Kafka DLQ 발행 실패: conversationId={}", event.conversationId(), kafkaException);
+		}
+	}
+
 	@Retryable(
 		value = Exception.class,
 		maxAttempts = 3,
