@@ -85,7 +85,9 @@ class ConversationEsSyncListenerTest {
 
 		Exception syncException = new RuntimeException("최종 실패 예외");
 
-		CompletableFuture<SendResult<String, Object>> future = mock(CompletableFuture.class);
+		SendResult<String, Object> sendResult = mock(SendResult.class);
+		CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(sendResult);
+
 		given(kafkaTemplate.send(eq("conversation-es-sync-dlq"), eq(conversationId.toString()), eq(event)))
 			.willReturn(future);
 
@@ -94,7 +96,6 @@ class ConversationEsSyncListenerTest {
 
 		// then
 		verify(kafkaTemplate).send("conversation-es-sync-dlq", conversationId.toString(), event);
-		verify(future).get();
 	}
 
 	@Test

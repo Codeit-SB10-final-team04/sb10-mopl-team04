@@ -128,19 +128,27 @@ public class ConversationService {
 		Conversation conversation,
 		List<ConversationParticipant> participants
 	) {
-		// 엔티티 리스트에서 User ID(UUID)만 추출
-		List<UUID> participantIds = participants.stream()
-			.map(participant -> participant.getUser().getId())
-			.toList();
+		try {
+			// 대화 참여자 ID 추출
+			List<UUID> participantIds = participants.stream()
+				.map(participant -> participant.getUser().getId())
+				.toList();
 
-		ConversationDocument initialDocument = ConversationDocument.builder()
-			.id(conversation.getId())
-			.participantIds(participantIds)
-			.messageContents(Collections.emptyList())
-			.createdAt(conversation.getCreatedAt())
-			.build();
+			ConversationDocument initialDocument = ConversationDocument.builder()
+				.id(conversation.getId())
+				.participantIds(participantIds)
+				.messageContents(Collections.emptyList())
+				.createdAt(conversation.getCreatedAt())
+				.build();
 
-		conversationElasticSearchRepository.save(initialDocument);
+			conversationElasticSearchRepository.save(initialDocument);
+
+		} catch (Exception e) {
+			log.error("[CONVERSATION_CREATE] ES 초기 문서 색인 실패: conversationId={}",
+				conversation.getId(), e);
+
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_SEARCH_FAILED, e);
+		}
 	}
 
 	/*

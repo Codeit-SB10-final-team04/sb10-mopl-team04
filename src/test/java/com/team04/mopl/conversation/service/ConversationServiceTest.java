@@ -209,7 +209,7 @@ class ConversationServiceTest {
 	}
 
 	@Test
-	@DisplayName("실패: ES 문서 저장 실패 시 ElasticsearchException이 발생하면 비즈니스 예외로 전파된다.")
+	@DisplayName("실패: ES 문서 저장 실패 시 ConversationException으로 래핑되어 전파된다.")
 	void createConversation_ES_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -236,15 +236,17 @@ class ConversationServiceTest {
 		given(conversationParticipantMapper.toEntity(any(Conversation.class), eq(withUser))).willReturn(participant2);
 		given(conversationParticipantRepository.saveAll(anyList())).willReturn(List.of(participant1, participant2));
 
-		// ES 저장 시 예외 발생 (Service에서 어떻게 래핑했는지에 따라 RuntimeException으로 대체 가능)
-		willThrow(RuntimeException.class)
+		// ES 저장 시 일반적인 런타임 예외 발생 시뮬레이션
+		willThrow(new RuntimeException("ES Connection Refused"))
 			.given(conversationElasticSearchRepository).save(any(ConversationDocument.class));
 
 		// when & then
+		// [리뷰 반영] Exception.class 대신 구체적인 예외와 에러 코드(메시지)를 검증
 		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
-			.isInstanceOf(Exception.class);
+			.isInstanceOf(ConversationException.class)
+			.hasMessageContaining(ConversationErrorCode.CONVERSATION_SEARCH_FAILED.getMessage());
 	}
-
+	
 	/*
 	=========================
 	   대화 단건 조회
