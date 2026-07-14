@@ -2,6 +2,8 @@ package com.team04.mopl.conversation.dto.request;
 
 import java.util.UUID;
 
+import org.springframework.util.StringUtils;
+
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
@@ -27,6 +29,9 @@ public record ConversationPageRequest(
 ) {
 	// 기본값 설정을 위한 생성자
 	public ConversationPageRequest {
+		// 유효성 검증: 입력값 필수 여부
+		validateCursorRequest(cursor, idAfter);
+
 		// 페이지 내 요소 개수 기본값 및 유효성 검증 (1 ~ 100)
 		if (limit == null) {
 			limit = 10;
@@ -44,5 +49,17 @@ public record ConversationPageRequest(
 		sortBy = (sortBy == null || sortBy.isBlank())
 			? "createdAt"
 			: sortBy;
+	}
+
+	private void validateCursorRequest(String cursor, UUID idAfter) {
+		boolean hasCursor = StringUtils.hasText(cursor);
+		boolean hasIdAfter = idAfter != null;
+
+		// 둘 중 하나만 존재할 경우 예외 발생
+		if (hasCursor ^ hasIdAfter) {
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT)
+				.addDetail("cursor", cursor != null ? cursor : "null")
+				.addDetail("idAfter", idAfter != null ? idAfter.toString() : "null");
+		}
 	}
 }

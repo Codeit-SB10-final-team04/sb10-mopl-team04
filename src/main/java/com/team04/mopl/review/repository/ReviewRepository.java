@@ -1,5 +1,6 @@
 package com.team04.mopl.review.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,4 +25,6 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, ReviewQds
 		@Param("contentId") UUID contentId);
 
 	Optional<Review> findByIdAndDeletedAtIsNull(UUID id);
+
+	List<Review> findAllByContentIdAndDeletedAtIsNull(UUID contentId);
 }

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Objects;
 
+import org.hibernate.annotations.BatchSize;
+
 import com.team04.mopl.common.entity.BaseUpdatableEntity;
 
 import jakarta.persistence.Column;
@@ -27,6 +29,7 @@ import lombok.NoArgsConstructor;
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@BatchSize(size = 100)
 public class Content extends BaseUpdatableEntity {
 	// 외부 API ID (TMDB: movie/tv id, SportsDB: idEvent)
 	@Column(length = 100)

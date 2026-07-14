@@ -410,16 +410,14 @@ class ConversationControllerTest {
 		);
 		mockSecurityContext(mockUserDetails);
 
-		given(conversationService.findAll(any(ConversationPageRequest.class), eq(requesterUserId)))
-			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT));
-
 		// when & then
 		mockMvc.perform(get("/api/conversations")
 				.param("cursor", "invalid-cursor-string")
 				.contentType(MediaType.APPLICATION_JSON))
 			.andDo(print())
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage()));
+			.andExpect(jsonPath("$.message").value("요청 파라미터 유효성 검사에 실패했습니다."))
+			.andExpect(jsonPath("$.details._global").value("잘못된 형태의 값이 입력되었습니다."));
 	}
 
 	@Test

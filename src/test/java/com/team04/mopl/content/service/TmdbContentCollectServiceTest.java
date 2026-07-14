@@ -102,8 +102,7 @@ class TmdbContentCollectServiceTest {
 
 		when(contentRepository.existsByExternalIdAndSource(any(), any())).thenReturn(false);
 		when(contentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(tagRepository.findByName(any())).thenReturn(Optional.empty());
-		when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+		when(tagRepository.findByName(any())).thenReturn(Optional.of(Tag.builder().name("영화").build()));
 		when(tmdbClient.buildThumbnailUrl("/abc.jpg")).thenReturn("https://image.tmdb.org/t/p/w500/abc.jpg");
 
 		// when
@@ -127,8 +126,7 @@ class TmdbContentCollectServiceTest {
 
 		when(contentRepository.existsByExternalIdAndSource(any(), any())).thenReturn(false);
 		when(contentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(tagRepository.findByName(any())).thenReturn(Optional.empty());
-		when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+		when(tagRepository.findByName(any())).thenReturn(Optional.of(Tag.builder().name("영화").build()));
 		when(tmdbClient.buildThumbnailUrl(any())).thenReturn("");
 
 		// when
@@ -153,8 +151,7 @@ class TmdbContentCollectServiceTest {
 
 		when(contentRepository.existsByExternalIdAndSource(any(), any())).thenReturn(false);
 		when(contentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(tagRepository.findByName(any())).thenReturn(Optional.empty());
-		when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+		when(tagRepository.findByName(any())).thenReturn(Optional.of(Tag.builder().name("영화").build()));
 		when(tmdbClient.buildThumbnailUrl("/squid.jpg")).thenReturn("https://image.tmdb.org/t/p/w500/squid.jpg");
 
 		// when

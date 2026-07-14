@@ -53,6 +53,9 @@ class ContentServiceTest {
 	@Mock
 	private WatchingSessionService watchingSessionService;
 
+	@Mock
+	private com.team04.mopl.review.repository.ReviewRepository reviewRepository;
+
 	@InjectMocks
 	private ContentService contentService;
 
@@ -67,21 +70,21 @@ class ContentServiceTest {
 		// given
 		UUID contentId = UUID.randomUUID();
 		Content content = mock(Content.class);
-		List<String> tags = List.of("영화");
+		when(content.getType()).thenReturn(com.team04.mopl.content.entity.ContentType.movie);
+		List<String> tags = List.of("영화", "액션");
+		List<String> filteredTags = List.of("액션"); // "영화"는 type 태그라 제외됨
 		ContentDto expectedDto = mock(ContentDto.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(tags);
-		when(contentMapper.toDto(eq(content), eq(tags), anyLong())).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(filteredTags), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.getContent(contentId);
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(contentRepository).findByIdAndDeletedAtIsNull(contentId);
-		verify(contentTagRepository).findTagNamesByContentId(contentId);
-		verify(contentMapper).toDto(eq(content), eq(tags), anyLong());
+		verify(contentMapper).toDto(eq(content), eq(filteredTags), anyLong());
 	}
 
 	@Test
@@ -145,8 +148,9 @@ class ContentServiceTest {
 
 		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
-		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(tag1)); // 액션만 기존 존재
-		when(tagRepository.save(any(Tag.class))).thenReturn(tag2);
+		when(tagRepository.findAllByNameIn(List.of("액션", "SF")))
+			.thenReturn(List.of(tag1))        // 첫 호출: 액션만 존재
+			.thenReturn(List.of(tag1, tag2));  // 두 번째 호출: 전체 재조회
 		when(contentMapper.toDto(any(Content.class), eq(List.of("액션", "SF")), anyLong())).thenReturn(expectedDto);
 
 		// when
@@ -154,8 +158,8 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(tagRepository).findAllByNameIn(List.of("액션", "SF"));
-		verify(tagRepository).save(any(Tag.class)); // SF는 새로 생성
+		verify(tagRepository, times(2)).findAllByNameIn(List.of("액션", "SF"));
+		verify(tagRepository).insertIgnore(any(UUID.class), eq("SF"));
 		verify(contentTagRepository).saveAll(any());
 	}
 
@@ -426,8 +430,9 @@ class ContentServiceTest {
 		ContentDto expectedDto = mock(ContentDto.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
-		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(existingTag)); // 액션만 기존 존재
-		when(tagRepository.save(any(Tag.class))).thenReturn(newTag);
+		when(tagRepository.findAllByNameIn(List.of("액션", "SF")))
+			.thenReturn(List.of(existingTag))       // 첫 호출: 액션만 존재
+			.thenReturn(List.of(existingTag, newTag)); // 두 번째 호출: 전체 재조회
 		when(contentMapper.toDto(eq(content), eq(List.of("액션", "SF")), anyLong())).thenReturn(expectedDto);
 
 		// when
@@ -436,8 +441,8 @@ class ContentServiceTest {
 		// then
 		assertThat(result).isEqualTo(expectedDto);
 		verify(contentTagRepository).deleteAllByContent(content);
-		verify(tagRepository).findAllByNameIn(List.of("액션", "SF"));
-		verify(tagRepository).save(any(Tag.class));
+		verify(tagRepository, times(2)).findAllByNameIn(List.of("액션", "SF"));
+		verify(tagRepository).insertIgnore(any(UUID.class), eq("SF"));
 		verify(contentTagRepository).saveAll(any());
 	}
 
@@ -523,6 +528,7 @@ class ContentServiceTest {
 		Content content = mock(Content.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(reviewRepository.findAllByContentIdAndDeletedAtIsNull(contentId)).thenReturn(List.of());
 
 		// when
 		contentService.deleteContent(contentId);

@@ -38,7 +38,6 @@ import lombok.extern.slf4j.Slf4j;
 // watcherCount는 DB가 아닌 인메모리 Store(WatchingSessionStore)에서 집계
 // 시청 세션은 WebSocket 연결과 수명이 같은 일시적 데이터이므로 DB 영속화 불필요
 // ContentDto 반환 시 인메모리 watcherCount를 합쳐서 내려줌 (ContentMapper 참고)
-// TODO: 다중 서버(스케일 아웃) 환경에서는 WatchingSessionStore를 Redis로 교체 필요
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -49,47 +48,50 @@ public class WatchingSessionService {
 	private final UserRepository userRepository;
 	private final ContentRepository contentRepository;
 
-	// 시청 세션 입장 처리, 이미 시청 중이면 empty 반환
-	public Optional<WatchingSessionChange> join(UUID contentId, UUID userId) {
-		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 시작: contentId={}, userId={}", contentId, userId);
+	// 시청 세션 입장 (sessionId로 멀티탭 참조 카운팅)
+	// 첫 탭이면 JOIN 브로드캐스트, 추가 탭이면 empty
+	public Optional<WatchingSessionChange> join(UUID contentId, UUID userId, String sessionId) {
+		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 시작: contentId={}, userId={}, sessionId={}",
+			contentId, userId, sessionId);
 
-		// 검증을 먼저 수행 - 실패 시 Store에 좀비 시청자가 남는 것을 방지
 		User user = getUserOrThrow(userId);
 		Content content = getContentOrThrow(contentId);
 
-		Optional<WatchingSessionInfo> added = watchingSessionStore.addWatcher(contentId, userId);
+		Optional<WatchingSessionInfo> added = watchingSessionStore.addWatcher(contentId, userId, sessionId);
 
 		if (added.isEmpty()) {
-			log.debug("[WATCHING_SESSION_JOIN] 이미 시청 중인 사용자: contentId={}, userId={}", contentId, userId);
+			log.debug("[WATCHING_SESSION_JOIN] 추가 탭 입장 (브로드캐스트 없음): contentId={}, userId={}",
+				contentId, userId);
 			return Optional.empty();
 		}
 
 		WatchingSessionChange change = createChange(ChangeType.JOIN, user, content, added.get());
 
-		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 완료: contentId={}, userId={}, watcherCount={}",
+		log.info("[WATCHING_SESSION_JOIN] 첫 탭 입장 완료: contentId={}, userId={}, watcherCount={}",
 			contentId, userId, change.watcherCount());
 
 		return Optional.of(change);
 	}
 
-	// 시청 세션 퇴장 처리, 시청 중이 아니었으면 empty 반환
-	public Optional<WatchingSessionChange> leave(UUID contentId, UUID userId) {
-		log.info("[WATCHING_SESSION_LEAVE] 시청 세션 퇴장 시작: contentId={}, userId={}", contentId, userId);
+	// 시청 세션 퇴장 (sessionId로 멀티탭 참조 카운팅)
+	// 마지막 탭이면 LEAVE 브로드캐스트, 아직 남았으면 empty
+	public Optional<WatchingSessionChange> leave(UUID contentId, UUID userId, String sessionId) {
+		log.info("[WATCHING_SESSION_LEAVE] 시청 세션 퇴장 시작: contentId={}, userId={}, sessionId={}",
+			contentId, userId, sessionId);
 
-		// 검증을 먼저 수행 - 실패 시에도 Store 상태가 변경되지 않도록 보장
 		User user = getUserOrThrow(userId);
 		Content content = getContentOrThrow(contentId);
 
-		Optional<WatchingSessionInfo> removed = watchingSessionStore.removeWatcher(contentId, userId);
+		Optional<WatchingSessionInfo> removed = watchingSessionStore.removeWatcher(contentId, userId, sessionId);
 
 		if (removed.isEmpty()) {
-			log.debug("[WATCHING_SESSION_LEAVE] 시청 중이 아닌 사용자: contentId={}, userId={}", contentId, userId);
+			log.debug("[WATCHING_SESSION_LEAVE] 탭 닫힘 (아직 시청 중): contentId={}, userId={}", contentId, userId);
 			return Optional.empty();
 		}
 
 		WatchingSessionChange change = createChange(ChangeType.LEAVE, user, content, removed.get());
 
-		log.info("[WATCHING_SESSION_LEAVE] 시청 세션 퇴장 완료: contentId={}, userId={}, watcherCount={}",
+		log.info("[WATCHING_SESSION_LEAVE] 마지막 탭 퇴장 완료: contentId={}, userId={}, watcherCount={}",
 			contentId, userId, change.watcherCount());
 
 		return Optional.of(change);

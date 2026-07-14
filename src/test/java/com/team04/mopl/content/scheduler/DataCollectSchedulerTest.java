@@ -5,10 +5,6 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,11 +20,11 @@ import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.batch.core.launch.JobLauncher;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class DataCollectSchedulerTest {
 
+	@Mock private com.team04.mopl.common.redis.DistributedLock distributedLock;
 	@Mock private JobLauncher jobLauncher;
 	@Mock private JobExplorer jobExplorer;
 	@Mock private Job sportsDataCollectJob;
@@ -39,9 +35,8 @@ class DataCollectSchedulerTest {
 
 	@BeforeEach
 	void setUp() {
-		// 같은 타입(Job)의 목이 여러 개라 @InjectMocks 주입 순서가 보장되지 않으므로 직접 생성
 		scheduler = new DataCollectScheduler(
-			jobLauncher, jobExplorer, sportsDataCollectJob, tmdbInitialCollectJob, tmdbDailyCollectJob);
+			distributedLock, jobLauncher, jobExplorer, sportsDataCollectJob, tmdbInitialCollectJob, tmdbDailyCollectJob);
 	}
 
 	// ========== isSeasonSkippable ==========
@@ -155,9 +150,15 @@ class DataCollectSchedulerTest {
 	// ========== runSportsJobWithLock ==========
 
 	@Test
-	@DisplayName("락 획득 성공 시 sportsDataCollectJob을 실행한다")
+	@DisplayName("분산 락 획득 성공 시 sportsDataCollectJob을 실행한다")
 	void runSportsJobWithLock_runsJob_whenLockAcquired() throws Exception {
-		// given
+		// given: 분산 락 획득 성공 → task 실행
+		when(distributedLock.executeWithLock(anyString(), anyLong(), anyLong(), any()))
+			.thenAnswer(inv -> {
+				Runnable task = inv.getArgument(3);
+				task.run();
+				return true;
+			});
 		JobExecution jobExecution = mock(JobExecution.class);
 		when(jobExecution.getStatus()).thenReturn(BatchStatus.COMPLETED);
 		when(jobExecution.getJobId()).thenReturn(1L);
@@ -171,71 +172,16 @@ class DataCollectSchedulerTest {
 	}
 
 	@Test
-	@DisplayName("락이 이미 점유 중이면 Job을 실행하지 않고 skip한다")
+	@DisplayName("분산 락 획득 실패 시 Job을 실행하지 않고 skip한다")
 	void runSportsJobWithLock_skipsJob_whenLockAlreadyHeld() throws Exception {
-		// given: ReentrantLock은 같은 스레드가 재진입 가능하므로 별도 스레드에서 락 선점
-		ReentrantLock lock = (ReentrantLock) ReflectionTestUtils.getField(scheduler, "sportsCollectLock");
-		CountDownLatch lockAcquired = new CountDownLatch(1);
-		CountDownLatch testDone = new CountDownLatch(1);
-		ExecutorService executor = Executors.newSingleThreadExecutor();
-
-		executor.submit(() -> {
-			lock.lock();
-			lockAcquired.countDown();
-			try {
-				testDone.await();
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			} finally {
-				lock.unlock();
-			}
-		});
-		lockAcquired.await();
-
-		try {
-			// when
-			scheduler.runSportsJobWithLock("2025-2026");
-
-			// then: 락 점유 중이라 Job 실행 안 됨
-			verify(jobLauncher, never()).run(any(), any());
-		} finally {
-			testDone.countDown();
-			executor.shutdown();
-		}
-	}
-
-	@Test
-	@DisplayName("Job 실행 후 락이 반드시 해제된다")
-	void runSportsJobWithLock_releasesLock_afterJobExecution() throws Exception {
-		// given
-		JobExecution jobExecution = mock(JobExecution.class);
-		when(jobExecution.getStatus()).thenReturn(BatchStatus.COMPLETED);
-		when(jobExecution.getJobId()).thenReturn(1L);
-		when(jobLauncher.run(eq(sportsDataCollectJob), any())).thenReturn(jobExecution);
-
-		ReentrantLock lock = (ReentrantLock) ReflectionTestUtils.getField(scheduler, "sportsCollectLock");
+		// given: 분산 락 획득 실패
+		when(distributedLock.executeWithLock(anyString(), anyLong(), anyLong(), any()))
+			.thenReturn(false);
 
 		// when
 		scheduler.runSportsJobWithLock("2025-2026");
 
-		// then: 실행 후 락이 해제되어 있어야 함
-		assertThat(lock.isLocked()).isFalse();
-	}
-
-	@Test
-	@DisplayName("Job 실행 중 예외가 발생해도 락이 해제된다")
-	void runSportsJobWithLock_releasesLock_evenWhenJobThrows() throws Exception {
-		// given
-		when(jobLauncher.run(eq(sportsDataCollectJob), any()))
-			.thenThrow(new RuntimeException("Job 실패"));
-
-		ReentrantLock lock = (ReentrantLock) ReflectionTestUtils.getField(scheduler, "sportsCollectLock");
-
-		// when
-		assertThatThrownBy(() -> scheduler.runSportsJobWithLock("2025-2026"))
-			.isInstanceOf(RuntimeException.class);
-
-		// then: 예외 발생해도 락 해제
-		assertThat(lock.isLocked()).isFalse();
+		// then
+		verify(jobLauncher, never()).run(any(), any());
 	}
 }

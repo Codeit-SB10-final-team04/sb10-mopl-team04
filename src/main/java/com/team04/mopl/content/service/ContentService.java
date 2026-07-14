@@ -29,6 +29,8 @@ import com.team04.mopl.content.mapper.ContentMapper;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
+import com.team04.mopl.review.entity.Review;
+import com.team04.mopl.review.repository.ReviewRepository;
 import com.team04.mopl.watching.service.WatchingSessionService;
 
 import lombok.RequiredArgsConstructor;
@@ -43,6 +45,7 @@ public class ContentService {
 	private final ContentRepository contentRepository;
 	private final ContentTagRepository contentTagRepository;
 	private final TagRepository tagRepository;
+	private final ReviewRepository reviewRepository;
 	// 썸네일이 저장될 디렉토리 (FileStorage는 도메인 공용이므로 용도별 디렉토리로 구분)
 	private static final String THUMBNAIL_DIRECTORY = "thumbnails";
 
@@ -55,7 +58,8 @@ public class ContentService {
 
 		List<String> tags = contentTagRepository.findTagNamesByContentId(contentId);
 
-		return contentMapper.toDto(content, tags, watchingSessionService.getWatcherCount(content.getId()));
+		return contentMapper.toDto(content, excludeTypeTag(tags, content.getType()),
+			watchingSessionService.getWatcherCount(content.getId()));
 	}
 
 	// 파일 저장, DB 저장은 한 트랜잭션에 묶일 수 없음
@@ -125,7 +129,7 @@ public class ContentService {
 		List<ContentDto> data = page.stream()
 			.map(c -> contentMapper.toDto(
 				c,
-				tagMap.getOrDefault(c.getId(), List.of()),
+				excludeTypeTag(tagMap.getOrDefault(c.getId(), List.of()), c.getType()),
 				watchingSessionService.getWatcherCount(c.getId())
 			))
 			.toList();
@@ -161,9 +165,13 @@ public class ContentService {
 		}
 
 		try {
-			// 콘텐츠 업데이트 - title, description, thumbnailUrl
-			content.updateTitle(contentUpdateRequest.title());
-			content.updateDescription(contentUpdateRequest.description());
+			// 콘텐츠 업데이트 - title, description, thumbnailUrl (null이면 변경 안 함)
+			if (contentUpdateRequest.title() != null) {
+				content.updateTitle(contentUpdateRequest.title());
+			}
+			if (contentUpdateRequest.description() != null) {
+				content.updateDescription(contentUpdateRequest.description());
+			}
 			if (newThumbnailUrl != null) {
 				content.updateThumbnailUrl(newThumbnailUrl);
 			}
@@ -176,6 +184,7 @@ public class ContentService {
 
 				// 기존 태그 연결 전부 삭제 후 교체
 				contentTagRepository.deleteAllByContent(content);
+				contentTagRepository.flush();
 
 				List<Tag> tags = findOrCreateTags(contentUpdateRequest.tags());
 
@@ -219,28 +228,49 @@ public class ContentService {
 	@Transactional
 	public void deleteContent(UUID contentId) {
 		log.info("[콘텐츠 삭제 시작] contentId={}", contentId);
-		// 삭제되지 않은 콘텐츠 조회
 		Content content = getNotDeletedContentEntityOrThrow(contentId);
 
-		content.markDeleted(Instant.now());
-		log.info("[콘텐츠 삭제 완료] contentId={}", contentId);
+		Instant now = Instant.now();
+		content.markDeleted(now);
+
+		// 연관 리뷰도 논리 삭제
+		List<Review> reviews = reviewRepository.findAllByContentIdAndDeletedAtIsNull(contentId);
+		reviews.forEach(review -> review.markDeleted(now));
+		log.info("[콘텐츠 삭제 완료] contentId={}, 연관 리뷰 {}건 삭제", contentId, reviews.size());
 	}
 
-	// 태그명 목록으로 태그 조회 or 생성 (N+1 방지)
+	// 태그명 목록으로 태그 조회 or 생성 (동시성 안전 - ON CONFLICT DO NOTHING)
 	private List<Tag> findOrCreateTags(List<String> tagNames) {
+		// 없는 태그는 INSERT (중복 시 무시)
 		List<Tag> existingTags = tagRepository.findAllByNameIn(tagNames);
 		Set<String> existingNames = existingTags.stream()
 			.map(Tag::getName)
 			.collect(Collectors.toSet());
 
-		List<Tag> newTags = tagNames.stream()
+		tagNames.stream()
 			.filter(name -> !existingNames.contains(name))
-			.map(name -> tagRepository.save(Tag.builder().name(name).build()))
-			.toList();
+			.forEach(name -> tagRepository.insertIgnore(UUID.randomUUID(), name));
 
-		List<Tag> allTags = new ArrayList<>(existingTags);
-		allTags.addAll(newTags);
-		return allTags;
+		// 전체 재조회 (INSERT된 것 포함)
+		return tagRepository.findAllByNameIn(tagNames);
+	}
+
+	// 프론트에서 type을 태그로 변환하여 표시하므로, API 응답에서 type 태그 제외
+	private static final Map<ContentType, String> TYPE_TAG_NAMES = Map.of(
+		ContentType.movie, "영화",
+		ContentType.tvSeries, "TV 시리즈",
+		ContentType.sport, "Sports"
+	);
+
+	private List<String> excludeTypeTag(List<String> tags, ContentType type) {
+		if (type == null) {
+			return tags;
+		}
+		String typeTag = TYPE_TAG_NAMES.get(type);
+		if (typeTag == null) {
+			return tags;
+		}
+		return tags.stream().filter(tag -> !tag.equals(typeTag)).toList();
 	}
 
 	// contentIds로 태그명 조회 메서드

@@ -1,20 +1,26 @@
 package com.team04.mopl.directmessage.repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.team04.mopl.directmessage.entity.DirectMessage;
+import com.team04.mopl.directmessage.repository.qdsl.DirectMessageQdslRepository;
 
-public interface DirectMessageRepository extends JpaRepository<DirectMessage, UUID> {
+public interface DirectMessageRepository extends JpaRepository<DirectMessage, UUID>, DirectMessageQdslRepository {
 
 	// 최근 메시지 단건 조회
 	Optional<DirectMessage> findTopByConversationIdOrderByCreatedAtDescIdDesc(UUID conversationId);
+
+	// 특정 수신자의 마지막 이벤트 메시지 단건 조회
+	Optional<DirectMessage> findByIdAndReceiverId(UUID id, UUID receiverId);
 
 	// 안 읽음 메시지 존재 유무
 	boolean existsByConversationIdAndReceiverIdAndReadFalse(UUID conversationId, UUID receiverId);
@@ -36,5 +42,30 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
 	Set<UUID> findUnreadConversationIds(
 		@Param("conversationIds") List<UUID> conversationIds,
 		@Param("receiverId") UUID receiverId
+	);
+
+	// 안 읽은 메시지 다건 조회: 특정 메시지 이후에 수신된 미읽음 메시지 목록 조회 (커서 X)
+	@Query("SELECT dm FROM DirectMessage dm "
+		+ "WHERE dm.receiver.id = :receiverId "
+		+ "AND dm.read = false "
+		+ "AND dm.createdAt >= :timeLimit "
+		+ "ORDER BY dm.createdAt ASC, dm.id ASC")
+	List<DirectMessage> findRecentUnreadMessages(
+		@Param("receiverId") UUID receiverId,
+		@Param("timeLimit") Instant timeLimit,
+		Pageable pageable
+	);
+
+	// 안 읽은 메시지 다건 조회: 특정 메시지 이후에 수신된 미읽음 메시지 목록 조회 (커서 O)
+	@Query("SELECT dm FROM DirectMessage dm "
+		+ "WHERE dm.receiver.id = :receiverId "
+		+ "AND dm.read = false "
+		+ "AND (dm.createdAt > :createdAt OR (dm.createdAt = :createdAt AND dm.id > :lastId)) "
+		+ "ORDER BY dm.createdAt ASC, dm.id ASC")
+	List<DirectMessage> findUnreadMessagesAfter(
+		@Param("receiverId") UUID receiverId,
+		@Param("lastId") UUID lastId,
+		@Param("createdAt") Instant createdAt,
+		Pageable pageable
 	);
 }
