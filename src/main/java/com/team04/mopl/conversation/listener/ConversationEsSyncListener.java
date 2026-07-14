@@ -36,7 +36,10 @@ public class ConversationEsSyncListener {
 	)
 	public void syncMessageToElasticsearch(DirectMessageSentEvent event) {
 		try {
-			// 1. 자바 스크립트 작성: Document 내 메시지 목록(messageContents)에 원소 추가 및 LRU 정책 적
+			log.info("[ES_SYNC] 메시지 동기화 시작: conversationId={}, messageId={}",
+				event.conversationId(), event.messageId());
+
+			// 1. 자바 스크립트 작성: Document 내 메시지 목록(messageContents)에 원소 추가 및 LRU 정책 적용
 			String script = """
 				ctx._source.messageContents.add(params.newMessage);
 				if (ctx._source.messageContents.size() > params.maxSize) {
@@ -56,7 +59,7 @@ public class ConversationEsSyncListener {
 			// 3. 쿼리 전송
 			elasticsearchOperations.update(updateQuery, IndexCoordinates.of("conversations"));
 
-			log.debug("[ES_SYNC] 메시지 동기화 완료: conversationId={}, messageId={}",
+			log.info("[ES_SYNC] 메시지 동기화 완료: conversationId={}, messageId={}",
 				event.conversationId(), event.messageId());
 		} catch (Exception e) {
 			log.error("[ES_SYNC] 메시지 동기화 실패: conversationId={}, messageId={}",
