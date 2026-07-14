@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -246,7 +247,7 @@ class ConversationServiceTest {
 			.isInstanceOf(ConversationException.class)
 			.hasMessageContaining(ConversationErrorCode.CONVERSATION_SEARCH_FAILED.getMessage());
 	}
-	
+
 	/*
 	=========================
 	   대화 단건 조회
@@ -617,10 +618,10 @@ class ConversationServiceTest {
 		conversationService.findAll(request, requestUserId);
 
 		// then
-		verify(conversationMapper).toCursorPageResponse(
-			argThat(data -> data.size() == 3),
-			any(), any(), anyBoolean(), anyLong(), any(), any()
-		);
+		InOrder inOrder = inOrder(conversationMapper);
+		inOrder.verify(conversationMapper).toDto(eq(conv1), any(), any(), anyBoolean());
+		inOrder.verify(conversationMapper).toDto(eq(conv2), any(), any(), anyBoolean());
+		inOrder.verify(conversationMapper).toDto(eq(conv3), any(), any(), anyBoolean());
 	}
 
 	@Test

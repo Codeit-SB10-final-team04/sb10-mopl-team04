@@ -99,11 +99,15 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 			.willReturn(searchHits);
 
 		// when
-		List<ConversationDocument> result = esRepository.searchConversation(request, requestUserId);
+		esRepository.searchConversation(request, requestUserId);
 
 		// then
-		assertThat(result).isEmpty();
-		verify(elasticsearchOperations).search(any(NativeQuery.class), eq(ConversationDocument.class));
+		verify(elasticsearchOperations).search(queryCaptor.capture(), eq(ConversationDocument.class));
+		NativeQuery capturedQuery = queryCaptor.getValue();
+
+		assertThat(capturedQuery.getSearchAfter()).isNotNull();
+		assertThat(capturedQuery.getSearchAfter())
+			.containsExactly(Instant.parse(validCursor).toEpochMilli(), idAfter.toString());
 	}
 
 	@Test
