@@ -65,7 +65,7 @@ public class ConversationEsSyncProcessor {
 
 			kafkaTemplate.send(DLQ_TOPIC, event.conversationId().toString(), event).get();
 
-			log.info("[ES_SYNC] Kafka DLQ 발행 실패: conversationId={}",
+			log.info("[ES_SYNC] Kafka DLQ 발행 완료: conversationId={}",
 				event.conversationId());
 		} catch (Exception kafkaException) {
 			log.error("[ES_SYNC] Kafka DLQ 발행 실패: conversationId={}", event.conversationId(), kafkaException);

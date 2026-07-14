@@ -287,9 +287,6 @@ public class ConversationService {
 		Long totalCount,
 		ConversationPageRequest conversationPageRequest
 	) {
-		// 유효성 검증: 정렬 기준
-		validateSortField(conversationPageRequest.sortBy());
-
 		return conversationMapper.toCursorPageResponse(
 			Collections.emptyList(),
 			null,
