@@ -9,9 +9,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+
+import javax.imageio.ImageIO;
 
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +34,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.team04.mopl.auth.service.TemporaryPasswordService;
+import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.user.dto.request.ChangePasswordRequest;
 import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
@@ -58,6 +64,9 @@ class UserServiceTest {
 
 	@Mock
 	private TemporaryPasswordService temporaryPasswordService;
+
+	@Mock
+	private AuthSessionStore authSessionStore;
 
 	@InjectMocks
 	private UserService userService;
@@ -261,6 +270,7 @@ class UserServiceTest {
 		verify(userRepository).findById(userId);
 		verify(passwordEncoder).encode("newPassword123");
 		verify(temporaryPasswordService).deleteTemporaryPassword(userId);
+		verify(authSessionStore).deleteByUserId(userId);
 		verifyNoInteractions(userMapper);
 		verifyNoInteractions(fileStorage);
 	}
@@ -366,7 +376,7 @@ class UserServiceTest {
 			"image",
 			"profile.png",
 			"image/png",
-			"image-data".getBytes()
+			validPngBytes()
 		);
 		UserDto expectedResponse = new UserDto(
 			userId,
@@ -459,7 +469,7 @@ class UserServiceTest {
 			"image",
 			"profile.png",
 			"image/png",
-			"image-data".getBytes()
+			validPngBytes()
 		);
 		UserDto expectedResponse = new UserDto(
 			userId,
@@ -504,7 +514,7 @@ class UserServiceTest {
 			"image",
 			"profile.png",
 			"image/png",
-			"image-data".getBytes()
+			validPngBytes()
 		);
 		UserDto expectedResponse = new UserDto(
 			userId,
@@ -549,7 +559,7 @@ class UserServiceTest {
 			"image",
 			"profile.png",
 			"image/png",
-			"image-data".getBytes()
+			validPngBytes()
 		);
 		UserDto expectedResponse = new UserDto(
 			userId,
@@ -600,7 +610,7 @@ class UserServiceTest {
 			"image",
 			"profile.png",
 			"image/png",
-			"image-data".getBytes()
+			validPngBytes()
 		);
 		UserDto expectedResponse = new UserDto(
 			userId,
@@ -646,7 +656,7 @@ class UserServiceTest {
 			"image",
 			"profile.png",
 			"image/png",
-			"image-data".getBytes()
+			validPngBytes()
 		);
 
 		given(userRepository.findById(userId))
@@ -698,6 +708,39 @@ class UserServiceTest {
 	}
 
 	@Test
+	@DisplayName("실제 이미지로 디코딩할 수 없으면 프로필 이미지를 저장하지 않는다")
+	void updateProfile_throwUserException_whenProfileImageIsNotReadable() {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, "Existing", null);
+		UserUpdateRequest request = new UserUpdateRequest(null);
+		MockMultipartFile image = new MockMultipartFile(
+			"image",
+			"profile.png",
+			"image/png",
+			"not-an-image".getBytes()
+		);
+
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+
+		// when
+		ThrowingCallable action = () -> userService.updateProfile(userId, request, image, userId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception -> {
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_INVALID_PROFILE_IMAGE);
+				assertThat(exception.getDetails())
+					.containsEntry("reason", "지원하지 않거나 손상된 이미지 파일입니다.");
+			});
+
+		verify(userRepository).findById(userId);
+		verifyNoInteractions(fileStorage);
+		verifyNoInteractions(userMapper);
+	}
+
+	@Test
 	@DisplayName("이미지 크기가 최대 크기를 초과하면 프로필 이미지를 저장하지 않는다")
 	void updateProfile_throwUserException_whenProfileImageSizeIsTooLarge() {
 		// given
@@ -741,7 +784,7 @@ class UserServiceTest {
 			"image",
 			"profile.png",
 			"image/png",
-			"image-data".getBytes()
+			validPngBytes()
 		);
 		RuntimeException originalException = new RuntimeException("mapping failed");
 
@@ -779,5 +822,19 @@ class UserServiceTest {
 		ReflectionTestUtils.setField(user, "id", userId);
 
 		return user;
+	}
+
+	// 테스트용 1x1 PNG 바이트 생성
+	private byte[] validPngBytes() {
+		BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+		ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+		try {
+			ImageIO.write(image, "png", outputStream);
+		} catch (IOException exception) {
+			throw new IllegalStateException(exception);
+		}
+
+		return outputStream.toByteArray();
 	}
 }
