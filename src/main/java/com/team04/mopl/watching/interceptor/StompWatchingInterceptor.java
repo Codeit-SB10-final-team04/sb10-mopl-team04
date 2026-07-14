@@ -97,7 +97,7 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 				subscriptionStore.register(sessionId, subscriptionId, destination);
 			}
 
-			watchingSessionService.join(contentId, userId)
+			watchingSessionService.join(contentId, userId, sessionId)
 				.ifPresent(change -> eventPublisher.publishEvent(new WatchingSessionEvent(contentId, change)));
 		} else if ("chat".equals(type)) {
 			// 시청 세션에 참여한 사용자만 채팅 구독 가능
@@ -146,7 +146,7 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 					UUID contentId = UUID.fromString(matcher.group(1));
 					UUID userId = getUserIdFromSession(sessionId);
 
-					watchingSessionService.leave(contentId, userId)
+					watchingSessionService.leave(contentId, userId, sessionId)
 						.ifPresent(change -> eventPublisher.publishEvent(
 							new WatchingSessionEvent(contentId, change)));
 				}
@@ -165,10 +165,10 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 
 		webSocketSessionStore.getUserId(sessionId)
 			.ifPresent(userId -> {
-				// 시청 중인 모든 콘텐츠에서 퇴장 처리
+				// 시청 중인 모든 콘텐츠에서 퇴장 처리 (sessionId 전달로 멀티탭 참조 카운팅)
 				watchingSessionService.getWatchingContentIds(userId)
 					.forEach(contentId ->
-						watchingSessionService.leave(contentId, userId)
+						watchingSessionService.leave(contentId, userId, sessionId)
 							.ifPresent(change -> eventPublisher.publishEvent(
 								new WatchingSessionEvent(contentId, change)))
 					);
