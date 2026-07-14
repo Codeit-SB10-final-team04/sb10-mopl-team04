@@ -1,5 +1,6 @@
 package com.team04.mopl.directmessage.service;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -30,6 +31,8 @@ public class DirectMessageRestoreService {
 
 	private final DirectMessageMapper directMessageMapper;
 
+	private final Clock clock;
+
 	@Transactional(readOnly = true)
 	public List<DirectMessageDto> findUnreadMessagesAfter(
 		UUID receiverId,
@@ -43,7 +46,7 @@ public class DirectMessageRestoreService {
 
 		// 2. 미읽음 메시지 조회
 		PageRequest pageRequest = PageRequest.of(0, RECOVERY_LIMIT);
-		Instant timeLimit = Instant.now().minus(RECOVERY_MINUTES, ChronoUnit.MINUTES);
+		Instant timeLimit = Instant.now(clock).minus(RECOVERY_MINUTES, ChronoUnit.MINUTES);
 
 		List<DirectMessage> messages = message == null
 			// 단순 조회

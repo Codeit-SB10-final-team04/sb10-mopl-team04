@@ -1,5 +1,6 @@
 package com.team04.mopl.notification.service;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -24,8 +25,11 @@ public class NotificationRestoreService {
 
 	private static final int RECOVERY_LIMIT = 500;
 	private static final int RECOVERY_MINUTES = 10;
+
 	private final NotificationRepository notificationRepository;
 	private final NotificationMapper notificationMapper;
+
+	private final Clock clock;
 
 	@Transactional(readOnly = true)
 	public List<NotificationDto> findUnreadNotificationsAfter(
@@ -41,7 +45,7 @@ public class NotificationRestoreService {
 				.orElse(null);
 
 		PageRequest pageRequest = PageRequest.of(0, RECOVERY_LIMIT);
-		Instant timeLimit = Instant.now().minus(RECOVERY_MINUTES, ChronoUnit.MINUTES);
+		Instant timeLimit = Instant.now(clock).minus(RECOVERY_MINUTES, ChronoUnit.MINUTES);
 
 		List<Notification> notifications = lastNotification == null
 			? notificationRepository.findRecentUnreadNotifications(receiverId, timeLimit, pageRequest)
