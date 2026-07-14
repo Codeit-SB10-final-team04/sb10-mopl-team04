@@ -1,10 +1,11 @@
 package com.team04.mopl.conversation.listener;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
-import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.core.document.Document;
 import org.springframework.data.elasticsearch.core.query.ScriptType;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -36,19 +37,26 @@ public class ConversationEsSyncProcessor {
 
 	@Retryable(
 		value = Exception.class,
+		exclude = {NullPointerException.class, IllegalArgumentException.class, IllegalStateException.class},
 		maxAttempts = 3,
 		backoff = @Backoff(delay = 1000, multiplier = 2)
 	)
 	public void createConversationDocument(ConversationCreatedEvent event) {
 		try {
-			ConversationDocument conversationDocument = ConversationDocument.builder()
+			// 1. 기존 문서가 있으면 메시지를 가져오고, 없거나 null이면 빈 리스트 할당
+			var messageContents = conversationElasticSearchRepository.findById(event.conversationId())
+				.map(ConversationDocument::getMessageContents)
+				.orElseGet(ArrayList::new);
+
+			// 2. 대화 문서 생성 및 저장
+			ConversationDocument document = ConversationDocument.builder()
 				.id(event.conversationId())
 				.participantIds(event.participantIds())
-				.messageContents(Collections.emptyList())
+				.messageContents(messageContents)
 				.createdAt(event.createdAt())
 				.build();
 
-			conversationElasticSearchRepository.save(conversationDocument);
+			conversationElasticSearchRepository.save(document);
 
 			log.info("[ES_SYNC] 대화방 초기 문서 생성 완료: conversationId={}", event.conversationId());
 		} catch (Exception e) {
@@ -63,7 +71,7 @@ public class ConversationEsSyncProcessor {
 			log.error("[ES_SYNC] 대화방 초기 문서 생성 최종 실패: conversationId={}",
 				event.conversationId(), e);
 
-			kafkaTemplate.send(DLQ_TOPIC, event.conversationId().toString(), event).get();
+			kafkaTemplate.send(DLQ_TOPIC, event.conversationId().toString(), event).get(5, TimeUnit.SECONDS);
 
 			log.info("[ES_SYNC] Kafka DLQ 발행 완료: conversationId={}",
 				event.conversationId());
@@ -74,6 +82,7 @@ public class ConversationEsSyncProcessor {
 
 	@Retryable(
 		value = Exception.class,
+		exclude = {NullPointerException.class, IllegalArgumentException.class, IllegalStateException.class},
 		maxAttempts = 3,
 		backoff = @Backoff(delay = 1000, multiplier = 2)
 	)
@@ -84,11 +93,19 @@ public class ConversationEsSyncProcessor {
 
 			// 1. 자바 스크립트 작성: Document 내 메시지 목록(messageContents)에 원소 추가 및 LRU 정책 적용
 			String script = """
+				if (ctx._source.messageContents == null) {
+				    ctx._source.messageContents = new ArrayList();
+				}
 				ctx._source.messageContents.add(params.newMessage);
 				if (ctx._source.messageContents.size() > params.maxSize) {
 				    ctx._source.messageContents.remove(0);
 				}
 				""";
+
+			// 대상 문서가 없을 경우, 빈 껍데기 문서 생성
+			Document defaultDoc = Document.create();
+			defaultDoc.put("id", event.conversationId().toString());
+			defaultDoc.put("messageContents", new ArrayList<>());
 
 			// 2. 쿼리 작성
 			UpdateQuery updateQuery = UpdateQuery.builder(event.conversationId().toString())
@@ -99,10 +116,13 @@ public class ConversationEsSyncProcessor {
 					"newMessage", event.content(),
 					"maxSize", MAX_MESSAGE_HISTORY_SIZE
 				))
+				.withUpsert(defaultDoc)
+				.withScriptedUpsert(true)
 				.build();
 
 			// 3. 쿼리 전송
-			elasticsearchOperations.update(updateQuery, IndexCoordinates.of("conversations"));
+			elasticsearchOperations.update(updateQuery,
+				elasticsearchOperations.getIndexCoordinatesFor(ConversationDocument.class));
 
 			log.info("[ES_SYNC] 메시지 동기화 완료: conversationId={}, messageId={}",
 				event.conversationId(), event.messageId());
@@ -124,7 +144,7 @@ public class ConversationEsSyncProcessor {
 				event.conversationId(), event.messageId(), errorMessage);
 
 			// DLQ 토픽으로 원본 이벤트 전송 및 대기
-			kafkaTemplate.send(DLQ_TOPIC, event.conversationId().toString(), event).get();
+			kafkaTemplate.send(DLQ_TOPIC, event.conversationId().toString(), event).get(5, TimeUnit.SECONDS);
 
 			log.info("[ES_SYNC_DLQ_PUBLISHED] Kafka DLQ 발행 완료: messageId={}, topic={}",
 				event.messageId(), DLQ_TOPIC);
