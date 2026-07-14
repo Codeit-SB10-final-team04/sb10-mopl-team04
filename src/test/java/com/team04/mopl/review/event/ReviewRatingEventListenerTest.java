@@ -1,9 +1,11 @@
 package com.team04.mopl.review.event;
 
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.team04.mopl.common.redis.DistributedLock;
 import com.team04.mopl.content.repository.ContentRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -19,8 +22,22 @@ class ReviewRatingEventListenerTest {
 	@Mock
 	private ContentRepository contentRepository;
 
+	@Mock
+	private DistributedLock distributedLock;
+
 	@InjectMocks
 	private ReviewRatingEventListener listener;
+
+	@BeforeEach
+	void setUp() {
+		// 분산 락이 항상 task를 실행하도록 mock
+		when(distributedLock.executeWithLock(anyString(), anyLong(), anyLong(), any()))
+			.thenAnswer(inv -> {
+				Runnable task = inv.getArgument(3);
+				task.run();
+				return true;
+			});
+	}
 
 	@Test
 	@DisplayName("refreshRatingAggregate 호출 시 업데이트된 행이 있으면 정상 처리된다")
