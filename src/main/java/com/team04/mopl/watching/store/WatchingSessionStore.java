@@ -84,13 +84,13 @@ public class WatchingSessionStore {
 
 		if (size != null && size == 0) {
 			// 마지막 세션 → 정리 + 카운터 감소
-			WatchingSessionInfo info = getInfo(contentId, userId);
+			Optional<WatchingSessionInfo> info = getInfo(contentId, userId);
 			redisTemplate.delete(sessionsKey);
 			redisTemplate.delete(String.format(INFO_KEY, contentId, userId));
 			redisTemplate.opsForValue().decrement(String.format(COUNT_KEY, contentId));
 			redisTemplate.opsForSet().remove(String.format(USER_CONTENTS_KEY, userId), contentId.toString());
 			redisTemplate.opsForSet().remove(String.format(WATCHERS_KEY, contentId), userId.toString());
-			return Optional.ofNullable(info);
+			return info;
 		}
 		return Optional.empty();
 	}
@@ -110,10 +110,7 @@ public class WatchingSessionStore {
 		Map<UUID, WatchingSessionInfo> result = new HashMap<>();
 		for (String userIdStr : userIds) {
 			UUID userId = UUID.fromString(userIdStr);
-			WatchingSessionInfo info = getInfo(contentId, userId);
-			if (info != null) {
-				result.put(userId, info);
-			}
+			getInfo(contentId, userId).ifPresent(info -> result.put(userId, info));
 		}
 		return result;
 	}
@@ -135,21 +132,18 @@ public class WatchingSessionStore {
 		Set<UUID> contentIds = getWatchingContentIds(userId);
 		Map<UUID, WatchingSessionInfo> result = new HashMap<>();
 		for (UUID contentId : contentIds) {
-			WatchingSessionInfo info = getInfo(contentId, userId);
-			if (info != null) {
-				result.put(contentId, info);
-			}
+			getInfo(contentId, userId).ifPresent(info -> result.put(contentId, info));
 		}
 		return result;
 	}
 
-	private WatchingSessionInfo getInfo(UUID contentId, UUID userId) {
+	private Optional<WatchingSessionInfo> getInfo(UUID contentId, UUID userId) {
 		String infoKey = String.format(INFO_KEY, contentId, userId);
 		Object id = redisTemplate.opsForHash().get(infoKey, "id");
 		Object joinedAt = redisTemplate.opsForHash().get(infoKey, "joinedAt");
 		if (id == null || joinedAt == null) {
-			return null;
+			return Optional.empty();
 		}
-		return new WatchingSessionInfo(UUID.fromString(id.toString()), Instant.parse(joinedAt.toString()));
+		return Optional.of(new WatchingSessionInfo(UUID.fromString(id.toString()), Instant.parse(joinedAt.toString())));
 	}
 }
