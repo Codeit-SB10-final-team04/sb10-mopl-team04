@@ -58,7 +58,8 @@ public class ContentService {
 
 		List<String> tags = contentTagRepository.findTagNamesByContentId(contentId);
 
-		return contentMapper.toDto(content, tags, watchingSessionService.getWatcherCount(content.getId()));
+		return contentMapper.toDto(content, excludeTypeTag(tags, content.getType()),
+			watchingSessionService.getWatcherCount(content.getId()));
 	}
 
 	// 파일 저장, DB 저장은 한 트랜잭션에 묶일 수 없음
@@ -128,7 +129,7 @@ public class ContentService {
 		List<ContentDto> data = page.stream()
 			.map(c -> contentMapper.toDto(
 				c,
-				tagMap.getOrDefault(c.getId(), List.of()),
+				excludeTypeTag(tagMap.getOrDefault(c.getId(), List.of()), c.getType()),
 				watchingSessionService.getWatcherCount(c.getId())
 			))
 			.toList();
@@ -252,6 +253,24 @@ public class ContentService {
 
 		// 전체 재조회 (INSERT된 것 포함)
 		return tagRepository.findAllByNameIn(tagNames);
+	}
+
+	// 프론트에서 type을 태그로 변환하여 표시하므로, API 응답에서 type 태그 제외
+	private static final Map<ContentType, String> TYPE_TAG_NAMES = Map.of(
+		ContentType.movie, "영화",
+		ContentType.tvSeries, "TV 시리즈",
+		ContentType.sport, "Sports"
+	);
+
+	private List<String> excludeTypeTag(List<String> tags, ContentType type) {
+		if (type == null) {
+			return tags;
+		}
+		String typeTag = TYPE_TAG_NAMES.get(type);
+		if (typeTag == null) {
+			return tags;
+		}
+		return tags.stream().filter(tag -> !tag.equals(typeTag)).toList();
 	}
 
 	// contentIds로 태그명 조회 메서드

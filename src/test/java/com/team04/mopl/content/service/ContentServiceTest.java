@@ -70,21 +70,21 @@ class ContentServiceTest {
 		// given
 		UUID contentId = UUID.randomUUID();
 		Content content = mock(Content.class);
-		List<String> tags = List.of("영화");
+		when(content.getType()).thenReturn(com.team04.mopl.content.entity.ContentType.movie);
+		List<String> tags = List.of("영화", "액션");
+		List<String> filteredTags = List.of("액션"); // "영화"는 type 태그라 제외됨
 		ContentDto expectedDto = mock(ContentDto.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(tags);
-		when(contentMapper.toDto(eq(content), eq(tags), anyLong())).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(filteredTags), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.getContent(contentId);
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(contentRepository).findByIdAndDeletedAtIsNull(contentId);
-		verify(contentTagRepository).findTagNamesByContentId(contentId);
-		verify(contentMapper).toDto(eq(content), eq(tags), anyLong());
+		verify(contentMapper).toDto(eq(content), eq(filteredTags), anyLong());
 	}
 
 	@Test

@@ -2,7 +2,6 @@ package com.team04.mopl.content.scheduler;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.locks.ReentrantLock;
 
 import javax.annotation.processing.Generated;
 
@@ -17,6 +16,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import com.team04.mopl.common.redis.DistributedLock;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,9 +57,7 @@ public class DataCollectScheduler {
 
 	private static final String CURRENT_SEASON = "2025-2026";
 
-	// 초기 수집 ↔ 주기 수집 동시 실행 방지용 락
-	private final ReentrantLock sportsCollectLock = new ReentrantLock();
-
+	private final DistributedLock distributedLock;
 	private final JobLauncher jobLauncher;
 	private final JobExplorer jobExplorer;
 	private final Job sportsDataCollectJob;
@@ -82,17 +81,19 @@ public class DataCollectScheduler {
 			}
 
 			log.info("[Scheduler] TMDB 초기 수집 시작 (최초 실행)");
-			try {
-				JobParameters params = new JobParametersBuilder()
-					.addLong("timestamp", System.currentTimeMillis())
-					.toJobParameters();
+			distributedLock.executeWithLock("batch:tmdb-initial", 0, 3600, () -> {
+				try {
+					JobParameters params = new JobParametersBuilder()
+						.addLong("timestamp", System.currentTimeMillis())
+						.toJobParameters();
 
-				JobExecution jobExecution = jobLauncher.run(tmdbInitialCollectJob, params);
-				log.info("[Scheduler] TMDB 초기 수집 완료 - status: {}, jobId: {}",
-					jobExecution.getStatus(), jobExecution.getJobId());
-			} catch (Exception e) {
-				log.error("[Scheduler] TMDB 초기 수집 실패: {}", e.getMessage(), e);
-			}
+					JobExecution jobExecution = jobLauncher.run(tmdbInitialCollectJob, params);
+					log.info("[Scheduler] TMDB 초기 수집 완료 - status: {}, jobId: {}",
+						jobExecution.getStatus(), jobExecution.getJobId());
+				} catch (Exception e) {
+					log.error("[Scheduler] TMDB 초기 수집 실패: {}", e.getMessage(), e);
+				}
+			});
 		});
 	}
 
@@ -140,45 +141,49 @@ public class DataCollectScheduler {
 		}
 	}
 
-	/**
-	 * 매일 새벽 4시 TMDB 주기 수집
-	 */
+	// 매일 새벽 4시 TMDB 주기 수집
 	@Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
 	public void runTmdbDailyCollectJob() {
 		log.info("[Scheduler] TMDB 주기 수집 시작");
-		try {
-			JobParameters params = new JobParametersBuilder()
-				.addLong("timestamp", System.currentTimeMillis())
-				.toJobParameters();
+		boolean executed = distributedLock.executeWithLock("batch:tmdb-daily", 0, 1800, () -> {
+			try {
+				JobParameters params = new JobParametersBuilder()
+					.addLong("timestamp", System.currentTimeMillis())
+					.toJobParameters();
 
-			JobExecution jobExecution = jobLauncher.run(tmdbDailyCollectJob, params);
-			log.info("[Scheduler] TMDB 주기 수집 완료 - status: {}, jobId: {}",
-				jobExecution.getStatus(), jobExecution.getJobId());
-		} catch (Exception e) {
-			log.error("[Scheduler] TMDB 주기 수집 실패: {}", e.getMessage(), e);
+				JobExecution jobExecution = jobLauncher.run(tmdbDailyCollectJob, params);
+				log.info("[Scheduler] TMDB 주기 수집 완료 - status: {}, jobId: {}",
+					jobExecution.getStatus(), jobExecution.getJobId());
+			} catch (Exception e) {
+				log.error("[Scheduler] TMDB 주기 수집 실패: {}", e.getMessage(), e);
+			}
+		});
+
+		if (!executed) {
+			log.warn("[Scheduler] TMDB 주기 수집 - 다른 서버에서 실행 중, skip");
 		}
 	}
 
-	/**
-	 * 락을 획득한 뒤 sportsDataCollectJob을 실행한다.
-	 * 락 획득 실패(다른 수집이 진행 중)이면 즉시 skip한다.
-	 */
+	// 분산 락을 획득한 뒤 sportsDataCollectJob 실행, 다른 서버에서 실행 중이면 skip
 	void runSportsJobWithLock(String season) throws Exception {
-		if (!sportsCollectLock.tryLock()) {
-			log.warn("[Scheduler] SportsDB 다른 수집이 실행 중, skip: season={}", season);
-			return;
-		}
-		try {
-			JobParameters params = new JobParametersBuilder()
-				.addString("season", season)
-				.addLong("timestamp", System.currentTimeMillis())
-				.toJobParameters();
+		boolean executed = distributedLock.executeWithLock(
+			"batch:sports:" + season, 0, 3600, () -> {
+				try {
+					JobParameters params = new JobParametersBuilder()
+						.addString("season", season)
+						.addLong("timestamp", System.currentTimeMillis())
+						.toJobParameters();
 
-			JobExecution jobExecution = jobLauncher.run(sportsDataCollectJob, params);
-			log.info("[Scheduler] sportsDataCollectJob 완료 - season: {}, status: {}, jobId: {}",
-				season, jobExecution.getStatus(), jobExecution.getJobId());
-		} finally {
-			sportsCollectLock.unlock();
+					JobExecution jobExecution = jobLauncher.run(sportsDataCollectJob, params);
+					log.info("[Scheduler] sportsDataCollectJob 완료 - season: {}, status: {}, jobId: {}",
+						season, jobExecution.getStatus(), jobExecution.getJobId());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			});
+
+		if (!executed) {
+			log.warn("[Scheduler] SportsDB 다른 서버에서 수집 중, skip: season={}", season);
 		}
 	}
 

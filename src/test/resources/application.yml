@@ -12,6 +12,7 @@ spring:
       - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchClientAutoConfiguration
       - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
       - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration
+      - org.redisson.spring.starter.RedissonAutoConfigurationV2
   batch:
     job:
       enabled: false
@@ -120,6 +121,9 @@ review:
     retention-days: 1
 
 mopl:
+  redis:
+    pubsub:
+      enabled: false
   jwt:
     secret: test-secret-key-must-be-at-least-32-bytes
     issuer: mopl
