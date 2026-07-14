@@ -1,13 +1,17 @@
 package com.team04.mopl.auth.security.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -17,6 +21,7 @@ import org.springframework.security.authentication.LockedException;
 import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.exception.AuthException;
 import com.team04.mopl.auth.security.support.AuthResponseWriter;
+import com.team04.mopl.common.exception.ErrorResponse;
 
 class LoginFailureHandlerTest {
 
@@ -28,6 +33,8 @@ class LoginFailureHandlerTest {
 	void onAuthenticationFailure_writesLockedAccountError_whenExceptionIsLockedException() throws Exception {
 		// given
 		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.addParameter("username", "test@test.com");
+		request.addParameter("password", "password123");
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		LockedException exception = new LockedException("locked");
 
@@ -49,6 +56,8 @@ class LoginFailureHandlerTest {
 	void onAuthenticationFailure_writesInvalidCredentialsError_whenExceptionIsNotLockedException() throws Exception {
 		// given
 		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.addParameter("username", "test@test.com");
+		request.addParameter("password", "wrong-password");
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		BadCredentialsException exception = new BadCredentialsException("bad credentials");
 
@@ -71,6 +80,8 @@ class LoginFailureHandlerTest {
 		throws Exception {
 		// given
 		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.addParameter("username", "test@test.com");
+		request.addParameter("password", "password123");
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		InternalAuthenticationServiceException exception = new InternalAuthenticationServiceException("database error");
 
@@ -85,5 +96,31 @@ class LoginFailureHandlerTest {
 		assertThat(exceptionCaptor.getValue())
 			.extracting("errorCode")
 			.isEqualTo(AuthErrorCode.AUTH_SERVICE_ERROR);
+	}
+
+	@Test
+	@DisplayName("필수 로그인 파라미터가 누락되면 400 에러 응답을 반환한다")
+	void onAuthenticationFailure_writesBadRequest_whenRequiredParameterIsMissing() throws Exception {
+		// given
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.addParameter("username", "test@test.com");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		BadCredentialsException exception = new BadCredentialsException("bad credentials");
+
+		ArgumentCaptor<ErrorResponse> errorResponseCaptor = ArgumentCaptor.forClass(ErrorResponse.class);
+
+		// when
+		loginFailureHandler.onAuthenticationFailure(request, response, exception);
+
+		// then
+		verify(authResponseWriter).writeJson(
+			same(response),
+			eq(HttpStatus.BAD_REQUEST),
+			errorResponseCaptor.capture()
+		);
+		verify(authResponseWriter, never()).writeError(same(response), any(AuthException.class));
+
+		assertThat(errorResponseCaptor.getValue().getDetails())
+			.containsEntry("password", "필수 값입니다.");
 	}
 }
