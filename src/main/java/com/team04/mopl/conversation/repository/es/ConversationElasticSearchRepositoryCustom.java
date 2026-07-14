@@ -7,8 +7,8 @@ import com.team04.mopl.conversation.document.ConversationDocument;
 import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 
 /*
-  ConversationElasticSearchRepository
-  -------------------------------------
+  ConversationElasticSearchRepositoryCustom
+  ------------------------------------------
   필터링, 정렬 및 페이지네이션에 활용할 Elastic Search 전용 인터페이스 선언
  */
 public interface ConversationElasticSearchRepositoryCustom {
