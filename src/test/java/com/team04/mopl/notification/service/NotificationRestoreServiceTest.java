@@ -3,15 +3,18 @@ package com.team04.mopl.notification.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
@@ -28,14 +31,25 @@ import com.team04.mopl.user.entity.User;
 @ExtendWith(MockitoExtension.class)
 class NotificationRestoreServiceTest {
 
+	private final Instant FIXED_TIME = Instant.parse("2026-06-24T00:00:00Z");
+	private final Clock fixedClock = Clock.fixed(FIXED_TIME, ZoneId.of("UTC"));
+
 	@Mock
 	private NotificationRepository notificationRepository;
 
 	@Mock
 	private NotificationMapper notificationMapper;
 
-	@InjectMocks
 	private NotificationRestoreService notificationRestoreService;
+
+	@BeforeEach
+	void setUp() {
+		notificationRestoreService = new NotificationRestoreService(
+			notificationRepository,
+			notificationMapper,
+			fixedClock
+		);
+	}
 
 	@Test
 	@DisplayName("lastEventId에 해당하는 알림이 없으면 최근 10분 이내의 미읽음 알림을 반환한다.")
@@ -48,7 +62,7 @@ class NotificationRestoreServiceTest {
 		Notification recentNotification = createNotification(
 			UUID.randomUUID(),
 			receiver,
-			Instant.now()
+			FIXED_TIME.minus(5, ChronoUnit.MINUTES)
 		);
 
 		NotificationDto recentDto = new NotificationDto(
@@ -64,9 +78,10 @@ class NotificationRestoreServiceTest {
 		when(notificationRepository.findByIdAndReceiverId(lastEventId, receiverId))
 			.thenReturn(Optional.empty());
 
-		// timeLimit은 내부에서 Instant.now()로 생성되므로 any(Instant.class) 사용
+		Instant expectedTimeLimit = FIXED_TIME.minus(10, ChronoUnit.MINUTES);
+
 		when(notificationRepository.findRecentUnreadNotifications(
-			eq(receiverId), any(Instant.class), eq(PageRequest.of(0, 500))
+			eq(receiverId), eq(expectedTimeLimit), eq(PageRequest.of(0, 500))
 		)).thenReturn(List.of(recentNotification));
 
 		when(notificationMapper.toDto(recentNotification)).thenReturn(recentDto);
@@ -79,7 +94,7 @@ class NotificationRestoreServiceTest {
 
 		verify(notificationRepository).findByIdAndReceiverId(lastEventId, receiverId);
 		verify(notificationRepository).findRecentUnreadNotifications(
-			eq(receiverId), any(Instant.class), eq(PageRequest.of(0, 500))
+			eq(receiverId), eq(expectedTimeLimit), eq(PageRequest.of(0, 500))
 		);
 		verify(notificationRepository, never()).findUnreadNotificationsAfter(
 			any(), any(), any(), any()
