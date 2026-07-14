@@ -48,12 +48,19 @@ public class MoplOAuth2UserService implements OAuth2UserService<OAuth2UserReques
 	// 제공자 사용자 정보를 표준화하고 MOPL 사용자로 연결
 	@Override
 	public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
+		String provider = userRequest.getClientRegistration().getRegistrationId();
+
+		log.info(
+			"[SOCIAL_LOGIN] 소셜 로그인 사용자 확인 시작: provider={}",
+			provider
+		);
+
 		// 제공자 UserInfo 엔드포인트 사용자 정보 조회
 		OAuth2User oauth2User = delegate.loadUser(userRequest);
 
 		// 제공자별 attributes를 내부 공통 DTO로 변환
 		OAuth2UserInfo userInfo = OAuth2UserInfoMapper.map(
-			userRequest.getClientRegistration().getRegistrationId(),
+			provider,
 			oauth2User.getAttributes()
 		);
 

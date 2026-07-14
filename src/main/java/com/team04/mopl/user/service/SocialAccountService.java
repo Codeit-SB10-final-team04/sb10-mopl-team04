@@ -44,6 +44,11 @@ public class SocialAccountService {
 
 	// 신규 소셜 사용자와 소셜 계정 연결 정보 생성
 	private User createSocialUser(OAuth2UserInfo userInfo) {
+		log.info(
+			"[SOCIAL_ACCOUNT_CREATE] 소셜 계정 연결 시작: provider={}",
+			userInfo.provider()
+		);
+
 		// 동일 이메일 기존 계정 존재 여부 확인
 		if (userRepository.existsByEmail(userInfo.email())) {
 			throw emailAlreadyExistsException();

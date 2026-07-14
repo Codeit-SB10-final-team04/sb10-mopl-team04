@@ -48,12 +48,19 @@ public class MoplOidcUserService implements OAuth2UserService<OidcUserRequest, O
 	// Google OIDC 사용자 정보 확인 후 MOPL 사용자 연결
 	@Override
 	public OidcUser loadUser(OidcUserRequest userRequest) throws OAuth2AuthenticationException {
+		String provider = userRequest.getClientRegistration().getRegistrationId();
+
+		log.info(
+			"[SOCIAL_LOGIN] OIDC 로그인 사용자 확인 시작: provider={}",
+			provider
+		);
+
 		// Google OIDC 사용자 정보 조회
 		OidcUser oidcUser = delegate.loadUser(userRequest);
 
 		// OIDC 사용자 정보를 내부 공통 DTO로 변환
 		OAuth2UserInfo userInfo = OAuth2UserInfoMapper.mapOidc(
-			userRequest.getClientRegistration().getRegistrationId(),
+			provider,
 			oidcUser
 		);
 
