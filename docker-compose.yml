@@ -91,6 +91,8 @@ services:
         condition: service_healthy
       broker:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     networks:
       - backend
     profiles:
