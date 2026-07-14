@@ -11,6 +11,8 @@ import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentTag;
 import com.team04.mopl.content.entity.ContentType;
 import com.team04.mopl.content.entity.Tag;
+import com.team04.mopl.content.exception.ContentErrorCode;
+import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
@@ -107,8 +109,9 @@ public class TmdbContentCollectService {
 	 * <p>태그가 없으면 신규 생성, 있으면 기존 태그 재사용
 	 */
 	private void linkTag(Content content, String tagName) {
+		tagRepository.insertIgnore(java.util.UUID.randomUUID(), tagName);
 		Tag tag = tagRepository.findByName(tagName)
-			.orElseGet(() -> tagRepository.save(new Tag(tagName)));
+			.orElseThrow(() -> new ContentException(ContentErrorCode.TAG_CREATION_FAILED));
 
 		contentTagRepository.save(ContentTag.builder()
 			.content(content)

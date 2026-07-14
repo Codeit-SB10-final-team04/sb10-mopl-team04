@@ -84,8 +84,7 @@ class MatchCollectServiceTest {
 
 		when(contentRepository.existsByExternalIdAndSource(any(), any())).thenReturn(false);
 		when(contentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(tagRepository.findByName(any())).thenReturn(Optional.empty());
-		when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+		when(tagRepository.findByName(any())).thenReturn(Optional.of(Tag.builder().name("태그").build()));
 
 		// when
 		boolean result = matchCollectService.saveIfNotExists(eventDetail, "Arsenal vs Chelsea");
@@ -108,8 +107,7 @@ class MatchCollectServiceTest {
 
 		when(contentRepository.existsByExternalIdAndSource(any(), any())).thenReturn(false);
 		when(contentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(tagRepository.findByName(any())).thenReturn(Optional.empty());
-		when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+		when(tagRepository.findByName(any())).thenReturn(Optional.of(Tag.builder().name("태그").build()));
 
 		// when
 		matchCollectService.saveIfNotExists(eventDetail, "Arsenal vs Chelsea");
@@ -134,8 +132,7 @@ class MatchCollectServiceTest {
 
 		when(contentRepository.existsByExternalIdAndSource(any(), any())).thenReturn(false);
 		when(contentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(tagRepository.findByName(any())).thenReturn(Optional.empty());
-		when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+		when(tagRepository.findByName(any())).thenReturn(Optional.of(Tag.builder().name("태그").build()));
 
 		// when
 		matchCollectService.saveIfNotExists(eventDetail, "Arsenal vs Chelsea");
@@ -159,8 +156,7 @@ class MatchCollectServiceTest {
 
 		when(contentRepository.existsByExternalIdAndSource(any(), any())).thenReturn(false);
 		when(contentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(tagRepository.findByName(any())).thenReturn(Optional.empty());
-		when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+		when(tagRepository.findByName(any())).thenReturn(Optional.of(Tag.builder().name("태그").build()));
 
 		// when
 		matchCollectService.saveIfNotExists(eventDetail, "Arsenal vs Chelsea");
