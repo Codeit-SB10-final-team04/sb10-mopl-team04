@@ -1,8 +1,11 @@
 package com.team04.mopl.follow.redis;
 
+import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,16 @@ public class FollowRedisStore {
 	private static final String FOLLOWING_KEY = "follow:following:%s";        // 내가 팔로우하는 사람들
 	private static final String FOLLOWERS_KEY = "follow:followers:%s";        // 나를 팔로우하는 사람들
 
+	// 원자적 업데이트: 자바 스크립트를 하나의 명령어로 취급
+	private static final String ADD_FOLLOW_SCRIPT = """
+		    local isNew = redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
+		    if isNew == 1 then
+		        redis.call('ZADD', KEYS[2], ARGV[1], ARGV[3])
+		        return 1
+		    end
+		    return 0
+		""";
+
 	private final StringRedisTemplate stringRedisTemplate;
 
 	// 팔로우 생성 (추가)
@@ -25,16 +38,17 @@ public class FollowRedisStore {
 
 		long timestamp = System.currentTimeMillis();
 
-		// 데이터가 새로 추가되면 true, 이미 존재하면 false 반환
-		Boolean isAdded = stringRedisTemplate.opsForZSet().add(followingKey, followeeId.toString(), timestamp);
+		// 스크립트 실행
+		DefaultRedisScript<Long> script = new DefaultRedisScript<>(ADD_FOLLOW_SCRIPT, Long.class);
+		Long result = stringRedisTemplate.execute(
+			script,
+			List.of(followingKey, followersKey),
+			String.valueOf(timestamp),
+			followeeId.toString(),
+			followerId.toString()
+		);
 
-		if (Boolean.TRUE.equals(isAdded)) {
-			// 내가 팔로우 성공했을 때만 상대방의 팔로워 목록에 추가
-			stringRedisTemplate.opsForZSet().add(followersKey, followerId.toString(), timestamp);
-
-			return true;
-		}
-		return false;
+		return result != null && result == 1L;
 	}
 
 	// 사용자의 특정 사용자 팔로우 여부 조회
@@ -62,7 +76,15 @@ public class FollowRedisStore {
 		String followersKey = String.format(FOLLOWERS_KEY, followeeId);
 		String followingKey = String.format(FOLLOWING_KEY, followerId);
 
-		stringRedisTemplate.opsForZSet().remove(followingKey, followeeId.toString());
-		stringRedisTemplate.opsForZSet().remove(followersKey, followerId.toString());
+		// 원자적 삭제: 파이프라이닝 적용
+		stringRedisTemplate.executePipelined((RedisCallback<Object>)connection -> {
+			byte[] followingKeyBytes = followingKey.getBytes();
+			byte[] followersKeyBytes = followersKey.getBytes();
+
+			connection.zSetCommands().zRem(followingKeyBytes, followeeId.toString().getBytes());
+			connection.zSetCommands().zRem(followersKeyBytes, followerId.toString().getBytes());
+
+			return null;
+		});
 	}
 }
