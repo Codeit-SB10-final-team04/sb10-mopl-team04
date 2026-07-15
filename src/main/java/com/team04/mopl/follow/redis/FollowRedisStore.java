@@ -1,9 +1,12 @@
 package com.team04.mopl.follow.redis;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
@@ -81,6 +84,24 @@ public class FollowRedisStore {
 		return count != null
 			? count
 			: 0L;
+	}
+
+	// 특정 사용자의 팔로워 목록 백필
+	public void initFollowers(UUID followeeId, Collection<UUID> followerIds) {
+
+		if (followerIds == null || followerIds.isEmpty()) {
+			return;
+		}
+
+		String followersKey = String.format(FOLLOWERS_KEY, followeeId);
+		long timestamp = System.currentTimeMillis();
+
+		// Tuple set 타입으로 변환
+		var tuples = followerIds.stream()
+			.map(id -> ZSetOperations.TypedTuple.of(id.toString(), (double)timestamp))
+			.collect(Collectors.toSet());
+
+		stringRedisTemplate.opsForZSet().add(followersKey, tuples);
 	}
 
 	// 팔로우 삭제 (취소)

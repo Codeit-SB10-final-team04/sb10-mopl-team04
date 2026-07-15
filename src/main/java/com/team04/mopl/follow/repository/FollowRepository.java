@@ -23,6 +23,7 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
 	// 팔로우 대상(followee)의 팔로워 수 조회
 	long countByFolloweeId(UUID followeeId);
 
+	// 특정 사용자를 팔로우하는 팔로워들의 ID 목록 조회
 	@Query(value = """
 		SELECT fr.id
 		FROM Follow AS f

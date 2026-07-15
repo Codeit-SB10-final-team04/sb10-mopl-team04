@@ -1,5 +1,6 @@
 package com.team04.mopl.follow.service;
 
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -122,7 +123,9 @@ public class FollowService {
 
 		// 3. 특정 사용자의 팔로우 수 조회 (DB FallBack)
 		if (followCount == null) {
-			followCount = followRepository.countByFolloweeId(followeeId);
+			Set<UUID> followerIds = followRepository.findFollowerIdsByFolloweeId(followeeId);
+			followRedisStore.initFollowers(followeeId, followerIds);
+			followCount = (long)followerIds.size();
 		}
 
 		log.debug("[FOLLOW_FIND_COUNT] 특정 사용자의 팔로우 수 조회 완료: followeeId={}, followCount={}",
