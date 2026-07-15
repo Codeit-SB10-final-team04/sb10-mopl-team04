@@ -36,7 +36,7 @@ public class EventDetailItemProcessor implements ItemProcessor<String, JsonNode>
 		// API 응답에 idEvent가 없거나 비어있으면 Reader에서 받은 eventId를 주입
 		if (!StringUtils.hasText(detail.path("idEvent").asText(""))) {
 			log.warn("[Batch] 응답에 idEvent 누락, Reader의 eventId로 보완: eventId={}", eventId);
-			((ObjectNode) detail).put("idEvent", eventId);
+			((ObjectNode)detail).put("idEvent", eventId);
 		}
 
 		return detail;
