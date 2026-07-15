@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -32,6 +33,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.team04.mopl.auth.service.TemporaryPasswordService;
 import com.team04.mopl.auth.session.AuthSessionStore;
@@ -733,6 +735,44 @@ class UserServiceTest {
 				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_INVALID_PROFILE_IMAGE);
 				assertThat(exception.getDetails())
 					.containsEntry("reason", "지원하지 않거나 손상된 이미지 파일입니다.");
+			});
+
+		verify(userRepository).findById(userId);
+		verifyNoInteractions(fileStorage);
+		verifyNoInteractions(userMapper);
+	}
+
+	@Test
+	@DisplayName("이미지 파일 스트림을 읽을 수 없으면 프로필 이미지를 저장하지 않는다")
+	void updateProfile_throwUserException_whenProfileImageInputStreamFails() throws Exception {
+		// given
+		UUID userId = UUID.randomUUID();
+		User user = createUser(userId, "Existing", null);
+		UserUpdateRequest request = new UserUpdateRequest(null);
+		MultipartFile image = mock(MultipartFile.class);
+
+		given(image.isEmpty())
+			.willReturn(false);
+		given(image.getSize())
+			.willReturn(1024L);
+		given(image.getContentType())
+			.willReturn("image/png");
+		given(image.getOriginalFilename())
+			.willReturn("broken.png");
+		given(image.getInputStream())
+			.willThrow(new IOException("stream failed"));
+		given(userRepository.findById(userId))
+			.willReturn(Optional.of(user));
+
+		// when
+		ThrowingCallable action = () -> userService.updateProfile(userId, request, image, userId);
+
+		// then
+		assertThatThrownBy(action)
+			.isInstanceOfSatisfying(UserException.class, exception -> {
+				assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.USER_INVALID_PROFILE_IMAGE);
+				assertThat(exception.getDetails())
+					.containsEntry("reason", "이미지 파일을 읽을 수 없습니다.");
 			});
 
 		verify(userRepository).findById(userId);
