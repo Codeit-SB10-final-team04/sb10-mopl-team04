@@ -20,9 +20,11 @@ import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
 import com.team04.mopl.follow.entity.Follow;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
+import com.team04.mopl.follow.event.FollowDeletedEvent;
 import com.team04.mopl.follow.exception.FollowErrorCode;
 import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
+import com.team04.mopl.follow.redis.FollowRedisStore;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.exception.UserErrorCode;
@@ -43,6 +45,9 @@ class FollowServiceTest {
 
 	@Mock
 	private FollowMapper followMapper;
+
+	@Mock
+	private FollowRedisStore followRedisStore;
 
 	@Mock
 	private ApplicationEventPublisher applicationEventPublisher;
@@ -156,11 +161,11 @@ class FollowServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> followService.createFollow(request, requestUserId))
-			.isInstanceOf(FollowException.class)
-			.hasMessageContaining(FollowErrorCode.FOLLOW_ALREADY_CONCURRENT.getMessage());
+			.isInstanceOf(DataIntegrityViolationException.class);
 
 		// 첫 번째 요청만 저장
 		verify(followRepository, times(1)).save(any(Follow.class));
+		verify(applicationEventPublisher, never()).publishEvent(any());
 	}
 
 	/*
@@ -183,6 +188,8 @@ class FollowServiceTest {
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(targetUser));
 		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestedUser));
 
+		given(followRedisStore.isFollowing(requestUserId, followeeId)).willReturn(true);
+
 		Follow mockFollow = mock(Follow.class);
 		given(mockFollow.getId()).willReturn(UUID.randomUUID());
 		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, requestUserId))
@@ -197,6 +204,7 @@ class FollowServiceTest {
 		// then
 		assertThat(result).isNotNull();
 		assertThat(result).isEqualTo(mockDto);
+		verify(followRepository, times(1)).findByFolloweeIdAndFollowerId(followeeId, requestUserId);
 		verify(followRepository, times(1)).findByFolloweeIdAndFollowerId(followeeId, requestUserId);
 	}
 
@@ -216,6 +224,7 @@ class FollowServiceTest {
 			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
 
 		verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
+		verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
 	}
 
 	@Test
@@ -234,13 +243,14 @@ class FollowServiceTest {
 		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestedUser));
 
 		// 팔로우 미존재
-		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, requestUserId))
-			.willReturn(Optional.empty());
+		given(followRedisStore.isFollowing(requestUserId, followeeId)).willReturn(false);
 
 		// when & then
 		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, requestUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
+
+		verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
 	}
 
 	/*
@@ -262,7 +272,7 @@ class FollowServiceTest {
 		long expectedCount = 15L;
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(mockUser));
-		given(followRepository.countByFolloweeId(followeeId)).willReturn(expectedCount);
+		given(followRedisStore.getFollowerCount(followeeId)).willReturn(expectedCount);
 
 		// when
 		Long result = followService.getFollowerCount(followeeId);
@@ -270,7 +280,8 @@ class FollowServiceTest {
 		// then
 		assertThat(result).isEqualTo(expectedCount);
 		verify(userRepository).findById(followeeId);
-		verify(followRepository).countByFolloweeId(followeeId);
+		verify(followRedisStore, times(1)).getFollowerCount(followeeId);
+		verify(followRepository, never()).countByFolloweeId(any());
 	}
 
 	@Test
@@ -302,9 +313,14 @@ class FollowServiceTest {
 		User follower = mock(User.class);
 		given(follower.getId()).willReturn(requestUserId);
 
+		UUID followeeId = UUID.randomUUID();
+		User followee = mock(User.class);
+		given(followee.getId()).willReturn(followeeId);
+
 		UUID followId = UUID.randomUUID();
 		Follow targetFollow = mock(Follow.class);
 		given(targetFollow.getFollower()).willReturn(follower);
+		given(targetFollow.getFollowee()).willReturn(followee);
 
 		given(followRepository.findById(followId)).willReturn(Optional.of(targetFollow));
 
@@ -313,6 +329,7 @@ class FollowServiceTest {
 
 		// then
 		verify(followRepository, times(1)).delete(targetFollow);
+		verify(applicationEventPublisher, times(1)).publishEvent(any(FollowDeletedEvent.class));
 	}
 
 	@Test
@@ -320,6 +337,7 @@ class FollowServiceTest {
 	void deleteFollow_FollowNotFound_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
+		
 		given(followRepository.findById(any())).willReturn(Optional.empty());
 
 		// when & then
