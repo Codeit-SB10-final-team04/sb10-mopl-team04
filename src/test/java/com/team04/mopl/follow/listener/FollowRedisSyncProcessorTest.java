@@ -21,15 +21,18 @@ import com.team04.mopl.follow.event.FollowDeletedEvent;
 import com.team04.mopl.follow.redis.FollowRedisStore;
 
 @ExtendWith(MockitoExtension.class)
-class FollowRedisSyncListenerTest {
+class FollowRedisSyncProcessorTest {
 
 	private static final String DLQ_TOPIC = "follow-redis-sync-dlq";
+
 	@Mock
 	private FollowRedisStore followRedisStore;
+
 	@Mock
 	private KafkaTemplate<String, Object> kafkaTemplate;
+
 	@InjectMocks
-	private FollowRedisSyncListener followRedisSyncListener;
+	private FollowRedisSyncProcessor followRedisSyncProcessor;
 
 	/*
 	======================================
@@ -48,7 +51,7 @@ class FollowRedisSyncListenerTest {
 		);
 
 		// when
-		followRedisSyncListener.syncRedisOnFollowCreated(event);
+		followRedisSyncProcessor.syncRedisOnFollowCreated(event);
 
 		// then
 		verify(followRedisStore, times(1)).addFollow(event.followerId(), event.followeeId());
@@ -69,7 +72,7 @@ class FollowRedisSyncListenerTest {
 			.given(followRedisStore).addFollow(event.followerId(), event.followeeId());
 
 		// when & then
-		assertThatThrownBy(() -> followRedisSyncListener.syncRedisOnFollowCreated(event))
+		assertThatThrownBy(() -> followRedisSyncProcessor.syncRedisOnFollowCreated(event))
 			.isInstanceOf(RuntimeException.class)
 			.hasMessageContaining("Redis Connection Failed");
 	}
@@ -94,7 +97,7 @@ class FollowRedisSyncListenerTest {
 			.willReturn(future);
 
 		// when
-		followRedisSyncListener.recoverCreateFailure(syncException, event);
+		followRedisSyncProcessor.recoverCreateFailure(syncException, event);
 
 		// then
 		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, event.followerId().toString(), event);
@@ -117,7 +120,7 @@ class FollowRedisSyncListenerTest {
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
 		// when & then
-		assertThatCode(() -> followRedisSyncListener.recoverCreateFailure(syncException, event))
+		assertThatCode(() -> followRedisSyncProcessor.recoverCreateFailure(syncException, event))
 			.doesNotThrowAnyException();
 	}
 
@@ -136,7 +139,7 @@ class FollowRedisSyncListenerTest {
 		);
 
 		// when
-		followRedisSyncListener.syncRedisOnFollowDeleted(event);
+		followRedisSyncProcessor.syncRedisOnFollowDeleted(event);
 
 		// then
 		verify(followRedisStore, times(1)).removeFollow(event.followeeId(), event.followerId());
@@ -155,7 +158,7 @@ class FollowRedisSyncListenerTest {
 			.given(followRedisStore).removeFollow(event.followeeId(), event.followerId());
 
 		// when & then
-		assertThatThrownBy(() -> followRedisSyncListener.syncRedisOnFollowDeleted(event))
+		assertThatThrownBy(() -> followRedisSyncProcessor.syncRedisOnFollowDeleted(event))
 			.isInstanceOf(RuntimeException.class)
 			.hasMessageContaining("Redis Timeout");
 	}
@@ -177,7 +180,7 @@ class FollowRedisSyncListenerTest {
 			.willReturn(future);
 
 		// when
-		followRedisSyncListener.recoverDeleteFailure(syncException, event);
+		followRedisSyncProcessor.recoverDeleteFailure(syncException, event);
 
 		// then
 		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, event.followerId().toString(), event);
@@ -197,7 +200,7 @@ class FollowRedisSyncListenerTest {
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
 		// when & then
-		assertThatCode(() -> followRedisSyncListener.recoverDeleteFailure(syncException, event))
+		assertThatCode(() -> followRedisSyncProcessor.recoverDeleteFailure(syncException, event))
 			.doesNotThrowAnyException();
 	}
 }
