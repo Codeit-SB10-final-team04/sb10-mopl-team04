@@ -13,12 +13,13 @@ import org.springframework.stereotype.Component;
 
 import com.team04.mopl.common.batch.BatchTimeZone;
 import com.team04.mopl.common.exception.BatchException;
+import com.team04.mopl.common.redis.DistributedLock;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 // 정해진 시간에 논리 삭제된 콘텐츠를 물리 삭제하는 스케줄러
-@Generated("jacoco-exclude") // jacoco 테스트 커버리지 제외
+@Generated("jacoco-exclude")
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -26,6 +27,7 @@ public class ContentHardDeleteBatchScheduler {
 
 	private final JobLauncher jobLauncher;
 	private final Job contentHardDeleteJob;
+	private final DistributedLock distributedLock;
 
 	@Scheduled(
 		cron = "${content.hard-delete.cron}",
@@ -34,22 +36,28 @@ public class ContentHardDeleteBatchScheduler {
 	public void runContentHardDeleteBatch() {
 		log.info("[CONTENT_HARD_DELETE_BATCH] 콘텐츠 물리 삭제 스케줄 시작");
 
-		try {
-			JobParameters jobParameters = new JobParametersBuilder()
-				.addLong("runId", System.currentTimeMillis())
-				.toJobParameters();
+		boolean executed = distributedLock.executeWithLock("batch:content-hard-delete", 0, 600, () -> {
+			try {
+				JobParameters jobParameters = new JobParametersBuilder()
+					.addLong("runId", System.currentTimeMillis())
+					.toJobParameters();
 
-			JobExecution jobExecution = jobLauncher.run(contentHardDeleteJob, jobParameters);
+				JobExecution jobExecution = jobLauncher.run(contentHardDeleteJob, jobParameters);
 
-			if (jobExecution.getStatus() != BatchStatus.COMPLETED) {
-				throw new IllegalStateException("콘텐츠 물리 삭제 배치 실패. jobExecutionId="
-					+ jobExecution.getId() + ", status=" + jobExecution.getStatus());
+				if (jobExecution.getStatus() != BatchStatus.COMPLETED) {
+					throw new IllegalStateException("콘텐츠 물리 삭제 배치 실패. jobExecutionId="
+						+ jobExecution.getId() + ", status=" + jobExecution.getStatus());
+				}
+
+				log.info("[CONTENT_HARD_DELETE_BATCH] 콘텐츠 물리 삭제 스케줄 완료");
+			} catch (Exception e) {
+				log.error("[CONTENT_HARD_DELETE_BATCH] 콘텐츠 물리 삭제 배치 실패", e);
+				throw new BatchException("콘텐츠 물리 삭제 배치에 실패했습니다.", e);
 			}
+		});
 
-			log.info("[CONTENT_HARD_DELETE_BATCH] 콘텐츠 물리 삭제 스케줄 완료");
-		} catch (Exception e) {
-			log.error("[CONTENT_HARD_DELETE_BATCH] 콘텐츠 물리 삭제 배치 실패", e);
-			throw new BatchException("콘텐츠 물리 삭제 배치에 실패했습니다.", e);
+		if (!executed) {
+			log.warn("[CONTENT_HARD_DELETE_BATCH] 다른 서버에서 실행 중, skip");
 		}
 	}
 }

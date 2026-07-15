@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import com.team04.mopl.common.batch.BatchTimeZone;
 import com.team04.mopl.common.exception.BatchException;
+import com.team04.mopl.common.redis.DistributedLock;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ public class ReviewHardDeleteBatchScheduler {
 
 	private final JobLauncher jobLauncher;
 	private final Job reviewHardDeleteJob;
+	private final DistributedLock distributedLock;
 
 	@Scheduled(
 		cron = "${review.hard-delete.cron}",
@@ -29,22 +31,29 @@ public class ReviewHardDeleteBatchScheduler {
 	)
 	public void runReviewHardDeleteBatch() {
 		log.info("[REVIEW_HARD_DELETE_BATCH] 배치 시작");
-		try {
-			JobParameters jobParameters = new JobParametersBuilder()
-				.addLong("runId", System.currentTimeMillis())
-				.toJobParameters();
 
-			JobExecution jobExecution = jobLauncher.run(reviewHardDeleteJob, jobParameters);
+		boolean executed = distributedLock.executeWithLock("batch:review-hard-delete", 0, 600, () -> {
+			try {
+				JobParameters jobParameters = new JobParametersBuilder()
+					.addLong("runId", System.currentTimeMillis())
+					.toJobParameters();
 
-			if (jobExecution.getStatus() != BatchStatus.COMPLETED) {
-				throw new IllegalStateException("리뷰 물리 삭제 배치 실패. jobExecutionId="
-					+ jobExecution.getId() + ", status=" + jobExecution.getStatus());
+				JobExecution jobExecution = jobLauncher.run(reviewHardDeleteJob, jobParameters);
+
+				if (jobExecution.getStatus() != BatchStatus.COMPLETED) {
+					throw new IllegalStateException("리뷰 물리 삭제 배치 실패. jobExecutionId="
+						+ jobExecution.getId() + ", status=" + jobExecution.getStatus());
+				}
+
+				log.info("[REVIEW_HARD_DELETE_BATCH] 배치 완료: jobExecutionId={}", jobExecution.getId());
+			} catch (Exception e) {
+				log.error("[REVIEW_HARD_DELETE_BATCH] 배치 실패", e);
+				throw new BatchException("리뷰 물리 삭제 배치에 실패했습니다. ", e);
 			}
+		});
 
-			log.info("[REVIEW_HARD_DELETE_BATCH] 배치 완료: jobExecutionId={}", jobExecution.getId());
-		} catch (Exception e) {
-			log.error("[REVIEW_HARD_DELETE_BATCH] 배치 실패", e);
-			throw new BatchException("리뷰 물리 삭제 배치에 실패했습니다. ", e);
+		if (!executed) {
+			log.warn("[REVIEW_HARD_DELETE_BATCH] 다른 서버에서 실행 중, skip");
 		}
 	}
 }

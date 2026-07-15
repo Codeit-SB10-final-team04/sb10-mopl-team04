@@ -6,11 +6,9 @@ import java.util.UUID;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Controller;
 
-import com.team04.mopl.auth.security.MoplUserDetails;
+import com.team04.mopl.common.redis.RedisMessagePublisher;
 import com.team04.mopl.content.dto.request.ContentChatSendRequest;
 import com.team04.mopl.content.dto.response.ContentChatDto;
 import com.team04.mopl.content.service.ContentChatService;
@@ -24,9 +22,10 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ContentChatController {
 
-	private final SimpMessagingTemplate messagingTemplate;
+	private final RedisMessagePublisher redisMessagePublisher;
 	private final ContentChatService contentChatService;
 
+	// 채팅 메시지를 Redis Pub/Sub으로 모든 서버에 전파
 	@MessageMapping("/contents/{contentId}/chat")
 	public void sendMessage(
 		@DestinationVariable UUID contentId,
@@ -34,10 +33,6 @@ public class ContentChatController {
 		Principal principal
 	) {
 		ContentChatDto chatMessage = contentChatService.createChatMessage(principal, request);
-
-		messagingTemplate.convertAndSend(
-			"/sub/contents/" + contentId + "/chat",
-			chatMessage
-		);
+		redisMessagePublisher.publish("/sub/contents/" + contentId + "/chat", chatMessage);
 	}
 }
