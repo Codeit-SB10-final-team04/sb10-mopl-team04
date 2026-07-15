@@ -12,17 +12,13 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class FollowRedisStore {
-
-	private static final String FOLLOWING_KEY = "follow:following:%s";        // 내가 팔로우하는 사람들
-	private static final String FOLLOWERS_KEY = "follow:followers:%s";        // 나를 팔로우하는 사람들
-
 	private static final String EMPTY_FOLLOWERS_KEY = "follow:followers:empty:%s";
+	private static final String FOLLOWING_KEY = "follow:following:%s";                // 내가 팔로우하는 사람들
+	private static final String FOLLOWERS_KEY = "follow:followers:%s";                // 나를 팔로우하는 사람들
 
 	// 원자적 업데이트: 자바 스크립트를 하나의 명령어로 취급
 	private static final String ADD_FOLLOW_SCRIPT = """
