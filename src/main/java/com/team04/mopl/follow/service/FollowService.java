@@ -89,15 +89,19 @@ public class FollowService {
 		User targetUser = getUserEntityOrThrow(followeeId);          // 특정 사용자
 		User requestedUser = getUserEntityOrThrow(requestUserId);    // 요청자
 
-		// 2. 팔로우 여부 조회 (Redis) 및 유효성 검증
+		// 2. 팔로우 여부 조회 (Redis)
 		boolean isFollowConnection = followRedisStore.isFollowing(requestUserId, followeeId);
-		validateFollow(isFollowConnection, targetUser.getId(), requestedUser.getId());
 
 		// 3. 팔로우 조회 (RDB)
 		Follow followConnection = getFollowEntityByFolloweeIdAndFollowerIdOrThrow(
 			targetUser.getId(),
 			requestedUser.getId()
 		);
+
+		// 4, 팔로우 여부 조회 (DB FallBack)
+		if (!isFollowConnection) {
+			followRedisStore.addFollow(requestUserId, followeeId);
+		}
 
 		log.debug("[FOLLOW_FIND_IS_FOLLWING] 특정 사용자 팔로우 여부 조회 완료: followId={}. followeeId={}, requestUserId={}",
 			followConnection.getId(), followeeId, requestUserId);
@@ -115,6 +119,11 @@ public class FollowService {
 
 		// 2. 특정 사용자의 팔로우 수 조회
 		Long followCount = followRedisStore.getFollowerCount(followeeId);
+
+		// 3. 특정 사용자의 팔로우 수 조회 (DB FallBack)
+		if (followCount == 0L) {
+			followCount = followRepository.countByFolloweeId(followeeId);
+		}
 
 		log.debug("[FOLLOW_FIND_COUNT] 특정 사용자의 팔로우 수 조회 완료: followeeId={}, followCount={}",
 			followeeId, followCount);
@@ -160,15 +169,6 @@ public class FollowService {
 	private void validateDuplicateFollow(UUID followeeId, UUID followerId) {
 		if (followRepository.existsByFolloweeIdAndFollowerId(followeeId, followerId)) {
 			throw new FollowException(FollowErrorCode.FOLLOW_ALREADY)
-				.addDetail("followeeId", followeeId)
-				.addDetail("followerId", followerId);
-		}
-	}
-
-	// 유효성 검증: 팔로우 존재 여부
-	private void validateFollow(boolean followConnection, UUID followeeId, UUID followerId) {
-		if (!followConnection) {
-			throw new FollowException(FollowErrorCode.FOLLOW_NOT_FOUND)
 				.addDetail("followeeId", followeeId)
 				.addDetail("followerId", followerId);
 		}
