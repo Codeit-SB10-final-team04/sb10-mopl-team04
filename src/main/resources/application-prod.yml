@@ -18,6 +18,9 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST}
       port: ${SPRING_DATA_REDIS_PORT}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      ssl:
+        enabled: true
   cache:
     type: ${SPRING_CACHE_TYPE}
     redis:
