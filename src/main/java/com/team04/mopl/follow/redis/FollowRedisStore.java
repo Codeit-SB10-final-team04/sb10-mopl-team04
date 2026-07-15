@@ -3,7 +3,6 @@ package com.team04.mopl.follow.redis;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -27,6 +26,13 @@ public class FollowRedisStore {
 		        return 1
 		    end
 		    return 0
+		""";
+
+	// 원자적 삭제
+	private static final String REMOVE_FOLLOW_SCRIPT = """
+		    redis.call('ZREM', KEYS[1], ARGV[1])
+		    redis.call('ZREM', KEYS[2], ARGV[2])
+		    return 1
 		""";
 
 	private final StringRedisTemplate stringRedisTemplate;
@@ -63,6 +69,12 @@ public class FollowRedisStore {
 	public Long getFollowerCount(UUID followeeId) {
 		String followersKey = String.format(FOLLOWERS_KEY, followeeId);
 
+		// Cache Miss 확인
+		Boolean hasKey = stringRedisTemplate.hasKey(followersKey);
+		if (Boolean.FALSE.equals(hasKey)) {
+			return null;
+		}
+
 		// Set 전체 크기 반환
 		Long count = stringRedisTemplate.opsForZSet().zCard(followersKey);
 
@@ -76,15 +88,13 @@ public class FollowRedisStore {
 		String followersKey = String.format(FOLLOWERS_KEY, followeeId);
 		String followingKey = String.format(FOLLOWING_KEY, followerId);
 
-		// 원자적 삭제: 파이프라이닝 적용
-		stringRedisTemplate.executePipelined((RedisCallback<Object>)connection -> {
-			byte[] followingKeyBytes = followingKey.getBytes();
-			byte[] followersKeyBytes = followersKey.getBytes();
-
-			connection.zSetCommands().zRem(followingKeyBytes, followeeId.toString().getBytes());
-			connection.zSetCommands().zRem(followersKeyBytes, followerId.toString().getBytes());
-
-			return null;
-		});
+		// 스크립트 실
+		DefaultRedisScript<Long> script = new DefaultRedisScript<>(REMOVE_FOLLOW_SCRIPT, Long.class);
+		stringRedisTemplate.execute(
+			script,
+			List.of(followingKey, followersKey),
+			followeeId.toString(),
+			followerId.toString()
+		);
 	}
 }
