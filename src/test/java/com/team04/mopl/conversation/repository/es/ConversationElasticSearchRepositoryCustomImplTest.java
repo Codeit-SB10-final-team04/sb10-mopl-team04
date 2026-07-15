@@ -17,18 +17,16 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.conversation.document.ConversationDocument;
 import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
-
-import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 
 @ExtendWith(MockitoExtension.class)
 class ConversationElasticSearchRepositoryCustomImplTest {
@@ -37,7 +35,7 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 	private ElasticsearchOperations elasticsearchOperations;
 
 	@Captor
-	private ArgumentCaptor<NativeQuery> queryCaptor;
+	private ArgumentCaptor<CriteriaQuery> queryCaptor;
 
 	@InjectMocks
 	private ConversationElasticSearchRepositoryCustomImpl esRepository;
@@ -63,7 +61,7 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 		SearchHits<ConversationDocument> searchHits = mock(SearchHits.class);
 		given(searchHits.stream()).willReturn(Stream.of(searchHit));
 
-		given(elasticsearchOperations.search(any(NativeQuery.class), eq(ConversationDocument.class)))
+		given(elasticsearchOperations.search(any(CriteriaQuery.class), eq(ConversationDocument.class)))
 			.willReturn(searchHits);
 
 		// when
@@ -95,7 +93,7 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 		SearchHits<ConversationDocument> searchHits = mock(SearchHits.class);
 		given(searchHits.stream()).willReturn(Stream.empty());
 
-		given(elasticsearchOperations.search(any(NativeQuery.class), eq(ConversationDocument.class)))
+		given(elasticsearchOperations.search(any(CriteriaQuery.class), eq(ConversationDocument.class)))
 			.willReturn(searchHits);
 
 		// when
@@ -103,7 +101,7 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 
 		// then
 		verify(elasticsearchOperations).search(queryCaptor.capture(), eq(ConversationDocument.class));
-		NativeQuery capturedQuery = queryCaptor.getValue();
+		CriteriaQuery capturedQuery = queryCaptor.getValue();
 
 		assertThat(capturedQuery.getSearchAfter()).isNotNull();
 		assertThat(capturedQuery.getSearchAfter())
@@ -136,7 +134,7 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 
 	@Test
 	@DisplayName("실패: ES 서버 장애 시 CONVERSATION_SEARCH_FAILED 예외로 변환되어 던져진다.")
-	void searchConversation_ElasticsearchException_Fail() {
+	void searchConversation_Exception_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
 		ConversationPageRequest request = new ConversationPageRequest(
@@ -148,9 +146,8 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 			"createdAt"
 		);
 
-		ElasticsearchException esException = mock(ElasticsearchException.class);
-		given(elasticsearchOperations.search(any(NativeQuery.class), eq(ConversationDocument.class)))
-			.willThrow(esException);
+		given(elasticsearchOperations.search(any(CriteriaQuery.class), eq(ConversationDocument.class)))
+			.willThrow(new RuntimeException("ES 서버 장애"));
 
 		// when & then
 		assertThatThrownBy(() -> esRepository.searchConversation(request, requestUserId))
@@ -172,7 +169,7 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 			"createdAt"
 		);
 
-		given(elasticsearchOperations.count(any(NativeQuery.class), eq(ConversationDocument.class)))
+		given(elasticsearchOperations.count(any(CriteriaQuery.class), eq(ConversationDocument.class)))
 			.willReturn(5L);
 
 		// when
@@ -184,7 +181,7 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 
 	@Test
 	@DisplayName("실패: 개수 조회 시 ES 서버 장애가 발생하면 CONVERSATION_SEARCH_FAILED 예외로 변환된다.")
-	void countConversation_ElasticsearchException_Fail() {
+	void countConversation_Exception_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
 		ConversationPageRequest request = new ConversationPageRequest(
@@ -196,9 +193,8 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 			"createdAt"
 		);
 
-		ElasticsearchException esException = mock(ElasticsearchException.class);
-		given(elasticsearchOperations.count(any(NativeQuery.class), eq(ConversationDocument.class)))
-			.willThrow(esException);
+		given(elasticsearchOperations.count(any(CriteriaQuery.class), eq(ConversationDocument.class)))
+			.willThrow(new RuntimeException("ES 서버 장애"));
 
 		// when & then
 		assertThatThrownBy(() -> esRepository.countConversation(request, requestUserId))
@@ -207,7 +203,7 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 	}
 
 	@Test
-	@DisplayName("성공: 검색 조건 및 정렬 방향이 NativeQuery 내부에 올바르게 생성되어 전달된다.")
+	@DisplayName("성공: 검색 조건 및 정렬 방향이 CriteriaQuery 내부에 올바르게 생성되어 전달된다.")
 	void buildSearchQuery_ConditionAndSort_Verified() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -222,7 +218,7 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 		);
 
 		SearchHits<ConversationDocument> searchHits = mock(SearchHits.class);
-		given(elasticsearchOperations.search(any(NativeQuery.class), eq(ConversationDocument.class)))
+		given(elasticsearchOperations.search(any(CriteriaQuery.class), eq(ConversationDocument.class)))
 			.willReturn(searchHits);
 
 		// when
@@ -230,7 +226,7 @@ class ConversationElasticSearchRepositoryCustomImplTest {
 
 		// then
 		verify(elasticsearchOperations).search(queryCaptor.capture(), eq(ConversationDocument.class));
-		NativeQuery capturedQuery = queryCaptor.getValue();
+		CriteriaQuery capturedQuery = queryCaptor.getValue();
 
 		assertThat(capturedQuery.getMaxResults()).isEqualTo(11);
 

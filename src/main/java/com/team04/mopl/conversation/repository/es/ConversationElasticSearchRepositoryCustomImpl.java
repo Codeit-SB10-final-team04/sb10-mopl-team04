@@ -43,6 +43,8 @@ public class ConversationElasticSearchRepositoryCustomImpl implements Conversati
 				.map(hit -> hit.getContent())
 				.toList();
 
+		} catch (ConversationException e) {
+			throw e;
 		} catch (Exception e) {
 			log.error("[CONVERSATION_ES] 대화 목록 검색 실패 - requestUserId: {}, Keyword: {}",
 				requestUserId, request.keywordLike(), e);
