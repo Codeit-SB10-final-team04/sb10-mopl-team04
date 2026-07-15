@@ -40,7 +40,7 @@ class FollowRedisStoreTest {
 	=========================
 	 */
 	@Test
-	@DisplayName("성공: 팔로우 추가 시 Lua 스크립트가 실행되고 1L이 반환되면 true를 반환한다.")
+	@DisplayName("성공: 팔로우 추가 시 Lua 스크립트가 실행되고 1L이 반환되며 TTL 7일이 지정된다.")
 	void addFollow_Success() {
 		// given
 		UUID followerId = UUID.randomUUID();
@@ -51,11 +51,11 @@ class FollowRedisStoreTest {
 			.willReturn(1L);
 
 		// when
-		boolean result = followRedisStore.addFollow(followerId, followeeId);
+		followRedisStore.addFollow(followerId, followeeId);
 
 		// then
-		assertThat(result).isTrue();
 		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), any(), any(), any());
+		verify(stringRedisTemplate, times(2)).expire(anyString(), eq(Duration.ofDays(7)));
 	}
 
 	@Test
@@ -65,19 +65,15 @@ class FollowRedisStoreTest {
 		UUID followerId = UUID.randomUUID();
 		UUID followeeId = UUID.randomUUID();
 
-		// 예측되는 emptyKey 값
 		String expectedEmptyKey = String.format("follow:followers:empty:%s", followeeId);
 
 		given(stringRedisTemplate.execute(any(RedisScript.class), anyList(), any(), any(), any()))
 			.willReturn(1L);
 
 		// when
-		boolean result = followRedisStore.addFollow(followerId, followeeId);
+		followRedisStore.addFollow(followerId, followeeId);
 
 		// then
-		assertThat(result).isTrue();
-
-		// 💡 핵심 검증: Lua 스크립트를 실행할 때 KEYS 배열(List)의 3번째 인자로 emptyKey가 정확히 넘어가는지 확인
 		verify(stringRedisTemplate, times(1)).execute(
 			any(RedisScript.class),
 			argThat(keys -> keys.size() == 3 && keys.get(2).equals(expectedEmptyKey)),
@@ -87,63 +83,65 @@ class FollowRedisStoreTest {
 		);
 	}
 
-	@Test
-	@DisplayName("실패: 팔로우 추가 시 이미 존재하거나 연산에 실패하여 0L이 반환되면 false를 반환한다.")
-	void addFollow_AlreadyExists_ReturnsFalse() {
-		// given
-		UUID followerId = UUID.randomUUID();
-		UUID followeeId = UUID.randomUUID();
-
-		// Lua 스크립트 실행 실패 / 중복 결과 (0L)
-		given(stringRedisTemplate.execute(any(RedisScript.class), anyList(), any(), any(), any()))
-			.willReturn(0L);
-
-		// when
-		boolean result = followRedisStore.addFollow(followerId, followeeId);
-
-		// then
-		assertThat(result).isFalse();
-	}
-
 	/*
 	============================
 	   특정 사용자 팔로우 여부 조회
 	============================
 	 */
 	@Test
-	@DisplayName("성공: Redis ZSET에 스코어가 존재하면 팔로우 중인 것으로 판단(true)한다.")
+	@DisplayName("성공: Redis ZSET에 Key가 존재하고 스코어가 존재하면 팔로우 중인 것으로 판단(true)한다.")
 	void isFollowing_True_Success() {
 		// given
 		UUID followerId = UUID.randomUUID();
 		UUID followeeId = UUID.randomUUID();
 
+		given(stringRedisTemplate.hasKey(anyString())).willReturn(true);
 		given(stringRedisTemplate.opsForZSet()).willReturn(zSetOperations);
 		given(zSetOperations.score(anyString(), eq(followeeId.toString())))
 			.willReturn(1623456789.0);
 
 		// when
-		boolean result = followRedisStore.isFollowing(followerId, followeeId);
+		Boolean result = followRedisStore.isFollowing(followerId, followeeId);
 
 		// then
 		assertThat(result).isTrue();
 	}
 
 	@Test
-	@DisplayName("성공: Redis ZSET에 스코어가 없으면 팔로우하지 않는 것으로 판단(false)한다.")
+	@DisplayName("성공: Redis ZSET에 Key가 존재하지만 스코어가 없으면 팔로우하지 않는 것으로 판단(false)한다.")
 	void isFollowing_False_Success() {
 		// given
 		UUID followerId = UUID.randomUUID();
 		UUID followeeId = UUID.randomUUID();
 
+		given(stringRedisTemplate.hasKey(anyString())).willReturn(true);
 		given(stringRedisTemplate.opsForZSet()).willReturn(zSetOperations);
 		given(zSetOperations.score(anyString(), eq(followeeId.toString())))
 			.willReturn(null);
 
 		// when
-		boolean result = followRedisStore.isFollowing(followerId, followeeId);
+		Boolean result = followRedisStore.isFollowing(followerId, followeeId);
 
 		// then
 		assertThat(result).isFalse();
+	}
+
+	@Test
+	@DisplayName("성공: Redis ZSET에 Key 자체가 존재하지 않으면 Cache Miss(null)를 반환한다.")
+	void isFollowing_CacheMiss_ReturnsNull() {
+		// given
+		UUID followerId = UUID.randomUUID();
+		UUID followeeId = UUID.randomUUID();
+
+		// 캐시 없음
+		given(stringRedisTemplate.hasKey(anyString())).willReturn(false);
+
+		// when
+		Boolean result = followRedisStore.isFollowing(followerId, followeeId);
+
+		// then
+		assertThat(result).isNull();
+		verify(stringRedisTemplate, never()).opsForZSet();
 	}
 
 	/*
@@ -152,7 +150,7 @@ class FollowRedisStoreTest {
 	=============================
 	 */
 	@Test
-	@DisplayName("성공: Redis 키가 존재(hasKey=true)하면 zCard를 통해 팔로워 수를 정상 반환한다.")
+	@DisplayName("성공: CacheState가 EXISTS면 zCard를 통해 팔로워 수를 정상 반환한다.")
 	void getFollowerCount_HasCount_Success() {
 		// given
 		UUID followeeId = UUID.randomUUID();
@@ -163,9 +161,9 @@ class FollowRedisStoreTest {
 
 		given(stringRedisTemplate.hasKey(emptyKey)).willReturn(false);
 		given(stringRedisTemplate.hasKey(followersKey)).willReturn(true);
-		
+
 		given(stringRedisTemplate.opsForZSet()).willReturn(zSetOperations);
-		given(zSetOperations.zCard(anyString())).willReturn(expectedCount);
+		given(zSetOperations.zCard(followersKey)).willReturn(expectedCount);
 
 		// when
 		Long result = followRedisStore.getFollowerCount(followeeId);
@@ -175,12 +173,15 @@ class FollowRedisStoreTest {
 	}
 
 	@Test
-	@DisplayName("성공: Redis 키가 존재하지 않으면(hasKey=false) Cache Miss로 간주하고 null을 반환한다.")
+	@DisplayName("성공: Redis 키가 모두 존재하지 않으면 CacheState.MISS로 간주하고 null을 반환한다.")
 	void getFollowerCount_CacheMiss_ReturnsNull() {
 		// given
 		UUID followeeId = UUID.randomUUID();
+		String emptyKey = String.format("follow:followers:empty:%s", followeeId);
+		String followersKey = String.format("follow:followers:%s", followeeId);
 
-		given(stringRedisTemplate.hasKey(anyString())).willReturn(false);
+		given(stringRedisTemplate.hasKey(emptyKey)).willReturn(false);
+		given(stringRedisTemplate.hasKey(followersKey)).willReturn(false);
 
 		// when
 		Long result = followRedisStore.getFollowerCount(followeeId);
@@ -191,13 +192,14 @@ class FollowRedisStoreTest {
 	}
 
 	@Test
-	@DisplayName("성공: 네거티브 캐시(empty 마커)가 존재하면 바로 0L을 반환한다.")
+	@DisplayName("성공: CacheState가 EMPTY면 네거티브 캐시를 인지하고 바로 0L을 반환한다.")
 	void getFollowerCount_NegativeCache_ReturnsZero() {
 		// given
 		UUID followeeId = UUID.randomUUID();
+		String emptyKey = String.format("follow:followers:empty:%s", followeeId);
 
 		// emptyKey가 존재함
-		given(stringRedisTemplate.hasKey(contains("empty"))).willReturn(true);
+		given(stringRedisTemplate.hasKey(emptyKey)).willReturn(true);
 
 		// when
 		Long result = followRedisStore.getFollowerCount(followeeId);
@@ -207,8 +209,13 @@ class FollowRedisStoreTest {
 		verify(stringRedisTemplate, never()).opsForZSet();
 	}
 
+	/*
+	==================
+	   팔로워 백필 초기화
+	==================
+	 */
 	@Test
-	@DisplayName("성공: 팔로워 백필 시 followerIds 컬렉션이 존재하면 벌크 ZADD(add) 연산을 수행한다.")
+	@DisplayName("성공: 팔로워 백필 시 followerIds 컬렉션이 존재하면 벌크 ZADD(add) 연산을 수행하고 7일 TTL을 세팅한다.")
 	void initFollowers_Success() {
 		// given
 		UUID followeeId = UUID.randomUUID();
@@ -222,6 +229,7 @@ class FollowRedisStoreTest {
 
 		// then
 		verify(zSetOperations, times(1)).add(anyString(), anySet());
+		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(Duration.ofDays(7)));
 	}
 
 	@Test
@@ -253,7 +261,6 @@ class FollowRedisStoreTest {
 		UUID followeeId = UUID.randomUUID();
 		UUID followerId = UUID.randomUUID();
 
-		// Lua 스크립트 실행 결과 모킹
 		given(stringRedisTemplate.execute(any(RedisScript.class), anyList(), any(), any()))
 			.willReturn(1L);
 
