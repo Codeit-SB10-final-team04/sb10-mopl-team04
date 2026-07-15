@@ -13,6 +13,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import com.team04.mopl.common.enums.CacheState;
+import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 
 import lombok.RequiredArgsConstructor;
@@ -47,12 +48,12 @@ public class DirectMessageRedisStore {
 	private final StringRedisTemplate stringRedisTemplate;
 
 	// [DM 생성] DM 추가
-	public void addDirectMessage(UUID conversationId, DirectMessage message) {
+	public void addDirectMessage(UUID conversationId, DirectMessageDto directMessageDto) {
 		// DM Key 생성: 빈 대화방 및 DM 저장 대화방
 		String key = String.format(DM_ROOM_KEY, conversationId);
 		String emptyKey = String.format(EMPTY_DM_ROOM_KEY, conversationId);
 
-		long timestamp = message.getCreatedAt().toEpochMilli();
+		long timestamp = directMessageDto.createdAt().toEpochMilli();
 
 		// 스크립트 생성
 		DefaultRedisScript<Long> script = new DefaultRedisScript<>(
@@ -65,7 +66,7 @@ public class DirectMessageRedisStore {
 			script,
 			List.of(key, emptyKey),
 			String.valueOf(timestamp),
-			message.getId().toString()
+			directMessageDto.id().toString()
 		);
 
 		// 메모리 관리: 최대 7일 보관
