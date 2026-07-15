@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -327,61 +328,48 @@ class FollowServiceTest {
 	}
 
 	@Test
-	@DisplayName("성공: Redis 캐시 미스(null) 발생 시, DB를 찔러서 DB 값을 반환한다.")
+	@DisplayName("성공: Redis 캐시 미스(null) 발생 시, DB에서 ID 목록을 가져와 캐시를 백필하고 사이즈를 반환한다.")
 	void getFollowerCount_CacheMiss_DBHasCount_Success() {
 		// given
 		UUID followeeId = UUID.randomUUID();
-
-		User mockUser = User.builder()
-			.name("테스트유저")
-			.email("test@example.com")
-			.build();
+		User mockUser = User.builder().name("테스트유저").email("test@example.com").build();
 		ReflectionTestUtils.setField(mockUser, "id", followeeId);
 
-		long expectedCount = 10L;
+		Set<UUID> followerIds = Set.of(UUID.randomUUID(), UUID.randomUUID());
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(mockUser));
-
-		// Redis Cache Miss (null)
 		given(followRedisStore.getFollowerCount(followeeId)).willReturn(null);
-
-		// DB FallBack
-		given(followRepository.countByFolloweeId(followeeId)).willReturn(expectedCount);
+		given(followRepository.findFollowerIdsByFolloweeId(followeeId)).willReturn(followerIds);
 
 		// when
 		Long result = followService.getFollowerCount(followeeId);
 
 		// then
-		assertThat(result).isEqualTo(expectedCount);
-		verify(followRepository, times(1)).countByFolloweeId(followeeId);
+		assertThat(result).isEqualTo((long)followerIds.size());
+		verify(followRepository, times(1)).findFollowerIdsByFolloweeId(followeeId);
+		verify(followRedisStore, times(1)).initFollowers(followeeId, followerIds);
 	}
 
 	@Test
-	@DisplayName("성공: Redis 캐시 미스(null) 발생 후 DB를 찔렀는데 DB에도 0명이면 0을 반환한다.")
+	@DisplayName("성공: Redis 캐시 미스(null) 발생 후 DB를 조회했는데 팔로워가 0명이면 0을 반환한다 (initFollowers에는 빈 Set이 전달됨).")
 	void getFollowerCount_CacheMiss_DBZero_Success() {
 		// given
 		UUID followeeId = UUID.randomUUID();
-
-		User mockUser = User.builder()
-			.name("테스트유저")
-			.email("test@example.com")
-			.build();
+		User mockUser = User.builder().name("테스트유저").email("test@example.com").build();
 		ReflectionTestUtils.setField(mockUser, "id", followeeId);
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(mockUser));
-
-		// Redis Cache Miss (null)
 		given(followRedisStore.getFollowerCount(followeeId)).willReturn(null);
-
-		// DB FallBack (0L)
-		given(followRepository.countByFolloweeId(followeeId)).willReturn(0L);
+		// DB에서 빈 리스트(Set)를 반환
+		given(followRepository.findFollowerIdsByFolloweeId(followeeId)).willReturn(Set.of());
 
 		// when
 		Long result = followService.getFollowerCount(followeeId);
 
 		// then
 		assertThat(result).isEqualTo(0L);
-		verify(followRepository, times(1)).countByFolloweeId(followeeId);
+		verify(followRepository, times(1)).findFollowerIdsByFolloweeId(followeeId);
+		verify(followRedisStore, times(1)).initFollowers(followeeId, Set.of());
 	}
 
 	@Test

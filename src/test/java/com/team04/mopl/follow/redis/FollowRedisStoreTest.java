@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.*;
 
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +29,11 @@ class FollowRedisStoreTest {
 	@InjectMocks
 	private FollowRedisStore followRedisStore;
 
+	/*
+	=========================
+	   팔로우 생성
+	=========================
+	 */
 	@Test
 	@DisplayName("성공: 팔로우 추가 시 Lua 스크립트가 실행되고 1L이 반환되면 true를 반환한다.")
 	void addFollow_Success() {
@@ -65,6 +71,11 @@ class FollowRedisStoreTest {
 		assertThat(result).isFalse();
 	}
 
+	/*
+	============================
+	   특정 사용자 팔로우 여부 조회
+	============================
+	 */
 	@Test
 	@DisplayName("성공: Redis ZSET에 스코어가 존재하면 팔로우 중인 것으로 판단(true)한다.")
 	void isFollowing_True_Success() {
@@ -101,6 +112,11 @@ class FollowRedisStoreTest {
 		assertThat(result).isFalse();
 	}
 
+	/*
+	=============================
+	   특정 사용자의 팔로우 수 조회
+	=============================
+	 */
 	@Test
 	@DisplayName("성공: Redis 키가 존재(hasKey=true)하면 zCard를 통해 팔로워 수를 정상 반환한다.")
 	void getFollowerCount_HasCount_Success() {
@@ -135,6 +151,42 @@ class FollowRedisStoreTest {
 		verify(stringRedisTemplate, never()).opsForZSet();
 	}
 
+	@Test
+	@DisplayName("성공: 팔로워 백필 시 followerIds 컬렉션이 존재하면 벌크 ZADD(add) 연산을 수행한다.")
+	void initFollowers_Success() {
+		// given
+		UUID followeeId = UUID.randomUUID();
+		Set<UUID> followerIds = Set.of(UUID.randomUUID(), UUID.randomUUID());
+
+		given(stringRedisTemplate.opsForZSet()).willReturn(zSetOperations);
+		given(zSetOperations.add(anyString(), anySet())).willReturn(2L);
+
+		// when
+		followRedisStore.initFollowers(followeeId, followerIds);
+
+		// then
+		verify(zSetOperations, times(1)).add(anyString(), anySet());
+	}
+
+	@Test
+	@DisplayName("성공: 팔로워 백필 시 followerIds가 비어있으면 Redis 명령을 수행하지 않고 종료한다.")
+	void initFollowers_EmptyList_NoOp() {
+		// given
+		UUID followeeId = UUID.randomUUID();
+		Set<UUID> emptySet = Set.of();
+
+		// when
+		followRedisStore.initFollowers(followeeId, emptySet);
+
+		// then
+		verify(stringRedisTemplate, never()).opsForZSet();
+	}
+
+	/*
+	==================
+	   팔로우 취소
+	==================
+	 */
 	@Test
 	@DisplayName("성공: 팔로우 취소 시 Lua 스크립트를 사용하여 원자적으로 두 ZSET에서 요소를 삭제한다.")
 	void removeFollow_LuaScript_Success() {
