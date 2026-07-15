@@ -1,14 +1,16 @@
 package com.team04.mopl.user.service;
 
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,8 +22,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.team04.mopl.auth.service.TemporaryPasswordService;
 import com.team04.mopl.auth.session.AuthSessionStore;
-import com.team04.mopl.user.dto.request.ChangePasswordRequest;
 import com.team04.mopl.common.storage.FileStorage;
+import com.team04.mopl.user.dto.request.ChangePasswordRequest;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserUpdateRequest;
 import com.team04.mopl.user.dto.response.UserDto;
@@ -202,7 +204,7 @@ public class UserService {
 	private void validateProfileImage(MultipartFile image) {
 		validateProfileImageSize(image);
 		validateProfileImageContentType(image);
-		// Content-Type은 클라이언트가 조작할 수 있으므로 실제 이미지로 디코딩 가능한지도 검증한다.
+		// 실제 이미지로 디코딩 가능한지 검증
 		validateProfileImageReadable(image);
 	}
 
@@ -239,15 +241,44 @@ public class UserService {
 		);
 	}
 
-	// ImageIO가 실제 이미지 바이트를 해석하지 못하면 확장자/Content-Type이 맞아도 거부
+	// ImageReader로 이미지 헤더의 크기를 확인해 전체 픽셀 디코딩 없이 실제 이미지 여부를 검증
 	private void validateProfileImageReadable(MultipartFile image) {
-		try (InputStream inputStream = image.getInputStream()) {
-			BufferedImage bufferedImage = ImageIO.read(inputStream);
+		try (
+			InputStream inputStream = image.getInputStream();
+			ImageInputStream imageInputStream = ImageIO.createImageInputStream(inputStream)
+		) {
+			if (imageInputStream == null) {
+				throw invalidProfileImage("지원하지 않거나 손상된 이미지 파일입니다.");
+			}
 
-			if (bufferedImage != null && bufferedImage.getWidth() > 0 && bufferedImage.getHeight() > 0) {
-				return;
+			Iterator<ImageReader> imageReaders = ImageIO.getImageReaders(imageInputStream);
+
+			if (!imageReaders.hasNext()) {
+				throw invalidProfileImage("지원하지 않거나 손상된 이미지 파일입니다.");
+			}
+
+			ImageReader imageReader = imageReaders.next();
+			imageInputStream.seek(0);
+
+			try {
+				// 픽셀 데이터 로드 생략 및 메타데이터 무시 설정을 통해 OOM 방어 및 성능 최적화
+				imageReader.setInput(imageInputStream, true, true);
+
+				if (imageReader.getWidth(0) > 0 && imageReader.getHeight(0) > 0) {
+					return;
+				}
+			} finally {
+				imageReader.dispose();
 			}
 		} catch (IOException exception) {
+			log.warn(
+				"[USER_PROFILE_UPDATE] 프로필 이미지 파일 판독 실패: filename={}, contentType={}, sizeBytes={}",
+				image.getOriginalFilename(),
+				image.getContentType(),
+				image.getSize(),
+				exception
+			);
+
 			throw invalidProfileImage("이미지 파일을 읽을 수 없습니다.");
 		}
 
