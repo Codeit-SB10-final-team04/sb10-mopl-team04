@@ -72,8 +72,9 @@ dependencies {
     // spotbugs
     compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.6'
 
-    // Elastic Search
+    // Elastic Search (OpenSearch)
     implementation("org.opensearch.client:spring-data-opensearch-starter:1.8.1")
+    implementation("org.opensearch.client:opensearch-java:2.19.0")
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
