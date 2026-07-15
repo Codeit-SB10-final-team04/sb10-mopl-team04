@@ -91,15 +91,26 @@ public class FollowService {
 		User requestedUser = getUserEntityOrThrow(requestUserId);    // 요청자
 
 		// 2. 팔로우 여부 조회 (Redis)
-		boolean isFollowConnection = followRedisStore.isFollowing(requestUserId, followeeId);
+		Boolean isFollowingCache = followRedisStore.isFollowing(requestUserId, followeeId);
 
-		// 3. 팔로우 조회 (RDB)
+		// 3. Cache-Aside 로직 적용
+		boolean isFollowConnection;
+
+		if (isFollowingCache != null) {
+			isFollowConnection = isFollowingCache;
+		} else {
+			isFollowConnection = followRepository.existsByFolloweeIdAndFollowerId(followeeId, requestUserId);
+
+			followRedisStore.addFollow(requestUserId, followeeId);
+		}
+
+		// 4. 팔로우 조회 (RDB)
 		Follow followConnection = getFollowEntityByFolloweeIdAndFollowerIdOrThrow(
 			targetUser.getId(),
 			requestedUser.getId()
 		);
 
-		// 4, 팔로우 여부 조회 (DB FallBack)
+		// 5. 팔로우 여부 조회 (DB FallBack)
 		if (!isFollowConnection) {
 			followRedisStore.addFollow(requestUserId, followeeId);
 		}
