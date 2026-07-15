@@ -62,7 +62,7 @@ public class FollowRedisStore {
 		);
 
 		// 스크립트 실행
-		Long result = stringRedisTemplate.execute(
+		stringRedisTemplate.execute(
 			script,
 			List.of(followingKey, followersKey, emptyKey),
 			String.valueOf(timestamp),
