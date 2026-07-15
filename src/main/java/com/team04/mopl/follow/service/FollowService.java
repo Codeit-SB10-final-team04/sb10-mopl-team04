@@ -121,7 +121,7 @@ public class FollowService {
 		Long followCount = followRedisStore.getFollowerCount(followeeId);
 
 		// 3. 특정 사용자의 팔로우 수 조회 (DB FallBack)
-		if (followCount == 0L) {
+		if (followCount == null) {
 			followCount = followRepository.countByFolloweeId(followeeId);
 		}
 
