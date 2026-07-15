@@ -1,5 +1,6 @@
 package com.team04.mopl.follow.redis;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +21,8 @@ public class FollowRedisStore {
 
 	private static final String FOLLOWING_KEY = "follow:following:%s";        // 내가 팔로우하는 사람들
 	private static final String FOLLOWERS_KEY = "follow:followers:%s";        // 나를 팔로우하는 사람들
+
+	private static final String EMPTY_FOLLOWERS_KEY = "follow:followers:empty:%s";
 
 	// 원자적 업데이트: 자바 스크립트를 하나의 명령어로 취급
 	private static final String ADD_FOLLOW_SCRIPT = """
@@ -70,6 +73,13 @@ public class FollowRedisStore {
 
 	// 특정 유저의 팔로우 수 (팔로워) 조회
 	public Long getFollowerCount(UUID followeeId) {
+		// 팔로워가 0명인 경우
+		String emptyKey = String.format(EMPTY_FOLLOWERS_KEY, followeeId);
+
+		if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(emptyKey))) {
+			return 0L;
+		}
+
 		String followersKey = String.format(FOLLOWERS_KEY, followeeId);
 
 		// Cache Miss 확인
@@ -90,6 +100,9 @@ public class FollowRedisStore {
 	public void initFollowers(UUID followeeId, Collection<UUID> followerIds) {
 
 		if (followerIds == null || followerIds.isEmpty()) {
+			String emptyKey = String.format(EMPTY_FOLLOWERS_KEY, followeeId);
+			stringRedisTemplate.opsForValue().set(emptyKey, "1", Duration.ofMinutes(10));
+
 			return;
 		}
 
