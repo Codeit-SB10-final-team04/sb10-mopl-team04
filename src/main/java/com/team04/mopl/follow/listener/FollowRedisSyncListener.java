@@ -9,9 +9,7 @@ import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.follow.event.FollowDeletedEvent;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class FollowRedisSyncListener {
