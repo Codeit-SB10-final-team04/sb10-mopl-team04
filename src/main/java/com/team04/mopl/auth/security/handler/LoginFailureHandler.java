@@ -45,15 +45,17 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 		HttpServletResponse response,
 		AuthenticationException exception
 	) throws IOException {
+		Map<String, String> missingParameters = resolveMissingRequiredLoginParameterDetails(request);
+
 		// 필수 폼 파라미터 누락 시 400으로 응답
-		if (hasMissingRequiredLoginParameter(request)) {
+		if (!missingParameters.isEmpty()) {
 			authResponseWriter.writeJson(
 				response,
 				HttpStatus.BAD_REQUEST,
 				ErrorResponse.of(
 					exception,
 					"필수 로그인 파라미터가 누락되었습니다.",
-					resolveMissingRequiredLoginParameterDetails(request)
+					missingParameters
 				)
 			);
 
@@ -64,12 +66,6 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 		AuthException authException = new AuthException(errorCode, exception);
 
 		authResponseWriter.writeError(response, authException);
-	}
-
-	// username/password 중 하나라도 비어 있으면 필수 파라미터 누락으로 판단
-	private boolean hasMissingRequiredLoginParameter(HttpServletRequest request) {
-		return !StringUtils.hasText(request.getParameter(USERNAME_PARAMETER))
-			|| !StringUtils.hasText(request.getParameter(PASSWORD_PARAMETER));
 	}
 
 	// 누락된 필드만 details에 담아 클라이언트가 보완할 값을 명확히 알 수 있게 함
