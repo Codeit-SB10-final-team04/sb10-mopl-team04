@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.*;
 
+import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
 
@@ -14,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.core.script.RedisScript;
 
@@ -25,6 +27,9 @@ class FollowRedisStoreTest {
 
 	@Mock
 	private ZSetOperations<String, String> zSetOperations;
+
+	@Mock
+	private ValueOperations<String, String> valueOperations;
 
 	@InjectMocks
 	private FollowRedisStore followRedisStore;
@@ -124,7 +129,8 @@ class FollowRedisStoreTest {
 		UUID followeeId = UUID.randomUUID();
 		long expectedCount = 42L;
 
-		given(stringRedisTemplate.hasKey(anyString())).willReturn(true);
+		given(stringRedisTemplate.hasKey(contains("empty"))).willReturn(false);
+		given(stringRedisTemplate.hasKey(contains("followers"))).willReturn(true);
 		given(stringRedisTemplate.opsForZSet()).willReturn(zSetOperations);
 		given(zSetOperations.zCard(anyString())).willReturn(expectedCount);
 
@@ -152,6 +158,23 @@ class FollowRedisStoreTest {
 	}
 
 	@Test
+	@DisplayName("성공: 네거티브 캐시(empty 마커)가 존재하면 바로 0L을 반환한다.")
+	void getFollowerCount_NegativeCache_ReturnsZero() {
+		// given
+		UUID followeeId = UUID.randomUUID();
+
+		// emptyKey가 존재함
+		given(stringRedisTemplate.hasKey(contains("empty"))).willReturn(true);
+
+		// when
+		Long result = followRedisStore.getFollowerCount(followeeId);
+
+		// then
+		assertThat(result).isEqualTo(0L);
+		verify(stringRedisTemplate, never()).opsForZSet();
+	}
+
+	@Test
 	@DisplayName("성공: 팔로워 백필 시 followerIds 컬렉션이 존재하면 벌크 ZADD(add) 연산을 수행한다.")
 	void initFollowers_Success() {
 		// given
@@ -169,16 +192,19 @@ class FollowRedisStoreTest {
 	}
 
 	@Test
-	@DisplayName("성공: 팔로워 백필 시 followerIds가 비어있으면 Redis 명령을 수행하지 않고 종료한다.")
-	void initFollowers_EmptyList_NoOp() {
+	@DisplayName("성공: 팔로워 백필 시 followerIds가 비어있으면 10분짜리 네거티브 캐시(empty 마커)를 설정한다.")
+	void initFollowers_EmptyList_SetsNegativeCache() {
 		// given
 		UUID followeeId = UUID.randomUUID();
-		Set<UUID> emptySet = Set.of();
+		Set<UUID> emptyList = Set.of();
+
+		given(stringRedisTemplate.opsForValue()).willReturn(valueOperations);
 
 		// when
-		followRedisStore.initFollowers(followeeId, emptySet);
+		followRedisStore.initFollowers(followeeId, emptyList);
 
 		// then
+		verify(valueOperations, times(1)).set(contains("empty"), eq("1"), any(Duration.class));
 		verify(stringRedisTemplate, never()).opsForZSet();
 	}
 
