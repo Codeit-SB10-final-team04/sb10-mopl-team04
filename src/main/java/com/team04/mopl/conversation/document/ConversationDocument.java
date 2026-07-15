@@ -9,6 +9,7 @@ import org.springframework.data.elasticsearch.annotations.DateFormat;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
+import org.springframework.data.elasticsearch.annotations.Setting;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -16,6 +17,7 @@ import lombok.Getter;
 @Getter
 @Builder
 @Document(indexName = "conversations")
+@Setting(settingPath = "elasticsearch/conversations-settings.json")
 public class ConversationDocument {
 
 	@Id

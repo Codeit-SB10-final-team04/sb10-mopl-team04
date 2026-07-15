@@ -1,10 +1,12 @@
 package com.team04.mopl.watching.store;
 
+import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -21,10 +23,14 @@ public class SubscriptionStore {
 	private static final String KEY_PREFIX = "stomp:sub:";
 	private static final String INDEX_PREFIX = "stomp:sub-index:";
 
+	private static final DefaultRedisScript<Boolean> EXPIRE_SCRIPT = new DefaultRedisScript<>(
+		"return redis.call('EXPIRE', KEYS[1], ARGV[1])", Boolean.class
+	);
+
 	public void register(String sessionId, String subscriptionId, String destination) {
 		redisTemplate.opsForValue().set(toKey(sessionId, subscriptionId), destination, 24, TimeUnit.HOURS);
 		redisTemplate.opsForSet().add(INDEX_PREFIX + sessionId, subscriptionId);
-		redisTemplate.expire(INDEX_PREFIX + sessionId, 24, TimeUnit.HOURS);
+		redisTemplate.execute(EXPIRE_SCRIPT, Collections.singletonList(INDEX_PREFIX + sessionId), "86400");
 	}
 
 	public Optional<String> getDestination(String sessionId, String subscriptionId) {
