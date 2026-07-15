@@ -372,7 +372,7 @@ class FollowServiceTest {
 
 		// Redis Cache Miss (null)
 		given(followRedisStore.getFollowerCount(followeeId)).willReturn(null);
-		
+
 		// DB FallBack (0L)
 		given(followRepository.countByFolloweeId(followeeId)).willReturn(0L);
 
