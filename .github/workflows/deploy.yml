@@ -114,6 +114,7 @@ jobs:
             MOPL_MAIL_FROM_NAME=${{ secrets.MOPL_MAIL_FROM_NAME }}
             MOPL_ADMIN_EMAIL=${{ secrets.MOPL_ADMIN_EMAIL }}
             MOPL_ADMIN_PASSWORD=${{ secrets.MOPL_ADMIN_PASSWORD }}
+            SPRING_ELASTICSEARCH_URIS=${{ secrets.SPRING_ELASTICSEARCH_URIS }}
 
       - name: 새 태스크 정의 배포 (Rolling Update)
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
