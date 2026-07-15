@@ -1,0 +1,10 @@
+{
+  "analysis": {
+    "analyzer": {
+      "nori": {
+        "type": "custom",
+        "tokenizer": "nori_tokenizer"
+      }
+    }
+  }
+}
