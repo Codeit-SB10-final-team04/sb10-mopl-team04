@@ -29,6 +29,7 @@ public class FollowRedisStore {
 		    local isNew = redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
 		    if isNew == 1 then
 		        redis.call('ZADD', KEYS[2], ARGV[1], ARGV[3])
+		        redis.call('DEL', KEYS[3])
 		        return 1
 		    end
 		    return 0
@@ -45,6 +46,8 @@ public class FollowRedisStore {
 
 	// 팔로우 생성 (추가)
 	public boolean addFollow(UUID followerId, UUID followeeId) {
+		String emptyKey = String.format(EMPTY_FOLLOWERS_KEY, followeeId);
+
 		String followingKey = String.format(FOLLOWING_KEY, followerId);
 		String followersKey = String.format(FOLLOWERS_KEY, followeeId);
 
@@ -54,7 +57,7 @@ public class FollowRedisStore {
 		DefaultRedisScript<Long> script = new DefaultRedisScript<>(ADD_FOLLOW_SCRIPT, Long.class);
 		Long result = stringRedisTemplate.execute(
 			script,
-			List.of(followingKey, followersKey),
+			List.of(followingKey, followersKey, emptyKey),
 			String.valueOf(timestamp),
 			followeeId.toString(),
 			followerId.toString()

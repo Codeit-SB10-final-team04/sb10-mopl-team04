@@ -59,6 +59,35 @@ class FollowRedisStoreTest {
 	}
 
 	@Test
+	@DisplayName("성공: 팔로우 추가 시 Lua 스크립트에 empty 마커 키가 정확히 전달되어 원자적 삭제를 유도한다.")
+	void addFollow_DeletesEmptyMarker_Success() {
+		// given
+		UUID followerId = UUID.randomUUID();
+		UUID followeeId = UUID.randomUUID();
+
+		// 예측되는 emptyKey 값
+		String expectedEmptyKey = String.format("follow:followers:empty:%s", followeeId);
+
+		given(stringRedisTemplate.execute(any(RedisScript.class), anyList(), any(), any(), any()))
+			.willReturn(1L);
+
+		// when
+		boolean result = followRedisStore.addFollow(followerId, followeeId);
+
+		// then
+		assertThat(result).isTrue();
+
+		// 💡 핵심 검증: Lua 스크립트를 실행할 때 KEYS 배열(List)의 3번째 인자로 emptyKey가 정확히 넘어가는지 확인
+		verify(stringRedisTemplate, times(1)).execute(
+			any(RedisScript.class),
+			argThat(keys -> keys.size() == 3 && keys.get(2).equals(expectedEmptyKey)),
+			anyString(),
+			anyString(),
+			anyString()
+		);
+	}
+
+	@Test
 	@DisplayName("실패: 팔로우 추가 시 이미 존재하거나 연산에 실패하여 0L이 반환되면 false를 반환한다.")
 	void addFollow_AlreadyExists_ReturnsFalse() {
 		// given
@@ -129,8 +158,12 @@ class FollowRedisStoreTest {
 		UUID followeeId = UUID.randomUUID();
 		long expectedCount = 42L;
 
-		given(stringRedisTemplate.hasKey(contains("empty"))).willReturn(false);
-		given(stringRedisTemplate.hasKey(contains("followers"))).willReturn(true);
+		String emptyKey = String.format("follow:followers:empty:%s", followeeId);
+		String followersKey = String.format("follow:followers:%s", followeeId);
+
+		given(stringRedisTemplate.hasKey(emptyKey)).willReturn(false);
+		given(stringRedisTemplate.hasKey(followersKey)).willReturn(true);
+		
 		given(stringRedisTemplate.opsForZSet()).willReturn(zSetOperations);
 		given(zSetOperations.zCard(anyString())).willReturn(expectedCount);
 
