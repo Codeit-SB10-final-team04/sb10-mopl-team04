@@ -266,7 +266,6 @@ class FollowServiceTest {
 
 		// 팔로우 캐시 미스 (Redis null)
 		given(followRedisStore.isFollowing(requestUserId, followeeId)).willReturn(null);
-
 		// DB 관계 없음 확인
 		given(followRepository.existsByFolloweeIdAndFollowerId(followeeId, requestUserId)).willReturn(false);
 
@@ -279,7 +278,7 @@ class FollowServiceTest {
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
 
-		verify(followRedisStore, atLeastOnce()).addFollow(requestUserId, followeeId);
+		verify(followRedisStore, never()).addFollow(any(), any());
 	}
 
 	/*

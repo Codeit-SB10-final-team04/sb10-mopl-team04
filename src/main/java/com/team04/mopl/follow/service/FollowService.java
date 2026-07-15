@@ -101,7 +101,9 @@ public class FollowService {
 		} else {
 			isFollowConnection = followRepository.existsByFolloweeIdAndFollowerId(followeeId, requestUserId);
 
-			followRedisStore.addFollow(requestUserId, followeeId);
+			if (isFollowConnection) {
+				followRedisStore.addFollow(requestUserId, followeeId);
+			}
 		}
 
 		// 4. 팔로우 조회 (RDB)
