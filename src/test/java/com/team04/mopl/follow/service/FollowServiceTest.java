@@ -174,7 +174,7 @@ class FollowServiceTest {
 	=============================
 	 */
 	@Test
-	@DisplayName("성공: 두 사용자가 존재하고 팔로우 관계가 있다면 FollowDto를 반환한다.")
+	@DisplayName("성공: 두 사용자가 존재하고 Redis에 팔로우 관계가 있다면 (Cache Hit) DB 갱신 없이 반환한다.")
 	void getFollowConnection_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -188,6 +188,7 @@ class FollowServiceTest {
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(targetUser));
 		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestedUser));
 
+		// Redis Cache Hit
 		given(followRedisStore.isFollowing(requestUserId, followeeId)).willReturn(true);
 
 		Follow mockFollow = mock(Follow.class);
@@ -205,7 +206,43 @@ class FollowServiceTest {
 		assertThat(result).isNotNull();
 		assertThat(result).isEqualTo(mockDto);
 		verify(followRepository, times(1)).findByFolloweeIdAndFollowerId(followeeId, requestUserId);
+		verify(followRedisStore, never()).addFollow(any(), any()); // Cache Reload(FallBack)가 일어나지 않음 검증
+	}
+
+	@Test
+	@DisplayName("성공: Redis에 팔로우 관계가 없지만 DB에 존재하면 (Cache Miss & Fallback) 반환하고 Redis를 갱신한다.")
+	void getFollowConnection_CacheMiss_Success() {
+		// given
+		UUID requestUserId = UUID.randomUUID();
+		User requestedUser = mock(User.class);
+		given(requestedUser.getId()).willReturn(requestUserId);
+
+		UUID followeeId = UUID.randomUUID();
+		User targetUser = mock(User.class);
+		given(targetUser.getId()).willReturn(followeeId);
+
+		given(userRepository.findById(followeeId)).willReturn(Optional.of(targetUser));
+		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestedUser));
+
+		// Redis Cache Miss (false 반환)
+		given(followRedisStore.isFollowing(requestUserId, followeeId)).willReturn(false);
+
+		Follow mockFollow = mock(Follow.class);
+		given(mockFollow.getId()).willReturn(UUID.randomUUID());
+		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, requestUserId))
+			.willReturn(Optional.of(mockFollow));
+
+		FollowDto mockDto = mock(FollowDto.class);
+		given(followMapper.toDto(mockFollow)).willReturn(mockDto);
+
+		// when
+		FollowDto result = followService.getFollowConnection(followeeId, requestUserId);
+
+		// then
+		assertThat(result).isNotNull();
+		assertThat(result).isEqualTo(mockDto);
 		verify(followRepository, times(1)).findByFolloweeIdAndFollowerId(followeeId, requestUserId);
+		verify(followRedisStore, times(1)).addFollow(requestUserId, followeeId);
 	}
 
 	@Test
@@ -224,11 +261,10 @@ class FollowServiceTest {
 			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
 
 		verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
-		verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
 	}
 
 	@Test
-	@DisplayName("실패: 팔로우 관계가 존재하지 않으면 FOLLOW_NOT_FOUND 예외가 발생한다.")
+	@DisplayName("실패: DB에도 팔로우 관계가 존재하지 않으면 FOLLOW_NOT_FOUND 예외가 발생한다.")
 	void getFollowConnection_FollowNotFound_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -242,15 +278,19 @@ class FollowServiceTest {
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(targetUser));
 		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestedUser));
 
-		// 팔로우 미존재
+		// 팔로우 미존재 (Redis)
 		given(followRedisStore.isFollowing(requestUserId, followeeId)).willReturn(false);
+
+		// 팔로우 미존재 (DB)
+		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, requestUserId))
+			.willReturn(Optional.empty());
 
 		// when & then
 		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, requestUserId))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
 
-		verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
+		verify(followRedisStore, never()).addFollow(any(), any());
 	}
 
 	/*
@@ -259,7 +299,7 @@ class FollowServiceTest {
 	=============================
 	 */
 	@Test
-	@DisplayName("성공: 유저가 존재하면 팔로워 수를 정상적으로 반환한다.")
+	@DisplayName("성공: 유저가 존재하고 Redis 캐시에 1명 이상이면 팔로워 수를 정상적으로 반환한다.")
 	void getFollowerCount_ReturnFollowerCount_Success() {
 		// given
 		UUID followeeId = UUID.randomUUID();
@@ -272,6 +312,8 @@ class FollowServiceTest {
 		long expectedCount = 15L;
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(mockUser));
+
+		// Redis Cache Hit
 		given(followRedisStore.getFollowerCount(followeeId)).willReturn(expectedCount);
 
 		// when
@@ -282,6 +324,64 @@ class FollowServiceTest {
 		verify(userRepository).findById(followeeId);
 		verify(followRedisStore, times(1)).getFollowerCount(followeeId);
 		verify(followRepository, never()).countByFolloweeId(any());
+	}
+
+	@Test
+	@DisplayName("성공: Redis 캐시 미스(null) 발생 시, DB를 찔러서 DB 값을 반환한다.")
+	void getFollowerCount_CacheMiss_DBHasCount_Success() {
+		// given
+		UUID followeeId = UUID.randomUUID();
+
+		User mockUser = User.builder()
+			.name("테스트유저")
+			.email("test@example.com")
+			.build();
+		ReflectionTestUtils.setField(mockUser, "id", followeeId);
+
+		long expectedCount = 10L;
+
+		given(userRepository.findById(followeeId)).willReturn(Optional.of(mockUser));
+
+		// Redis Cache Miss (null)
+		given(followRedisStore.getFollowerCount(followeeId)).willReturn(null);
+
+		// DB FallBack
+		given(followRepository.countByFolloweeId(followeeId)).willReturn(expectedCount);
+
+		// when
+		Long result = followService.getFollowerCount(followeeId);
+
+		// then
+		assertThat(result).isEqualTo(expectedCount);
+		verify(followRepository, times(1)).countByFolloweeId(followeeId);
+	}
+
+	@Test
+	@DisplayName("성공: Redis 캐시 미스(null) 발생 후 DB를 찔렀는데 DB에도 0명이면 0을 반환한다.")
+	void getFollowerCount_CacheMiss_DBZero_Success() {
+		// given
+		UUID followeeId = UUID.randomUUID();
+
+		User mockUser = User.builder()
+			.name("테스트유저")
+			.email("test@example.com")
+			.build();
+		ReflectionTestUtils.setField(mockUser, "id", followeeId);
+
+		given(userRepository.findById(followeeId)).willReturn(Optional.of(mockUser));
+
+		// Redis Cache Miss (null)
+		given(followRedisStore.getFollowerCount(followeeId)).willReturn(null);
+		
+		// DB FallBack (0L)
+		given(followRepository.countByFolloweeId(followeeId)).willReturn(0L);
+
+		// when
+		Long result = followService.getFollowerCount(followeeId);
+
+		// then
+		assertThat(result).isEqualTo(0L);
+		verify(followRepository, times(1)).countByFolloweeId(followeeId);
 	}
 
 	@Test
@@ -337,7 +437,7 @@ class FollowServiceTest {
 	void deleteFollow_FollowNotFound_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		
+
 		given(followRepository.findById(any())).willReturn(Optional.empty());
 
 		// when & then
