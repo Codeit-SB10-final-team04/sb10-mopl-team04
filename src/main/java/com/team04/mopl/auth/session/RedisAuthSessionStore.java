@@ -83,18 +83,18 @@ public class RedisAuthSessionStore implements AuthSessionStore {
 	) {
 		// 세션 값 검증
 		AuthSessionData newSession = new AuthSessionData(
-			userId,
-			sessionId,
-			refreshTokenHash,
-			accessExpiresAt,
-			refreshExpiresAt,
+			Objects.requireNonNull(userId, "userId는 필수입니다."),
+			Objects.requireNonNull(sessionId, "sessionId는 필수입니다."),
+			requireText(refreshTokenHash, "Refresh Token 해시는 필수입니다."),
+			Objects.requireNonNull(accessExpiresAt, "accessExpiresAt은 필수입니다."),
+			Objects.requireNonNull(refreshExpiresAt, "refreshExpiresAt은 필수입니다."),
 			null,
-			issuedAt
+			Objects.requireNonNull(issuedAt, "issuedAt은 필수입니다.")
 		);
 
 		// Redis 키 생성
-		String sessionKey = sessionKey(userId);
-		String newRefreshKey = refreshKey(refreshTokenHash);
+		String sessionKey = sessionKey(newSession.userId());
+		String newRefreshKey = refreshKey(newSession.refreshTokenHash());
 
 		// CAS 충돌 재시도
 		for (int attempt = 0; attempt < MAX_COMPARE_AND_SET_RETRIES; attempt++) {
@@ -151,20 +151,19 @@ public class RedisAuthSessionStore implements AuthSessionStore {
 	@Override
 	public boolean isActive(UUID userId, UUID sessionId) {
 		// JWT 세션 식별자 검증
-		if (userId == null || sessionId == null) {
-			return false;
-		}
+		UUID requiredUserId = Objects.requireNonNull(userId, "userId는 필수입니다.");
+		UUID requiredSessionId = Objects.requireNonNull(sessionId, "sessionId는 필수입니다.");
 
 		List<String> activeSession = executeRedis(
 			() -> hashOperations().multiGet(
-				sessionKey(userId),
+				sessionKey(requiredUserId),
 				List.of(SESSION_ID_FIELD, REFRESH_TOKEN_HASH_FIELD)
 			)
 		);
 
 		// sessionId 및 refresh hash 검증
 		return activeSession.size() == 2
-			&& sessionId.toString().equals(activeSession.get(0))
+			&& requiredSessionId.toString().equals(activeSession.get(0))
 			&& activeSession.get(1) != null
 			&& !activeSession.get(1).isBlank();
 	}
@@ -173,12 +172,13 @@ public class RedisAuthSessionStore implements AuthSessionStore {
 	@Override
 	public Optional<AuthSessionData> findByRefreshTokenHash(String refreshTokenHash) {
 		// refresh hash 검증
-		if (refreshTokenHash == null || refreshTokenHash.isBlank()) {
-			return Optional.empty();
-		}
+		String requiredRefreshTokenHash = requireText(
+			refreshTokenHash,
+			"Refresh Token 해시는 필수입니다."
+		);
 
 		// refresh 역인덱스 조회
-		String refreshKey = refreshKey(refreshTokenHash);
+		String refreshKey = refreshKey(requiredRefreshTokenHash);
 		String userIdValue = executeRedis(() -> redisTemplate.opsForValue().get(refreshKey));
 
 		// 역인덱스 미존재
@@ -196,7 +196,7 @@ public class RedisAuthSessionStore implements AuthSessionStore {
 
 		// 역인덱스와 세션 교차 검증
 		Optional<AuthSessionData> authSession = findByUserId(userId)
-			.filter(session -> session.matchesRefreshTokenHash(refreshTokenHash));
+			.filter(session -> session.matchesRefreshTokenHash(requiredRefreshTokenHash));
 
 		// 불일치 역인덱스 정리
 		if (authSession.isEmpty()) {
@@ -228,22 +228,23 @@ public class RedisAuthSessionStore implements AuthSessionStore {
 			newRefreshTokenHash,
 			"새 Refresh Token 해시는 필수입니다."
 		);
+		Instant requiredRefreshedAt = Objects.requireNonNull(refreshedAt, "refreshedAt은 필수입니다.");
 
 		// 갱신 세션 값 검증
 		AuthSessionData refreshedSession = new AuthSessionData(
 			Objects.requireNonNull(userId, "userId는 필수입니다."),
 			Objects.requireNonNull(sessionId, "sessionId는 필수입니다."),
 			newHash,
-			accessExpiresAt,
-			refreshExpiresAt,
-			refreshedAt,
-			refreshedAt
+			Objects.requireNonNull(accessExpiresAt, "accessExpiresAt은 필수입니다."),
+			Objects.requireNonNull(refreshExpiresAt, "refreshExpiresAt은 필수입니다."),
+			requiredRefreshedAt,
+			requiredRefreshedAt
 		);
 
 		// refresh hash 및 세션 원자 교체
 		long result = executeScript(
 			REFRESH_SCRIPT,
-			List.of(sessionKey(userId), refreshKey(currentHash), refreshKey(newHash)),
+			List.of(sessionKey(refreshedSession.userId()), refreshKey(currentHash), refreshKey(newHash)),
 			refreshedSession.userId().toString(),
 			refreshedSession.sessionId().toString(),
 			currentHash,
