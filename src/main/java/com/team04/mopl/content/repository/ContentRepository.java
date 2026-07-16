@@ -21,7 +21,7 @@ public interface ContentRepository extends JpaRepository<Content, UUID>, Content
 
 	Optional<Content> findByIdAndDeletedAtIsNull(UUID contentId);
 
-	@Modifying
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query(
 		"UPDATE Content c SET "
 			+ "c.averageRating = COALESCE("

@@ -1,4 +1,4 @@
-package com.team04.mopl.content.batch;
+package com.team04.mopl.content.batch.tmdb;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -8,9 +8,6 @@ import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
-
-import com.team04.mopl.content.batch.step.TmdbDailyCollectTasklet;
-import com.team04.mopl.content.batch.step.TmdbInitialCollectTasklet;
 
 import lombok.RequiredArgsConstructor;
 
