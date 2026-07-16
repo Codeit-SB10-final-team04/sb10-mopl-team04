@@ -1,4 +1,4 @@
-package com.team04.mopl.content.batch;
+package com.team04.mopl.content.batch.delete;
 
 import java.util.UUID;
 

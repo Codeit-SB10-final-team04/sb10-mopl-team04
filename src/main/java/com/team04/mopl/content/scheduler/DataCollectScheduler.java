@@ -65,10 +65,13 @@ public class DataCollectScheduler {
 	private final Job tmdbDailyCollectJob;
 
 	/**
-	 * 앱 기동 시 TMDB 초기 수집 (최초 1회)
+	 * 앱 기동 시 초기 수집 (TMDB → SportsDB 순차 실행)
+	 *
+	 * <p>Spring Batch 메타 테이블에 동시 접근하면 경합이 발생하므로
+	 * TMDB 완료 후 SportsDB를 실행한다.
 	 */
 	@EventListener(ApplicationReadyEvent.class)
-	public void runTmdbInitialCollectIfNeeded() {
+	public void runInitialCollectIfNeeded() {
 		CompletableFuture.runAsync(() -> {
 			boolean hasCompleted = jobExplorer.getJobInstances("tmdbInitialCollectJob", 0, Integer.MAX_VALUE)
 				.stream()
@@ -94,18 +97,7 @@ public class DataCollectScheduler {
 					log.error("[Scheduler] TMDB 초기 수집 실패: {}", e.getMessage(), e);
 				}
 			});
-		});
-	}
-
-	/**
-	 * 앱 기동 시 SportsDB 초기 수집 (시즌별 최초 1회)
-	 *
-	 * <p>COMPLETED 또는 RUNNING 상태인 시즌은 skip.
-	 * 락 획득 실패 시 주기 수집이 실행 중인 것으로 판단하고 전체 초기 수집을 포기한다.
-	 */
-	@EventListener(ApplicationReadyEvent.class)
-	public void runSportsInitialCollectIfNeeded() {
-		CompletableFuture.runAsync(() -> {
+		}).thenRunAsync(() -> {
 			log.info("[Scheduler] SportsDB 초기 수집 확인 시작");
 
 			for (String season : INITIAL_SEASONS) {

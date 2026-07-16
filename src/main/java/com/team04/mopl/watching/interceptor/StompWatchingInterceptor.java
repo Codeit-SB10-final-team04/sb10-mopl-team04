@@ -155,7 +155,7 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 			});
 	}
 
-	// DISCONNECT: 모든 시청 세션 정리 + 스토어 정리
+	// DISCONNECT: 즉시 퇴장하지 않고 지연 퇴장 예약 (새로고침 시 재연결 대비)
 	private void handleDisconnect(StompHeaderAccessor accessor) {
 		String sessionId = accessor.getSessionId();
 
@@ -165,18 +165,17 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 
 		webSocketSessionStore.getUserId(sessionId)
 			.ifPresent(userId -> {
-				// 시청 중인 모든 콘텐츠에서 퇴장 처리 (sessionId 전달로 멀티탭 참조 카운팅)
 				watchingSessionService.getWatchingContentIds(userId)
 					.forEach(contentId ->
-						watchingSessionService.leave(contentId, userId, sessionId)
-							.ifPresent(change -> eventPublisher.publishEvent(
+						watchingSessionService.scheduleLeave(contentId, userId, sessionId,
+							change -> eventPublisher.publishEvent(
 								new WatchingSessionEvent(contentId, change)))
 					);
 
 				subscriptionStore.removeAllBySession(sessionId);
 				webSocketSessionStore.remove(sessionId);
 
-				log.info("[WATCHING_SESSION_DISCONNECT] WebSocket 연결 종료 정리 완료: sessionId={}, userId={}",
+				log.info("[WATCHING_SESSION_DISCONNECT] WebSocket 연결 종료, 퇴장 예약 완료: sessionId={}, userId={}",
 					sessionId, userId);
 			});
 	}

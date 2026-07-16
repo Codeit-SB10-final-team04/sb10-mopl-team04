@@ -1,4 +1,9 @@
-package com.team04.mopl.content.service;
+package com.team04.mopl.content.batch.tmdb;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,8 +35,8 @@ import lombok.extern.slf4j.Slf4j;
  * <ul>
  *   <li>{@code "영화"} — movie 고정 태그</li>
  *   <li>{@code "TV 시리즈"} — tv_series 고정 태그</li>
+ *   <li>장르 태그 — {@code genre_ids} 필드를 장르명으로 매핑하여 저장</li>
  * </ul>
- * TODO: 장르 태그 추가 예정 ({@code genre_ids} → {@code /genre/movie/list}, {@code /genre/tv/list} API로 장르명 매핑)
  *
  * <h3>Movie vs TV 필드명 차이</h3>
  * <ul>
@@ -49,6 +54,9 @@ public class TmdbContentCollectService {
 	private final TagRepository tagRepository;
 	private final ContentTagRepository contentTagRepository;
 	private final TmdbClient tmdbClient;
+
+	// 장르 ID → 장르명 캐시 (배치 실행 중 한 번만 로드)
+	private final Map<Integer, String> genreCache = new ConcurrentHashMap<>();
 
 	/**
 	 * item 1건을 저장 → 이미 존재하면 저장하지 않고 false 반환
@@ -86,21 +94,43 @@ public class TmdbContentCollectService {
 			.thumbnailUrl(tmdbClient.buildThumbnailUrl(item.path("poster_path").asText("")))
 			.build());
 
-		saveTags(content, type);
+		List<Integer> genreIds = extractGenreIds(item);
+		saveTags(content, type, genreIds);
 
 		return true;
 	}
 
 	/**
-	 * Content에 고정 태그 연결
+	 * 배치 시작 전 장르 캐시 로드
 	 *
-	 * <p>저장 태그: {@code "영화"} (movie) / {@code "TV 시리즈"} (tv_series)
-	 *
-	 * <p>TODO: 장르 태그 추가 예정 ({@code genre_ids} → {@code /genre/movie/list}, {@code /genre/tv/list} API로 장르명 매핑)
+	 * <p>Tasklet에서 execute() 시작 시 호출하여 장르 맵을 미리 캐싱.
+	 * 이미 로드된 경우 재로드하지 않음.
 	 */
-	private void saveTags(Content content, ContentType type) {
+	public void loadGenreCacheIfEmpty() {
+		if (!genreCache.isEmpty()) {
+			return;
+		}
+		genreCache.putAll(tmdbClient.getMovieGenres());
+		genreCache.putAll(tmdbClient.getTvGenres());
+		log.info("[TMDB] 장르 캐시 로드 완료: {}건", genreCache.size());
+	}
+
+	/**
+	 * Content에 고정 태그 + 장르 태그 연결
+	 *
+	 * <p>고정 태그: {@code "영화"} (movie) / {@code "TV 시리즈"} (tv_series)
+	 * <p>장르 태그: {@code genre_ids} → 장르 캐시에서 장르명 조회 후 연결
+	 */
+	private void saveTags(Content content, ContentType type, List<Integer> genreIds) {
 		String fixedTag = (type == ContentType.movie) ? "영화" : "TV 시리즈";
 		linkTag(content, fixedTag);
+
+		for (Integer genreId : genreIds) {
+			String genreName = genreCache.get(genreId);
+			if (genreName != null) {
+				linkTag(content, genreName);
+			}
+		}
 	}
 
 	/**
@@ -117,6 +147,25 @@ public class TmdbContentCollectService {
 			.content(content)
 			.tag(tag)
 			.build());
+	}
+
+	/**
+	 * TMDB item에서 genre_ids 배열 추출
+	 *
+	 * @param item TMDB API results 배열의 단일 {@link JsonNode}
+	 * @return 장르 ID 리스트 (없으면 빈 리스트)
+	 */
+	private List<Integer> extractGenreIds(JsonNode item) {
+		JsonNode genreIds = item.path("genre_ids");
+		if (genreIds.isMissingNode() || !genreIds.isArray()) {
+			return List.of();
+		}
+
+		List<Integer> ids = new ArrayList<>();
+		for (JsonNode id : genreIds) {
+			ids.add(id.asInt());
+		}
+		return ids;
 	}
 
 	/**

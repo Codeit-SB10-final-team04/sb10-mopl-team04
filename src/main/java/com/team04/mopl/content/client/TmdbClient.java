@@ -3,7 +3,9 @@ package com.team04.mopl.content.client;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
@@ -184,6 +186,81 @@ public class TmdbClient {
 			return 1;
 		}
 		return root.path("total_pages").asInt(1);
+	}
+
+	/**
+	 영화 장르 목록 조회
+
+	 엔드포인트: GET /genre/movie/list?language=ko-KR
+	 응답: {"genres": [{"id": 28, "name": "액션"}, ...]}
+
+	 @return 장르 ID → 장르명 매핑 (예: {28: "액션", 878: "SF"})
+	 */
+	@Retryable(
+		retryFor = HttpClientErrorException.TooManyRequests.class,
+		maxAttempts = 3,
+		backoff = @Backoff(delay = 60_000)
+	)
+	public Map<Integer, String> getMovieGenres() {
+		log.debug("[TMDB] 영화 장르 목록 조회");
+
+		JsonNode root = restClient.get()
+			.uri("/genre/movie/list?api_key={key}&language={lang}", apiKey, LANGUAGE)
+			.retrieve()
+			.body(JsonNode.class);
+
+		return parseGenres(root);
+	}
+
+	/**
+	 TV 장르 목록 조회
+
+	 엔드포인트: GET /genre/tv/list?language=ko-KR
+	 응답: {"genres": [{"id": 10759, "name": "액션 & 어드벤처"}, ...]}
+
+	 @return 장르 ID → 장르명 매핑
+	 */
+	@Retryable(
+		retryFor = HttpClientErrorException.TooManyRequests.class,
+		maxAttempts = 3,
+		backoff = @Backoff(delay = 60_000)
+	)
+	public Map<Integer, String> getTvGenres() {
+		log.debug("[TMDB] TV 장르 목록 조회");
+
+		JsonNode root = restClient.get()
+			.uri("/genre/tv/list?api_key={key}&language={lang}", apiKey, LANGUAGE)
+			.retrieve()
+			.body(JsonNode.class);
+
+		return parseGenres(root);
+	}
+
+	/**
+	 장르 응답 JSON → Map 변환
+
+	 @param root API 응답 루트 JsonNode
+	 @return 장르 ID → 장르명 매핑 (없으면 빈 맵)
+	 */
+	private Map<Integer, String> parseGenres(JsonNode root) {
+		if (root == null || root.isMissingNode()) {
+			return Map.of();
+		}
+
+		JsonNode genres = root.path("genres");
+		if (genres.isMissingNode() || !genres.isArray()) {
+			return Map.of();
+		}
+
+		Map<Integer, String> genreMap = new LinkedHashMap<>();
+		for (JsonNode genre : genres) {
+			int id = genre.path("id").asInt(0);
+			String name = genre.path("name").asText("");
+			if (id > 0 && !name.isBlank()) {
+				genreMap.put(id, name);
+			}
+		}
+		return genreMap;
 	}
 
 	/**
