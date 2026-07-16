@@ -90,32 +90,11 @@ public class FollowService {
 		User targetUser = getUserEntityOrThrow(followeeId);          // 특정 사용자
 		User requestedUser = getUserEntityOrThrow(requestUserId);    // 요청자
 
-		// 2. 팔로우 여부 조회 (Redis)
-		Boolean isFollowingCache = followRedisStore.isFollowing(requestUserId, followeeId);
-
-		// 3. Cache-Aside 로직 적용
-		boolean isFollowConnection;
-
-		if (isFollowingCache != null) {
-			isFollowConnection = isFollowingCache;
-		} else {
-			isFollowConnection = followRepository.existsByFolloweeIdAndFollowerId(followeeId, requestUserId);
-
-			if (isFollowConnection) {
-				followRedisStore.addFollow(requestUserId, followeeId);
-			}
-		}
-
-		// 4. 팔로우 조회 (RDB)
+		// 2. 팔로우 조회: 존재하지 않을 경우, Not Found 반환
 		Follow followConnection = getFollowEntityByFolloweeIdAndFollowerIdOrThrow(
 			targetUser.getId(),
 			requestedUser.getId()
 		);
-
-		// 5. 팔로우 여부 조회 (DB FallBack)
-		if (!isFollowConnection) {
-			followRedisStore.addFollow(requestUserId, followeeId);
-		}
 
 		log.debug("[FOLLOW_FIND_IS_FOLLWING] 특정 사용자 팔로우 여부 조회 완료: followId={}. followeeId={}, requestUserId={}",
 			followConnection.getId(), followeeId, requestUserId);
@@ -134,10 +113,13 @@ public class FollowService {
 		// 2. 특정 사용자의 팔로우 수 조회
 		Long followCount = followRedisStore.getFollowerCount(followeeId);
 
-		// 3. 특정 사용자의 팔로우 수 조회 (DB FallBack)
+		// 3. Cache-Aside 로직 적용
 		if (followCount == null) {
 			Set<UUID> followerIds = followRepository.findFollowerIdsByFolloweeId(followeeId);
+
+			// DB 백필
 			followRedisStore.initFollowers(followeeId, followerIds);
+
 			followCount = (long)followerIds.size();
 		}
 
