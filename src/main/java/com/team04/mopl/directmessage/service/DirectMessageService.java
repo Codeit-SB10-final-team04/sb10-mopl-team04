@@ -142,7 +142,7 @@ public class DirectMessageService {
 		validateMessageInConversation(directMessage, conversation.getId());
 
 		// 5. 유효성 검증: DM 수신인 여부
-		// validateReceiver(directMessage, requestUserId);
+		validateReceiver(directMessage, requestUserId);
 
 		// 6. DM 읽음 처리 및 저장
 		directMessage.markAsRead();
