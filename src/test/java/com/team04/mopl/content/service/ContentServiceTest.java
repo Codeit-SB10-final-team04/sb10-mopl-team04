@@ -527,13 +527,14 @@ class ContentServiceTest {
 		Content content = mock(Content.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
-		when(reviewRepository.findAllByContentIdAndDeletedAtIsNull(contentId)).thenReturn(List.of());
+		when(reviewRepository.bulkMarkDeletedByContentId(eq(contentId), any())).thenReturn(0);
 
 		// when
 		contentService.deleteContent(contentId);
 
 		// then
 		verify(content).markDeleted(any());
+		verify(reviewRepository).bulkMarkDeletedByContentId(eq(contentId), any());
 	}
 
 	@Test

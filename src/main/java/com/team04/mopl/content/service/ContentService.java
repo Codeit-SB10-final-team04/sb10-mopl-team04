@@ -29,7 +29,6 @@ import com.team04.mopl.content.mapper.ContentMapper;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.content.repository.ContentTagRepository;
 import com.team04.mopl.content.repository.TagRepository;
-import com.team04.mopl.review.entity.Review;
 import com.team04.mopl.review.repository.ReviewRepository;
 import com.team04.mopl.watching.service.WatchingSessionService;
 
@@ -219,10 +218,8 @@ public class ContentService {
 		Instant now = Instant.now();
 		content.markDeleted(now);
 
-		// 연관 리뷰도 논리 삭제
-		List<Review> reviews = reviewRepository.findAllByContentIdAndDeletedAtIsNull(contentId);
-		reviews.forEach(review -> review.markDeleted(now));
-		log.info("[콘텐츠 삭제 완료] contentId={}, 연관 리뷰 {}건 삭제", contentId, reviews.size());
+		int deletedReviewCount = reviewRepository.bulkMarkDeletedByContentId(contentId, now);
+		log.info("[콘텐츠 삭제 완료] contentId={}, 연관 리뷰 {}건 삭제", contentId, deletedReviewCount);
 	}
 
 	private List<String> updateTags(Content content, UUID contentId, List<String> requestedTagNames) {
