@@ -183,13 +183,11 @@ public class DirectMessageService {
 
 		// Redis 조회 결과가 없는 경우, DB 조회
 		if (totalCount == null) {
-			totalCount = directMessageRepository.countDirectMessage(
-				conversation.getId(),
-				directMessagePageRequest
-			);
+			List<DirectMessage> allMessages = directMessageRepository.findAllByConversationId(conversation.getId());
+			totalCount = (long)allMessages.size();
 
 			// Redis 백필
-			directMessageRedisStore.initDirectMessages(conversation.getId(), directMessages);
+			directMessageRedisStore.initDirectMessages(conversation.getId(), allMessages);
 		}
 
 		// 5. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기

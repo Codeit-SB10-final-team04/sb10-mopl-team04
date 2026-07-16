@@ -427,7 +427,7 @@ class DirectMessageServiceTest {
 		// then
 		assertThat(result).isEqualTo(expectedResponse);
 
-		verify(directMessageRepository, never()).countDirectMessage(any(), any());
+		verify(directMessageRepository, never()).findAllByConversationId(any());
 		verify(directMessageRedisStore, never()).initDirectMessages(any(), any());
 	}
 
@@ -471,7 +471,7 @@ class DirectMessageServiceTest {
 
 		given(directMessageRepository.findDirectMessagesByCursor(conversationId, request)).willReturn(
 			List.of(msg1, msg2, msg3));
-		given(directMessageRepository.countDirectMessage(conversationId, request)).willReturn(3L);
+		given(directMessageRepository.findAllByConversationId(conversationId)).willReturn(List.of(msg1, msg2, msg3));
 
 		CursorResponseDirectMessageDto expectedResponse = CursorResponseDirectMessageDto.builder()
 			.data(Collections.emptyList())
@@ -496,12 +496,12 @@ class DirectMessageServiceTest {
 		// then
 		assertThat(result).isEqualTo(expectedResponse);
 
-		verify(directMessageRepository, times(1)).countDirectMessage(conversationId, request);
+		verify(directMessageRepository, times(1)).findAllByConversationId(conversationId);
 		verify(directMessageRedisStore, times(1)).initDirectMessages(eq(conversationId), anyList());
 	}
 
 	@Test
-	@DisplayName("성공: [Cache Miss] 조회 결과가 빈 리스트일 경우 다음 커서가 null인 빈 응답을 반환하고 백필한다.")
+	@DisplayName("성공: [Cache Miss] 조회 결과가 빈 리스트일 경우 다음 커서가 null인 빈 응답을 반환하고 빈 리스트를 백필한다.")
 	void findAll_Success_EmptyList_CacheMiss() {
 		// given
 		UUID conversationId = UUID.randomUUID();
@@ -529,7 +529,7 @@ class DirectMessageServiceTest {
 		given(directMessageRedisStore.getRoomMessageTotalCount(conversationId)).willReturn(null);
 
 		given(directMessageRepository.findDirectMessagesByCursor(conversationId, request)).willReturn(List.of());
-		given(directMessageRepository.countDirectMessage(conversationId, request)).willReturn(0L);
+		given(directMessageRepository.findAllByConversationId(conversationId)).willReturn(List.of());
 		given(directMessageMapper.toDtoList(anyList())).willReturn(List.of());
 
 		CursorResponseDirectMessageDto expectedResponse = CursorResponseDirectMessageDto.builder()
@@ -552,7 +552,7 @@ class DirectMessageServiceTest {
 		// then
 		assertThat(result).isNotNull();
 
-		verify(directMessageRepository, times(1)).countDirectMessage(conversationId, request);
+		verify(directMessageRepository, times(1)).findAllByConversationId(conversationId);
 		verify(directMessageRedisStore, times(1)).initDirectMessages(conversationId, List.of());
 	}
 
