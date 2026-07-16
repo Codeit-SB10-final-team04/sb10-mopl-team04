@@ -1,4 +1,4 @@
-package com.team04.mopl.content.batch.step;
+package com.team04.mopl.content.batch.sports;
 
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.stereotype.Component;

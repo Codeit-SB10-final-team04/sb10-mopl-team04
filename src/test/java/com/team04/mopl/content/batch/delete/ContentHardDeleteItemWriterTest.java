@@ -1,4 +1,4 @@
-package com.team04.mopl.content.batch.step;
+package com.team04.mopl.content.batch.delete;
 
 import static org.mockito.Mockito.*;
 
