@@ -143,7 +143,36 @@ class AuthTokenServiceTest {
 				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.AUTH_MISSING_REFRESH_TOKEN)
 			);
 
-		verifyNoInteractions(tokenHasher, authSessionStore, userRepository, userMapper);
+		verifyNoInteractions(
+			tokenHasher,
+			authSessionStore,
+			userRepository,
+			jwtTokenProvider,
+			refreshTokenGenerator,
+			userMapper
+		);
+	}
+
+	@Test
+	@DisplayName("refresh token이 공백이면 토큰 재발급에 실패한다")
+	void refresh_throwMissingRefreshToken_whenRefreshTokenIsBlank() {
+		// given
+		String refreshToken = " ";
+
+		// when & then
+		assertThatThrownBy(() -> authTokenService.refresh(refreshToken))
+			.isInstanceOfSatisfying(AuthException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.AUTH_MISSING_REFRESH_TOKEN)
+			);
+
+		verifyNoInteractions(
+			tokenHasher,
+			authSessionStore,
+			userRepository,
+			jwtTokenProvider,
+			refreshTokenGenerator,
+			userMapper
+		);
 	}
 
 	@Test
