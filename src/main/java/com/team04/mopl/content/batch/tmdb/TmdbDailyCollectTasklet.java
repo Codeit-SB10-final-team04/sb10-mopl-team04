@@ -10,7 +10,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.team04.mopl.content.client.TmdbClient;
 import com.team04.mopl.content.entity.ContentType;
 
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
