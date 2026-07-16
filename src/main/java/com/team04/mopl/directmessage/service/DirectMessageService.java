@@ -141,10 +141,13 @@ public class DirectMessageService {
 		// 4. 유효성 검증: 해당 대화 내 DM 존재 유무
 		validateMessageInConversation(directMessage, conversation.getId());
 
-		// 5. DM 읽음 처리 및 저장
+		// 5. 유효성 검증: DM 수신인 여부
+		// validateReceiver(directMessage, requestUserId);
+
+		// 6. DM 읽음 처리 및 저장
 		directMessage.markAsRead();
 
-		// 6. 읽음 처리 Redis 동기화를 위한 이벤트 발행
+		// 7. 읽음 처리 Redis 동기화를 위한 이벤트 발행
 		eventPublisher.publishEvent(new DirectMessageReadEvent(
 			requestUserId,
 			conversationId,
@@ -239,6 +242,15 @@ public class DirectMessageService {
 		if (!isParticipant) {
 			throw new ConversationException(ConversationErrorCode.CONVERSATION_ACCESS_DENIED)
 				.addDetail("conversationId", conversationId)
+				.addDetail("userId", userId);
+		}
+	}
+
+	// 유효성 검증: DM 수신인 여부
+	private void validateReceiver(DirectMessage directMessage, UUID userId) {
+		if (!directMessage.getReceiver().getId().equals(userId)) {
+			throw new DirectMessageException(DirectMessageErrorCode.DM_ACCESS_DENIED)
+				.addDetail("directMessageId", directMessage.getId())
 				.addDetail("userId", userId);
 		}
 	}
