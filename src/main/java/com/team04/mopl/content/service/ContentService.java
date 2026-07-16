@@ -1,6 +1,7 @@
 package com.team04.mopl.content.service;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -179,22 +180,8 @@ public class ContentService {
 			List<String> tagNames;
 
 			if (contentUpdateRequest.tags() != null) {
-				log.debug("[콘텐츠 수정] 태그 갱신: contentId={}, tags={}", contentId, contentUpdateRequest.tags());
-
-				// 기존 태그 연결 전부 삭제 후 교체
-				contentTagRepository.deleteAllByContent(content);
-				contentTagRepository.flush();
-
-				List<Tag> tags = findOrCreateTags(contentUpdateRequest.tags());
-
-				List<ContentTag> contentTags = tags.stream()
-					.map(tag -> ContentTag.builder().content(content).tag(tag).build())
-					.toList();
-				contentTagRepository.saveAll(contentTags);
-
-				tagNames = tags.stream().map(Tag::getName).toList();
+				tagNames = updateTags(content, contentId, contentUpdateRequest.tags());
 			} else {
-				// tags가 null이면 기존 태그 유지
 				tagNames = contentTagRepository.findTagNamesByContentId(contentId);
 			}
 
@@ -238,7 +225,35 @@ public class ContentService {
 		log.info("[콘텐츠 삭제 완료] contentId={}, 연관 리뷰 {}건 삭제", contentId, reviews.size());
 	}
 
-	// 태그명 목록으로 태그 조회 or 생성 (동시성 안전 - ON CONFLICT DO NOTHING)
+	private List<String> updateTags(Content content, UUID contentId, List<String> requestedTagNames) {
+		List<String> existingTagNames = contentTagRepository.findTagNamesByContentId(contentId);
+
+		Set<String> existingSet = new HashSet<>(existingTagNames);
+		Set<String> requestedSet = new HashSet<>(requestedTagNames);
+
+		List<String> toAdd = requestedTagNames.stream()
+			.filter(name -> !existingSet.contains(name))
+			.toList();
+
+		List<String> toRemove = existingTagNames.stream()
+			.filter(name -> !requestedSet.contains(name))
+			.toList();
+
+		if (!toRemove.isEmpty()) {
+			contentTagRepository.deleteByContentAndTagNameIn(content, toRemove);
+		}
+
+		if (!toAdd.isEmpty()) {
+			List<Tag> newTags = findOrCreateTags(toAdd);
+			List<ContentTag> newContentTags = newTags.stream()
+				.map(tag -> ContentTag.builder().content(content).tag(tag).build())
+				.toList();
+			contentTagRepository.saveAll(newContentTags);
+		}
+
+		return requestedTagNames;
+	}
+
 	private List<Tag> findOrCreateTags(List<String> tagNames) {
 		// 없는 태그는 INSERT (중복 시 무시)
 		List<Tag> existingTags = tagRepository.findAllByNameIn(tagNames);

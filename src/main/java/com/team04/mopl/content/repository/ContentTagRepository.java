@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.jpa.repository.Modifying;
+
 import com.team04.mopl.content.dto.row.TagRow;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentTag;
@@ -26,6 +28,10 @@ public interface ContentTagRepository extends JpaRepository<ContentTag, UUID> {
 	// contentId로 관련 태그명들 조회하는 메서드
 	@Query("SELECT t.name FROM ContentTag ct JOIN ct.tag t WHERE ct.content.id = :contentId")
 	List<String> findTagNamesByContentId(@Param("contentId") UUID contentId);
+
+	@Modifying
+	@Query("DELETE FROM ContentTag ct WHERE ct.content = :content AND ct.tag.name IN :tagNames")
+	void deleteByContentAndTagNameIn(@Param("content") Content content, @Param("tagNames") List<String> tagNames);
 
 	boolean existsByContentAndTag(Content content, Tag tag);
 
