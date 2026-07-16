@@ -72,7 +72,7 @@ public class DirectMessageRedisStore {
 		// 스크립트 실행
 		stringRedisTemplate.execute(
 			script,
-			List.of(key, emptyKey),
+			List.of(key, emptyKey, unreadKey, globalKey),
 			String.valueOf(timestamp),
 			directMessageDto.id().toString()
 		);

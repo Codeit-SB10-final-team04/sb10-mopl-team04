@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -56,15 +57,22 @@ class DirectMessageRedisStoreTest {
 		given(dto.createdAt()).willReturn(Instant.now());
 		given(dto.id()).willReturn(UUID.randomUUID());
 
-		given(stringRedisTemplate.execute(any(RedisScript.class), anyList(), any(), any()))
+		ArgumentCaptor<List<String>> keysCaptor = ArgumentCaptor.forClass(List.class);
+
+		given(stringRedisTemplate.execute(any(RedisScript.class), keysCaptor.capture(), any(), any()))
 			.willReturn(1L);
 
 		// when
 		directMessageRedisStore.addDirectMessage(conversationId, receiverId, dto);
 
 		// then
-		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), any(), any());
+		List<String> capturedKeys = keysCaptor.getValue();
+		assertThat(capturedKeys).hasSize(4);
+		assertThat(capturedKeys.get(0)).contains(conversationId.toString());
+		assertThat(capturedKeys.get(2)).contains(receiverId.toString());
+		assertThat(capturedKeys.get(3)).contains(receiverId.toString());
 
+		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), any(), any());
 		verify(stringRedisTemplate, times(3)).expire(anyString(), eq(7L), eq(TimeUnit.DAYS));
 	}
 
