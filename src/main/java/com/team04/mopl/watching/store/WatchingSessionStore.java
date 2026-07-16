@@ -1,6 +1,7 @@
 package com.team04.mopl.watching.store;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,59 +38,90 @@ public class WatchingSessionStore {
 	private static final String USER_CONTENTS_KEY = "watching:user-contents:%s";
 	private static final String WATCHERS_KEY = "watching:watchers:%s";
 
-	// Lua: SADD 후 SCARD를 원자적으로 반환
-	private static final DefaultRedisScript<Long> ADD_AND_COUNT = new DefaultRedisScript<>(
-		"redis.call('SADD', KEYS[1], ARGV[1]); return redis.call('SCARD', KEYS[1])", Long.class);
+	// Lua: SADD + 첫 세션이면 info/count/역인덱스까지 원자적으로 처리
+	// KEYS: [1]sessions [2]info [3]count [4]userContents [5]watchers
+	// ARGV: [1]sessionId [2]infoId [3]joinedAt [4]contentId [5]userId
+	// 반환: "1" = 첫 세션(JOIN), "0" = 추가 탭
+	private static final DefaultRedisScript<String> ADD_WATCHER_SCRIPT = new DefaultRedisScript<>("""
+		redis.call('SADD', KEYS[1], ARGV[1])
+		local size = redis.call('SCARD', KEYS[1])
+		if size == 1 then
+			redis.call('HSET', KEYS[2], 'id', ARGV[2], 'joinedAt', ARGV[3])
+			redis.call('INCR', KEYS[3])
+			redis.call('SADD', KEYS[4], ARGV[4])
+			redis.call('SADD', KEYS[5], ARGV[5])
+			return '1'
+		end
+		return '0'
+		""", String.class);
 
-	// Lua: SREM 후 SCARD를 원자적으로 반환
-	private static final DefaultRedisScript<Long> REMOVE_AND_COUNT = new DefaultRedisScript<>(
-		"redis.call('SREM', KEYS[1], ARGV[1]); return redis.call('SCARD', KEYS[1])", Long.class);
+	// Lua: SREM + 마지막 세션이면 info 조회 후 전체 정리까지 원자적으로 처리
+	// KEYS: [1]sessions [2]info [3]count [4]userContents [5]watchers
+	// ARGV: [1]sessionId [2]contentId [3]userId
+	// 반환: "id|joinedAt" = 마지막 세션(LEAVE), "" = 아직 탭 남음
+	private static final DefaultRedisScript<String> REMOVE_WATCHER_SCRIPT = new DefaultRedisScript<>("""
+		redis.call('SREM', KEYS[1], ARGV[1])
+		local size = redis.call('SCARD', KEYS[1])
+		if size == 0 then
+			local id = redis.call('HGET', KEYS[2], 'id')
+			local joinedAt = redis.call('HGET', KEYS[2], 'joinedAt')
+			redis.call('DEL', KEYS[1])
+			redis.call('DEL', KEYS[2])
+			redis.call('DECR', KEYS[3])
+			redis.call('SREM', KEYS[4], ARGV[2])
+			redis.call('SREM', KEYS[5], ARGV[3])
+			if id and joinedAt then
+				return id .. '|' .. joinedAt
+			end
+			return ''
+		end
+		return ''
+		""", String.class);
 
-	// 시청자 추가 (Lua 스크립트로 원자적 처리, 첫 세션이면 세션 정보 반환)
 	public Optional<WatchingSessionInfo> addWatcher(UUID contentId, UUID userId) {
 		return addWatcher(contentId, userId, "default");
 	}
 
 	public Optional<WatchingSessionInfo> addWatcher(UUID contentId, UUID userId, String sessionId) {
-		String sessionsKey = String.format(SESSIONS_KEY, contentId, userId);
+		WatchingSessionInfo info = WatchingSessionInfo.create();
 
-		// Lua: SADD + SCARD 원자적 실행
-		Long size = redisTemplate.execute(ADD_AND_COUNT, List.of(sessionsKey), sessionId);
+		List<String> keys = Arrays.asList(
+			String.format(SESSIONS_KEY, contentId, userId),
+			String.format(INFO_KEY, contentId, userId),
+			String.format(COUNT_KEY, contentId),
+			String.format(USER_CONTENTS_KEY, userId),
+			String.format(WATCHERS_KEY, contentId)
+		);
 
-		if (size != null && size == 1) {
-			// 첫 세션 → 세션 정보 생성 + 카운터 증가 + 역인덱스 추가
-			WatchingSessionInfo info = WatchingSessionInfo.create();
-			String infoKey = String.format(INFO_KEY, contentId, userId);
-			redisTemplate.opsForHash().put(infoKey, "id", info.id().toString());
-			redisTemplate.opsForHash().put(infoKey, "joinedAt", info.joinedAt().toString());
-			redisTemplate.opsForValue().increment(String.format(COUNT_KEY, contentId));
-			redisTemplate.opsForSet().add(String.format(USER_CONTENTS_KEY, userId), contentId.toString());
-			redisTemplate.opsForSet().add(String.format(WATCHERS_KEY, contentId), userId.toString());
-			return Optional.of(info);
-		}
-		return Optional.empty();
+		String result = redisTemplate.execute(ADD_WATCHER_SCRIPT, keys,
+			sessionId, info.id().toString(), info.joinedAt().toString(),
+			contentId.toString(), userId.toString());
+
+		return "1".equals(result) ? Optional.of(info) : Optional.empty();
 	}
 
-	// 시청자 제거 (Lua 스크립트로 원자적 처리, 마지막 세션이면 세션 정보 반환)
 	public Optional<WatchingSessionInfo> removeWatcher(UUID contentId, UUID userId) {
 		return removeWatcher(contentId, userId, "default");
 	}
 
 	public Optional<WatchingSessionInfo> removeWatcher(UUID contentId, UUID userId, String sessionId) {
-		String sessionsKey = String.format(SESSIONS_KEY, contentId, userId);
+		List<String> keys = Arrays.asList(
+			String.format(SESSIONS_KEY, contentId, userId),
+			String.format(INFO_KEY, contentId, userId),
+			String.format(COUNT_KEY, contentId),
+			String.format(USER_CONTENTS_KEY, userId),
+			String.format(WATCHERS_KEY, contentId)
+		);
 
-		// Lua: SREM + SCARD 원자적 실행
-		Long size = redisTemplate.execute(REMOVE_AND_COUNT, List.of(sessionsKey), sessionId);
+		String result = redisTemplate.execute(REMOVE_WATCHER_SCRIPT, keys,
+			sessionId, contentId.toString(), userId.toString());
 
-		if (size != null && size == 0) {
-			// 마지막 세션 → 정리 + 카운터 감소
-			Optional<WatchingSessionInfo> info = getInfo(contentId, userId);
-			redisTemplate.delete(sessionsKey);
-			redisTemplate.delete(String.format(INFO_KEY, contentId, userId));
-			redisTemplate.opsForValue().decrement(String.format(COUNT_KEY, contentId));
-			redisTemplate.opsForSet().remove(String.format(USER_CONTENTS_KEY, userId), contentId.toString());
-			redisTemplate.opsForSet().remove(String.format(WATCHERS_KEY, contentId), userId.toString());
-			return info;
+		if (result != null && !result.isEmpty()) {
+			String[] parts = result.split("\\|", 2);
+			return Optional.of(new WatchingSessionInfo(
+				UUID.fromString(parts[0]),
+				Instant.parse(parts[1])
+			));
 		}
 		return Optional.empty();
 	}
