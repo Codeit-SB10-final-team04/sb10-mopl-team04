@@ -10,7 +10,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +27,7 @@ import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.mapper.ConversationMapper;
 import com.team04.mopl.conversation.mapper.ConversationParticipantMapper;
+import com.team04.mopl.conversation.redis.ConversationRedisStore;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
 import com.team04.mopl.conversation.repository.es.ConversationElasticSearchRepository;
@@ -55,17 +55,15 @@ public class ConversationService {
 	private final DirectMessageRepository directMessageRepository;
 	private final UserRepository userRepository;
 
+	private final ConversationRedisStore conversationRedisStore;
+
 	private final ConversationMapper conversationMapper;
 	private final ConversationParticipantMapper conversationParticipantMapper;
 	private final DirectMessageMapper directMessageMapper;
 
 	private final ApplicationEventPublisher applicationEventPublisher;
 
-	/*
-	=========================
-	   대화 생성
-	=========================
-	 */
+	// 대화 생성
 	@Transactional
 	@PreAuthorize("#conversationCreateRequest.withUserId() != #requestUserId")
 	public ConversationDto createConversation(
@@ -82,47 +80,40 @@ public class ConversationService {
 		// 2. 유효성 검증: 중복 검사
 		validateDuplicateConversation(requestUser.getId(), withUser.getId());
 
-		// 3. 대화 생성 및 저장 (try-catch문으로 동시성 방어)
-		// TODO: 분산 환경에서의 동시성 이슈를 해결하기 위한 Redis 분산 락(Redisson 등) 적용 예정 (심화)
-		// 분산 락 적용 시, DB 제약조건 예외를 잡는 현재의 catch 블록은 제거 후 로직 개선
-		try {
-			// 대화방 생성 및 저장
-			Conversation newConversation = Conversation.create();
-			conversationRepository.save(newConversation);
+		// 3. 대화방 생성 및 저장
+		Conversation newConversation = Conversation.create();
+		conversationRepository.save(newConversation);
 
-			// 대화 참여자 생성 및 저장
-			List<ConversationParticipant> participants = createConversationParticipant(newConversation, requestUser,
-				withUser);
+		// 4. 대화 참여자 생성 및 저장
+		List<ConversationParticipant> participants = createConversationParticipant(
+			newConversation,
+			requestUser,
+			withUser
+		);
 
-			// 대화 인덱스 생성 및 저장을 위한 이벤트 발행
-			List<UUID> participantIds = participants.stream()
-				.map(p -> p.getUser().getId())
-				.toList();
+		// 5. ES 생성 및 Redis 동기화를 위한 이벤트 발행
+		List<UUID> participantIds = participants.stream()
+			.map(participant -> participant.getUser().getId())
+			.toList();
 
-			applicationEventPublisher.publishEvent(
-				new ConversationCreatedEvent(
-					newConversation.getId(),
-					participantIds,
-					newConversation.getCreatedAt())
-			);
+		applicationEventPublisher.publishEvent(
+			new ConversationCreatedEvent(
+				newConversation.getId(),
+				participantIds,
+				newConversation.getCreatedAt())
+		);
 
-			log.info("[CONVERSATION_CREATE] 대화 생성 완료: conversationId={}",
-				newConversation.getId());
+		log.info("[CONVERSATION_CREATE] 대화 생성 완료: conversationId={}",
+			newConversation.getId());
 
-			// 응답 DTO 변환 (대화방, 대화 상대 정보, 마지막 메시지 내용, 안 읽음 여부)
-			// 대화방 생성 로직이므로 마지막 메시지 내용은 null, 안 읽음 여부는 false 처리
-			UserSummary with = getUserSummary(withUser);
-			return conversationMapper.toDto(newConversation, with, null, false);
+		// 6. 대화 상대 정보 조회
+		UserSummary with = getUserSummary(withUser);
 
-		} catch (DataIntegrityViolationException e) {
-			// DB 제약조건 위반 시, 이미 중복인 상황으로 간주
-			throw new ConversationException(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS)
-				.addDetail("requestUserId", requestUserId)
-				.addDetail("withUserId", conversationCreateRequest.withUserId());
-		}
+		// 7. 응답 DTO 변환 (대화방, 대화 상대 정보, 마지막 메시지 내용, 안 읽음 여부)
+		return conversationMapper.toDto(newConversation, with, null, false);
 	}
 
-	// 대화 참여자 생성 및 저장 (ES 저장을 위해 생성된 목록 반환하도록 수정)
+	// 대화 참여자 생성 및 저장
 	private List<ConversationParticipant> createConversationParticipant(
 		Conversation conversation,
 		User requestUser,
@@ -136,11 +127,7 @@ public class ConversationService {
 		return conversationParticipantRepository.saveAll(participants);
 	}
 
-	/*
-	=========================
-	   대화 단건 조회
-	=========================
-	 */
+	// 대화 단건 조회
 	public ConversationDto findConversationById(
 		UUID conversationId,
 		UUID requestUserId
@@ -161,26 +148,43 @@ public class ConversationService {
 		UUID conversationId,
 		UUID requestUserId
 	) {
-		// 1. 특정 대화의 참여자 목록 조회
-		List<ConversationParticipant> participants =
-			conversationParticipantRepository.findByConversationId(conversationId);
+		// 1. 특정 대화의 참여자 목록 조회 (Redis)
+		Set<UUID> participantIds = conversationRedisStore.getParticipants(conversationId);
+
+		List<ConversationParticipant> participants;
+
+		// 특정 대화의 참여자 목록이 없을 경우
+		if (participantIds == null) {
+			// 특정 대화의 참여자 목록 조회
+			participants = conversationParticipantRepository.findByConversationId(conversationId);
+
+			// 대화 참여자 ID 추출 및 목록 변환
+			participantIds = participants.stream()
+				.map(participant -> participant.getUser().getId())
+				.collect(Collectors.toSet());
+
+			// DB 백필
+			conversationRedisStore.initParticipants(conversationId, participantIds);
+		}
 
 		// 2. 유효성 검증: 요청자의 대화 참여자 소속 여부
-		validateParticipants(participants, requestUserId);
+		validateParticipantsAccess(participantIds, requestUserId);
 
-		return participants.stream()
-			.map(ConversationParticipant::getUser)
-			// 요청자가 아닌 대화 상대 필터링
-			.filter(user -> !user.getId().equals(requestUserId))
+		// 3. 대화 상대방 ID 추출
+		UUID withUserId = extractWithUserId(participantIds, requestUserId);
+
+		return getUserEntityOrThrow(withUserId);
+	}
+
+	// 대화 상대방 ID 추출
+	private UUID extractWithUserId(Set<UUID> participantIds, UUID requestUserId) {
+		return participantIds.stream()
+			.filter(id -> !id.equals(requestUserId))
 			.findFirst()
 			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_PARTICIPANT_NOT_FOUND));
 	}
 
-	/*
-	=========================
-	   특정 사용자와의 대화 조회
-	=========================
-	 */
+	// 특정 사용자와의 대화 조회
 	public ConversationDto findConversationByUserId(
 		UUID userId,
 		UUID requestUserId
@@ -198,6 +202,7 @@ public class ConversationService {
 		Conversation conversation = getConversationEntityOrThrow(conversationId);
 
 		log.debug("[CONVERSATION_FIND_BY_USER_ID] 특정 사용자와의 대화 조회 완료: conversationId={}", conversationId);
+
 		return mapToConversationDto(conversation, withUser, requestUserId);
 	}
 
@@ -206,16 +211,24 @@ public class ConversationService {
 		UUID requestUserId,
 		UUID withUserId
 	) {
-		return conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
-			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND));
+		// 1. 특정 사용자와의 대화 조회 (Redis)
+		UUID conversationId = conversationRedisStore.getConversationId(requestUserId, withUserId);
+
+		// 특정 사용자와의 대화가 존재하지 않을 경우
+		if (conversationId == null) {
+			conversationId = getConversationIdOrNull(requestUserId, withUserId);
+
+			// DB 백필
+			conversationRedisStore.initConversationMapping(requestUserId, withUserId, conversationId);
+		}
+
+		// 3. 유효성 검증: 빈 대화방일 경우 예외 발생
+		validateConversation(conversationId);
+
+		return conversationId;
 	}
 
-	/*
-	=================================
-	   대화 목록 조회
-	   (정렬 + 필터링 + 커서 페이지네이션)
-	=================================
-	 */
+	// 대화 목록 조회 (필터링 + 정렬 + 커서 페이지네이션)
 	public CursorResponseConversationDto findAll(
 		ConversationPageRequest conversationPageRequest,
 		UUID requestUserId
@@ -314,12 +327,6 @@ public class ConversationService {
 			.toList();
 	}
 
-	/*
-	=========================
-	   유효성 검증
-	=========================
-	 */
-
 	// 유효성 검증: 대화 중복 검사
 	private void validateDuplicateConversation(UUID requestUserId, UUID withUserId) {
 		conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
@@ -329,20 +336,28 @@ public class ConversationService {
 			});
 	}
 
-	// 유효성 검증: 특정 대화방 참가자 여부
-	private void validateParticipants(List<ConversationParticipant> participants, UUID requestUserId) {
-		boolean isParticipant = participants.stream()
-			.anyMatch(participant -> participant.getUser().getId().equals(requestUserId));
+	// 유효성 검증: 대화 존재 여부
+	private void validateConversation(UUID conversationId) {
+		if (ConversationRedisStore.EMPTY_MARKER.equals(conversationId) || conversationId == null) {
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND)
+				.addDetail("conversationId", conversationId);
+		}
+	}
 
-		if (!isParticipant) {
-			throw new ConversationException(ConversationErrorCode.CONVERSATION_ACCESS_DENIED);
+	// 유효성 검증: 특정 대화방 참가자 여부
+	private void validateParticipantsAccess(Set<UUID> participantIds, UUID requestUserId) {
+		if (participantIds.isEmpty() || !participantIds.contains(requestUserId)) {
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_ACCESS_DENIED)
+				.addDetail("requestUserId", requestUserId);
 		}
 	}
 
 	// 유효성 검증: 자기 자신 조회
 	private void validateSelfReadConversation(UUID requestUserId, UUID withUserId) {
 		if (requestUserId.equals(withUserId)) {
-			throw new ConversationException(ConversationErrorCode.CONVERSATION_SELF_SELECT_MOT_ALLOWED);
+			throw new ConversationException(ConversationErrorCode.CONVERSATION_SELF_SELECT_MOT_ALLOWED)
+				.addDetail("requestUserId", requestUserId)
+				.addDetail("withUserId", withUserId);
 		}
 	}
 
@@ -354,17 +369,17 @@ public class ConversationService {
 		}
 	}
 
-	/*
-	=========================
-	   엔티티 조회 및 예외 처리
-	=========================
-	 */
-
 	// 대화 엔티티 반환
 	private Conversation getConversationEntityOrThrow(UUID conversationId) {
 		return conversationRepository.findById(conversationId)
 			.orElseThrow(() -> new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND)
 				.addDetail("conversationId", conversationId));
+	}
+
+	// 대화 ID 반환: DB 백필을 위해 Null 반환
+	private UUID getConversationIdOrNull(UUID requestUserId, UUID withUserId) {
+		return conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId)
+			.orElse(null);
 	}
 
 	// 사용자 엔티티 반환
@@ -383,11 +398,7 @@ public class ConversationService {
 		);
 	}
 
-	/*
-	=========================
-	   DTO 변환
-	=========================
-	 */
+	// DTO 변환
 	private ConversationDto mapToConversationDto(
 		Conversation conversation,
 		User withUser,
@@ -417,11 +428,7 @@ public class ConversationService {
 		return directMessageRepository.existsByConversationIdAndReceiverIdAndReadFalse(conversationId, receiverId);
 	}
 
-	/*
-	=========================
-	   DTO 목록 조회
-	=========================
-	 */
+	// DTO 목록 변환
 	private List<ConversationDto> mapToConversationDtoList(
 		List<Conversation> conversations,
 		UUID requestUserId
