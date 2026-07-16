@@ -340,7 +340,7 @@ public class ConversationService {
 	private void validateConversation(UUID conversationId) {
 		if (ConversationRedisStore.EMPTY_MARKER.equals(conversationId) || conversationId == null) {
 			throw new ConversationException(ConversationErrorCode.CONVERSATION_NOT_FOUND)
-				.addDetail("conversationId", conversationId);
+				.addDetail("conversationId", String.valueOf(conversationId));
 		}
 	}
 
