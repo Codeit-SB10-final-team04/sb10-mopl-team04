@@ -22,7 +22,7 @@ public class DirectMessageRedisSyncListener {
 		directMessageRedisSyncProcessor.syncRedisOnDirectMessageCreated(directMessageCreatedEvent);
 	}
 
-	@Async
+	@Async("eventTaskExecutor")
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	public void handleDirectMessageReadForRedis(DirectMessageReadEvent directMessageReadEvent) {
 		directMessageRedisSyncProcessor.syncRedisOnDirectMessageRead(directMessageReadEvent);

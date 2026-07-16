@@ -39,6 +39,12 @@ public class DirectMessageRedisSyncProcessor {
 				directMessageCreatedEvent.directMessageDto()
 			);
 
+			// 안 읽음 카운트 증가 (Redis)
+			directMessageRedisStore.incrementUnreadCount(
+				directMessageCreatedEvent.receiverId(),
+				directMessageCreatedEvent.directMessageDto().conversationId()
+			);
+
 			log.info("[REDIS_SYNC] DM 생성 Redis 동기화 완료: directMessageId={}",
 				directMessageCreatedEvent.directMessageId());
 		} catch (Exception e) {

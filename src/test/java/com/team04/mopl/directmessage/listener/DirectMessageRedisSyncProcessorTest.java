@@ -42,10 +42,11 @@ class DirectMessageRedisSyncProcessorTest {
 	======================================
 	 */
 	@Test
-	@DisplayName("성공: DM 생성 이벤트 수신 시 Redis에 데이터를 정상적으로 추가한다.")
+	@DisplayName("성공: DM 생성 이벤트 수신 시 Redis에 데이터를 추가하고 수신자 안읽음 카운트를 증가시킨다.")
 	void syncRedisOnDirectMessageCreated_Success() {
 		// given
 		UUID conversationId = UUID.randomUUID();
+		UUID receiverId = UUID.randomUUID();
 		DirectMessageDto mockDto = mock(DirectMessageDto.class);
 		given(mockDto.conversationId()).willReturn(conversationId);
 
@@ -60,6 +61,7 @@ class DirectMessageRedisSyncProcessorTest {
 
 		// then
 		verify(directMessageRedisStore, times(1)).addDirectMessage(conversationId, mockDto);
+		verify(directMessageRedisStore, times(1)).incrementUnreadCount(event.receiverId(), conversationId);
 	}
 
 	@Test
