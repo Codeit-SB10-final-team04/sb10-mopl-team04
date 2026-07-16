@@ -1,10 +1,10 @@
 package com.team04.mopl.follow.redis;
 
-import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -71,8 +71,8 @@ public class FollowRedisStore {
 		);
 
 		// 메모리 관리: 최대 7일 보관
-		stringRedisTemplate.expire(followingKey, Duration.ofDays(7));
-		stringRedisTemplate.expire(followersKey, Duration.ofDays(7));
+		stringRedisTemplate.expire(followingKey, 7, TimeUnit.DAYS);
+		stringRedisTemplate.expire(followersKey, 7, TimeUnit.DAYS);
 	}
 
 	// [사용자의 특정 사용자 팔로우 여부 조회] 팔로우 여부 반환
@@ -141,7 +141,7 @@ public class FollowRedisStore {
 			String emptyKey = String.format(EMPTY_FOLLOWERS_KEY, followeeId);
 
 			// DB 반복 조회 방지: 10분동안 팔로워 없는 사용자 상태 유지
-			stringRedisTemplate.opsForValue().set(emptyKey, "1", Duration.ofMinutes(10));
+			stringRedisTemplate.opsForValue().set(emptyKey, "1", 10, TimeUnit.MINUTES);
 
 			return;
 		}
@@ -162,7 +162,7 @@ public class FollowRedisStore {
 		stringRedisTemplate.opsForZSet().add(followersKey, tuples);
 
 		// 최대 7일 보관
-		stringRedisTemplate.expire(followersKey, Duration.ofDays(7));
+		stringRedisTemplate.expire(followersKey, 7L, TimeUnit.DAYS);
 	}
 
 	// 공통 메서드: 특정 사용자의 캐시 상태를 확인하여 Enum으로 반환
