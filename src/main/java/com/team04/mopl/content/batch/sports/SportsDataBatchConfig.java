@@ -1,4 +1,4 @@
-package com.team04.mopl.content.batch;
+package com.team04.mopl.content.batch.sports;
 
 import java.util.List;
 
@@ -16,12 +16,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.team04.mopl.content.batch.step.EventDetailItemProcessor;
-import com.team04.mopl.content.batch.step.EventDetailItemReader;
-import com.team04.mopl.content.batch.step.EventDetailItemWriter;
-import com.team04.mopl.content.batch.step.EventDetailNotFoundException;
-import com.team04.mopl.content.batch.step.LeagueCollectTasklet;
-import com.team04.mopl.content.batch.step.MatchListCollectTasklet;
 
 import lombok.RequiredArgsConstructor;
 

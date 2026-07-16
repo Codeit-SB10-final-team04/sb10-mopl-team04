@@ -1,4 +1,4 @@
-package com.team04.mopl.content.batch.step;
+package com.team04.mopl.content.batch.tmdb;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.team04.mopl.content.client.TmdbClient;
 import com.team04.mopl.content.entity.ContentType;
-import com.team04.mopl.content.service.TmdbContentCollectService;
 
 @ExtendWith(MockitoExtension.class)
 class TmdbInitialCollectTaskletTest {
@@ -145,6 +144,25 @@ class TmdbInitialCollectTaskletTest {
 		// then: page=1, page=2 총 2회 API 호출 검증
 		verify(tmdbClient).getNowPlayingMovies(1);
 		verify(tmdbClient).getNowPlayingMovies(2);
+	}
+
+	@Test
+	@DisplayName("수집 시작 전 장르 캐시를 로드한다")
+	void execute_loadsGenreCache_beforeCollecting() throws Exception {
+		// given
+		when(tmdbClient.getNowPlayingMovies(1)).thenReturn(movieRoot);
+		when(tmdbClient.extractTotalPages(movieRoot)).thenReturn(1);
+		when(tmdbClient.extractResults(movieRoot)).thenReturn(Collections.emptyList());
+
+		when(tmdbClient.getOnAirTv(1)).thenReturn(tvRoot);
+		when(tmdbClient.extractTotalPages(tvRoot)).thenReturn(1);
+		when(tmdbClient.extractResults(tvRoot)).thenReturn(Collections.emptyList());
+
+		// when
+		tmdbInitialCollectTasklet.execute(contribution, chunkContext);
+
+		// then
+		verify(tmdbContentCollectService).loadGenreCacheIfEmpty();
 	}
 
 	@Test

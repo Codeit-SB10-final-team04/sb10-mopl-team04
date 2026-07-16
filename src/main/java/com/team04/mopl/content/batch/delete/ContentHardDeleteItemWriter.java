@@ -1,4 +1,4 @@
-package com.team04.mopl.content.batch.step;
+package com.team04.mopl.content.batch.delete;
 
 import java.util.ArrayList;
 import java.util.List;

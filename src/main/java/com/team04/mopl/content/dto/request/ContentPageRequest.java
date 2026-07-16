@@ -21,6 +21,8 @@ public record ContentPageRequest(
 	public ContentPageRequest {
 		if (sortBy == null || sortBy.isBlank()) {
 			sortBy = "watcherCount";
+		} else if ("rate".equals(sortBy)) {
+			sortBy = "averageRating";
 		}
 		if (sortDirection == null || sortDirection.isBlank()) {
 			sortDirection = "DESCENDING";

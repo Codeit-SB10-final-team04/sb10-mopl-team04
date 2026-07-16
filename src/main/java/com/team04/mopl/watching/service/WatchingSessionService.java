@@ -8,6 +8,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,15 +49,22 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional(readOnly = true)
 public class WatchingSessionService {
 
+	private static final long DISCONNECT_GRACE_PERIOD_SECONDS = 3;
+
 	private final WatchingSessionStore watchingSessionStore;
 	private final UserRepository userRepository;
 	private final ContentRepository contentRepository;
+	private final ScheduledExecutorService disconnectScheduler = Executors.newSingleThreadScheduledExecutor();
+	private final ConcurrentHashMap<String, ScheduledFuture<?>> pendingDisconnects = new ConcurrentHashMap<>();
 
 	// 시청 세션 입장 (sessionId로 멀티탭 참조 카운팅)
 	// 첫 탭이면 JOIN 브로드캐스트, 추가 탭이면 empty
+	// 재연결(새로고침) 시 대기 중인 퇴장 예약이 있으면 취소
 	public Optional<WatchingSessionChange> join(UUID contentId, UUID userId, String sessionId) {
 		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 시작: contentId={}, userId={}, sessionId={}",
 			contentId, userId, sessionId);
+
+		cancelPendingDisconnect(contentId, userId);
 
 		User user = getUserOrThrow(userId);
 		Content content = getContentOrThrow(contentId);
@@ -95,6 +107,70 @@ public class WatchingSessionService {
 			contentId, userId, change.watcherCount());
 
 		return Optional.of(change);
+	}
+
+	// DISCONNECT 시 즉시 퇴장하지 않고 일정 시간 대기 후 강제 퇴장 (재연결 대비)
+	// 강제 퇴장: sessionId 상관없이 해당 유저의 모든 세션을 정리 (좀비 세션 방지)
+	public void scheduleLeave(UUID contentId, UUID userId, String sessionId,
+		java.util.function.Consumer<WatchingSessionChange> onLeave) {
+
+		String key = toDisconnectKey(contentId, userId);
+
+		log.debug("[WATCHING_SESSION_DISCONNECT] 퇴장 예약: contentId={}, userId={}, {}초 후 실행",
+			contentId, userId, DISCONNECT_GRACE_PERIOD_SECONDS);
+
+		ScheduledFuture<?> future = disconnectScheduler.schedule(() -> {
+			try {
+				forceLeave(contentId, userId)
+					.ifPresent(onLeave);
+			} catch (Exception e) {
+				log.error("[WATCHING_SESSION_DISCONNECT] 지연 퇴장 실패: contentId={}, userId={}",
+					contentId, userId, e);
+			} finally {
+				pendingDisconnects.remove(key);
+			}
+		}, DISCONNECT_GRACE_PERIOD_SECONDS, TimeUnit.SECONDS);
+
+		ScheduledFuture<?> prev = pendingDisconnects.put(key, future);
+		if (prev != null) {
+			prev.cancel(false);
+		}
+	}
+
+	// 강제 퇴장: sessionId 무관하게 해당 유저의 모든 세션 정리
+	private Optional<WatchingSessionChange> forceLeave(UUID contentId, UUID userId) {
+		log.info("[WATCHING_SESSION_FORCE_LEAVE] 강제 퇴장: contentId={}, userId={}", contentId, userId);
+
+		User user = getUserOrThrow(userId);
+		Content content = getContentOrThrow(contentId);
+
+		Optional<WatchingSessionInfo> removed = watchingSessionStore.forceRemoveWatcher(contentId, userId);
+
+		if (removed.isEmpty()) {
+			log.debug("[WATCHING_SESSION_FORCE_LEAVE] 이미 퇴장 상태: contentId={}, userId={}", contentId, userId);
+			return Optional.empty();
+		}
+
+		WatchingSessionChange change = createChange(ChangeType.LEAVE, user, content, removed.get());
+
+		log.info("[WATCHING_SESSION_FORCE_LEAVE] 강제 퇴장 완료: contentId={}, userId={}, watcherCount={}",
+			contentId, userId, change.watcherCount());
+
+		return Optional.of(change);
+	}
+
+	private void cancelPendingDisconnect(UUID contentId, UUID userId) {
+		String key = toDisconnectKey(contentId, userId);
+		ScheduledFuture<?> pending = pendingDisconnects.remove(key);
+		if (pending != null) {
+			pending.cancel(false);
+			log.info("[WATCHING_SESSION_JOIN] 퇴장 예약 취소 (재연결 감지): contentId={}, userId={}",
+				contentId, userId);
+		}
+	}
+
+	private String toDisconnectKey(UUID contentId, UUID userId) {
+		return contentId + ":" + userId;
 	}
 
 	// 특정 유저가 시청 중인 모든 contentId 조회
