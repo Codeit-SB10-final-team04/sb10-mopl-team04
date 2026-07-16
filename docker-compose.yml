@@ -19,7 +19,7 @@ services:
       SPRING_KAFKA_CONSUMER_GROUP_ID: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
       SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}
 
-      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      SPRING_ELASTICSEARCH_URIS: http://opensearch:9200
 
       MOPL_JWT_ISSUER: ${MOPL_JWT_ISSUER}
       MOPL_JWT_SECRET: ${MOPL_JWT_SECRET}
@@ -64,7 +64,7 @@ services:
         condition: service_healthy
       broker:
         condition: service_healthy
-      elasticsearch:
+      opensearch:
         condition: service_healthy
     networks:
       # backend 네트워크에 app 서비스 연결
@@ -91,7 +91,7 @@ services:
         condition: service_healthy
       broker:
         condition: service_healthy
-      elasticsearch:
+      opensearch:
         condition: service_healthy
     networks:
       - backend
@@ -170,17 +170,17 @@ services:
     networks:
       - backend
 
-  elasticsearch:
+  opensearch:
     image: opensearchproject/opensearch:2.19.0
-    container_name: elasticsearch
+    container_name: opensearch
     environment:
       - discovery.type=single-node
-      - plugins.security.disabled=true
+      - DISABLE_SECURITY_PLUGIN=true
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
       - "9200:9200"
     volumes:
-      - elasticsearch-data:/usr/share/opensearch/data
+      - opensearch-data:/usr/share/opensearch/data
     command: >
       bash -c '
         if [ ! -d "plugins/analysis-nori" ]; then
@@ -203,5 +203,5 @@ volumes: # 데이터 영속성을 위한 볼륨 정의
   # PostgreSQL 데이터 저장용 볼륨
   postgres-data:
   redis-data:
-  # Elasticsearch 데이터 저장용 볼륨
-  elasticsearch-data:
+  # OpenSearch 데이터 저장용 볼륨
+  opensearch-data:
