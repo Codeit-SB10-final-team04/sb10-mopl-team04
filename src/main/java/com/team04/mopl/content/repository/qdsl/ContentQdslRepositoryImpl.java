@@ -92,7 +92,7 @@ public class ContentQdslRepositoryImpl implements ContentQdslRepository {
 	// 커서 조건: (정렬값 비교) OR (정렬값 동일 AND id 비교)
 	private BooleanExpression buildCursorCondition(String sortBy, String cursor, UUID idAfter, boolean isDesc) {
 		return switch (sortBy) {
-			case "rate" -> {
+			case "averageRating" -> {
 				BigDecimal cursorVal = new BigDecimal(cursor);
 				yield isDesc
 					? content.averageRating.lt(cursorVal)
@@ -126,7 +126,7 @@ public class ContentQdslRepositoryImpl implements ContentQdslRepository {
 
 	private OrderSpecifier<?> buildOrder(String sortBy, boolean isDesc) {
 		return switch (sortBy) {
-			case "rate" -> isDesc ? content.averageRating.desc() : content.averageRating.asc();
+			case "averageRating" -> isDesc ? content.averageRating.desc() : content.averageRating.asc();
 			case "createdAt" -> isDesc ? content.createdAt.desc() : content.createdAt.asc();
 			default -> isDesc ? content.watcherCount.desc() : content.watcherCount.asc();
 		};
