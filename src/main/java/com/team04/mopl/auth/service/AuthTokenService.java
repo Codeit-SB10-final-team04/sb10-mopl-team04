@@ -97,7 +97,7 @@ public class AuthTokenService {
 			refreshedAt
 		);
 
-		// refresh token 재사용 검증
+		// refresh token 회전 결과 검증
 		if (!refreshed) {
 			log.warn("[AUTH_REFRESH_TOKEN] 토큰 재발급 실패: 인증 세션 갱신 실패, userId={}, sessionId={}",
 				user.getId(),
