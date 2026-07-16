@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 		@UniqueConstraint(
 			name = "uk_content_tags_content_tag",
 			columnNames = {"content_id", "tag_id"}
-			)
+		)
 	}
 )
 @Getter

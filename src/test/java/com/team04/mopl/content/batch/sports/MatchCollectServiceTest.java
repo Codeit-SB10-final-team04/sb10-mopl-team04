@@ -1,4 +1,4 @@
-package com.team04.mopl.content.service;
+package com.team04.mopl.content.batch.sports;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;

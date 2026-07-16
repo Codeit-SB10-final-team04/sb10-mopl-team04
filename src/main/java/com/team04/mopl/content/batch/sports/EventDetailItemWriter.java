@@ -1,11 +1,10 @@
-package com.team04.mopl.content.batch.step;
+package com.team04.mopl.content.batch.sports;
 
 import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.team04.mopl.content.service.MatchCollectService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

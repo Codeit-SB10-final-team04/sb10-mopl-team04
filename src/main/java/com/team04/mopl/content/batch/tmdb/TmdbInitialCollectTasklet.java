@@ -1,4 +1,4 @@
-package com.team04.mopl.content.batch.step;
+package com.team04.mopl.content.batch.tmdb;
 
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.team04.mopl.content.client.TmdbClient;
 import com.team04.mopl.content.entity.ContentType;
-import com.team04.mopl.content.service.TmdbContentCollectService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +41,9 @@ public class TmdbInitialCollectTasklet implements Tasklet {
 	@Override
 	public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
 		log.info("[TMDB] ===== 초기 수집 시작 =====");
+
+		// 장르 캐시 로드 (배치 시작 시 1회)
+		tmdbContentCollectService.loadGenreCacheIfEmpty();
 
 		// movie/now_playing 전체 수집
 		log.info("[TMDB] 상영 중 영화 수집 시작");

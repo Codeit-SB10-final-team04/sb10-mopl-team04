@@ -1,4 +1,4 @@
-package com.team04.mopl.content.service;
+package com.team04.mopl.content.batch.sports;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
