@@ -30,7 +30,7 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, ReviewQds
 
 	List<Review> findAllByContentIdAndDeletedAtIsNull(UUID contentId);
 
-	@Modifying
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query("UPDATE Review r SET r.deletedAt = :now WHERE r.content.id = :contentId AND r.deletedAt IS NULL")
 	int bulkMarkDeletedByContentId(@Param("contentId") UUID contentId, @Param("now") Instant now);
 }

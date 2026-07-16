@@ -19,7 +19,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.persistence.EntityManager;
 
 import com.team04.mopl.common.storage.FileStorage;
 import com.team04.mopl.content.dto.request.ContentCreateRequest;
@@ -61,9 +60,6 @@ class ContentIntegrationTest extends IntegrationTestBase {
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
-
-	@Autowired
-	private EntityManager entityManager;
 
 	@MockitoBean
 	private FileStorage fileStorage;
@@ -160,10 +156,6 @@ class ContentIntegrationTest extends IntegrationTestBase {
 			.user(user).content(content).text("좋아요").rating((short) 5).build());
 
 		contentService.deleteContent(content.getId());
-
-		// @Modifying 쿼리는 영속성 컨텍스트를 거치지 않으므로 캐시 초기화
-		entityManager.flush();
-		entityManager.clear();
 
 		// 콘텐츠 soft delete 확인
 		assertThat(contentRepository.findByIdAndDeletedAtIsNull(content.getId())).isEmpty();

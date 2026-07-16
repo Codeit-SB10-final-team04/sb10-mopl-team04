@@ -165,10 +165,7 @@ class ReviewIntegrationTest extends IntegrationTestBase {
 
 		// 평점 재계산 → (5+3+1)/3 = 3.00
 		entityManager.flush();
-		entityManager.clear();
 		contentRepository.refreshRatingAggregate(content.getId());
-		entityManager.flush();
-		entityManager.clear();
 		Content refreshed = contentRepository.findById(content.getId()).orElseThrow();
 		assertThat(refreshed.getAverageRating()).isEqualByComparingTo(new BigDecimal("3.00"));
 		assertThat(refreshed.getReviewCount()).isEqualTo(3);
@@ -176,10 +173,7 @@ class ReviewIntegrationTest extends IntegrationTestBase {
 		// rating=3 리뷰 삭제 후 재계산 → (5+1)/2 = 3.00
 		reviewService.deleteReview(review2.id(), userDetails(user2));
 		entityManager.flush();
-		entityManager.clear();
 		contentRepository.refreshRatingAggregate(content.getId());
-		entityManager.flush();
-		entityManager.clear();
 		Content afterDelete = contentRepository.findById(content.getId()).orElseThrow();
 		assertThat(afterDelete.getAverageRating()).isEqualByComparingTo(new BigDecimal("3.00"));
 		assertThat(afterDelete.getReviewCount()).isEqualTo(2);
