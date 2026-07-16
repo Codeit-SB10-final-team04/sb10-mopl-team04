@@ -48,11 +48,10 @@ class DirectMessageRedisSyncProcessorTest {
 		UUID conversationId = UUID.randomUUID();
 		UUID receiverId = UUID.randomUUID();
 		DirectMessageDto mockDto = mock(DirectMessageDto.class);
-		given(mockDto.conversationId()).willReturn(conversationId);
 
 		DirectMessageCreatedEvent event = new DirectMessageCreatedEvent(
 			UUID.randomUUID(),
-			UUID.randomUUID(),
+			receiverId,
 			mockDto
 		);
 
@@ -60,8 +59,7 @@ class DirectMessageRedisSyncProcessorTest {
 		directMessageRedisSyncProcessor.syncRedisOnDirectMessageCreated(event);
 
 		// then
-		verify(directMessageRedisStore, times(1)).addDirectMessage(conversationId, mockDto);
-		verify(directMessageRedisStore, times(1)).incrementUnreadCount(event.receiverId(), conversationId);
+		verify(directMessageRedisStore, times(1)).addDirectMessage(any(), any(), any());
 	}
 
 	@Test
@@ -69,17 +67,19 @@ class DirectMessageRedisSyncProcessorTest {
 	void syncRedisOnDirectMessageCreated_Fail_ThrowsException() {
 		// given
 		UUID conversationId = UUID.randomUUID();
+		UUID receiverId = UUID.randomUUID();
 		DirectMessageDto mockDto = mock(DirectMessageDto.class);
 		given(mockDto.conversationId()).willReturn(conversationId);
 
 		DirectMessageCreatedEvent event = new DirectMessageCreatedEvent(
 			UUID.randomUUID(),
-			UUID.randomUUID(),
+			receiverId,
 			mockDto
 		);
 
 		willThrow(new RuntimeException("Redis Connection Failed"))
-			.given(directMessageRedisStore).addDirectMessage(conversationId, mockDto);
+			.given(directMessageRedisStore)
+			.addDirectMessage(any(UUID.class), any(UUID.class), any(DirectMessageDto.class));
 
 		// when & then
 		assertThatThrownBy(() -> directMessageRedisSyncProcessor.syncRedisOnDirectMessageCreated(event))

@@ -123,7 +123,7 @@ class DirectMessageServiceTest {
 		assertThat(published.directMessageDto()).isEqualTo(expectedDto);
 
 		verify(directMessageRepository).save(directMessage);
-		verify(directMessageRedisStore, never()).addDirectMessage(any(), any());
+		verify(directMessageRedisStore, never()).addDirectMessage(any(), any(), any());
 	}
 
 	@Test

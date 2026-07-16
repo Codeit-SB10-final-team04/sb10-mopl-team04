@@ -4,16 +4,17 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.*;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -50,44 +51,36 @@ class DirectMessageRedisStoreTest {
 	void addDirectMessage_Success() {
 		// given
 		UUID conversationId = UUID.randomUUID();
+		UUID receiverId = UUID.randomUUID();
 		DirectMessageDto dto = mock(DirectMessageDto.class);
 
 		given(dto.createdAt()).willReturn(Instant.now());
 		given(dto.id()).willReturn(UUID.randomUUID());
 
-		given(stringRedisTemplate.execute(any(RedisScript.class), anyList(), any(), any()))
+		ArgumentCaptor<List<String>> keysCaptor = ArgumentCaptor.forClass(List.class);
+
+		given(stringRedisTemplate.execute(any(RedisScript.class), keysCaptor.capture(), any(), any()))
 			.willReturn(1L);
 
 		// when
-		directMessageRedisStore.addDirectMessage(conversationId, dto);
+		directMessageRedisStore.addDirectMessage(conversationId, receiverId, dto);
 
 		// then
+		List<String> capturedKeys = keysCaptor.getValue();
+		assertThat(capturedKeys).hasSize(4);
+		assertThat(capturedKeys.get(0)).contains(conversationId.toString());
+		assertThat(capturedKeys.get(2)).contains(receiverId.toString());
+		assertThat(capturedKeys.get(3)).contains(receiverId.toString());
+
 		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), any(), any());
-		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(Duration.ofDays(7)));
+		verify(stringRedisTemplate, times(3)).expire(anyString(), eq(7L), eq(TimeUnit.DAYS));
 	}
 
 	/*
 	=========================
-	   안 읽음 카운트 증가/감소
+	   안 읽음 카운트 감소
 	=========================
 	 */
-	@Test
-	@DisplayName("성공: 특정 사용자의 특정 대화방 및 전체 안 읽음 DM 개수가 증가한다.")
-	void incrementUnreadCount_Success() {
-		// given
-		UUID receiverId = UUID.randomUUID();
-		UUID conversationId = UUID.randomUUID();
-
-		given(stringRedisTemplate.opsForValue()).willReturn(valueOperations);
-		given(valueOperations.increment(anyString())).willReturn(1L);
-
-		// when
-		directMessageRedisStore.incrementUnreadCount(receiverId, conversationId);
-
-		// then
-		verify(valueOperations, times(2)).increment(anyString());
-		verify(stringRedisTemplate, times(2)).expire(anyString(), eq(Duration.ofDays(7)));
-	}
 
 	@Test
 	@DisplayName("성공: 안 읽음 개수 감소 시 Lua 스크립트를 사용하여 원자적으로 감소시킨다.")
@@ -344,7 +337,7 @@ class DirectMessageRedisStoreTest {
 
 		// then
 		verify(zSetOperations, times(1)).add(anyString(), anySet());
-		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(Duration.ofDays(7)));
+		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(7L), eq(TimeUnit.DAYS));
 	}
 
 	@Test
@@ -360,7 +353,7 @@ class DirectMessageRedisStoreTest {
 		directMessageRedisStore.initDirectMessages(conversationId, emptyList);
 
 		// then
-		verify(valueOperations, times(1)).set(contains("empty"), eq("1"), any(Duration.class));
+		verify(valueOperations, times(1)).set(contains("empty"), eq("1"), eq(10L), eq(TimeUnit.MINUTES));
 		verify(stringRedisTemplate, never()).opsForZSet();
 	}
 }

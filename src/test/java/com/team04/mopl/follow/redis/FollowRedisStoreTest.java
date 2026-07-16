@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.*;
 
-import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,7 +55,7 @@ class FollowRedisStoreTest {
 
 		// then
 		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), any(), any(), any());
-		verify(stringRedisTemplate, times(2)).expire(anyString(), eq(Duration.ofDays(7)));
+		verify(stringRedisTemplate, times(2)).expire(anyString(), eq(7L), eq(TimeUnit.DAYS));
 	}
 
 	@Test
@@ -229,7 +229,7 @@ class FollowRedisStoreTest {
 
 		// then
 		verify(zSetOperations, times(1)).add(anyString(), anySet());
-		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(Duration.ofDays(7)));
+		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(7L), eq(TimeUnit.DAYS));
 	}
 
 	@Test
@@ -245,7 +245,7 @@ class FollowRedisStoreTest {
 		followRedisStore.initFollowers(followeeId, emptyList);
 
 		// then
-		verify(valueOperations, times(1)).set(contains("empty"), eq("1"), any(Duration.class));
+		verify(valueOperations, times(1)).set(contains("empty"), eq("1"), eq(10L), eq(TimeUnit.MINUTES));
 		verify(stringRedisTemplate, never()).opsForZSet();
 	}
 

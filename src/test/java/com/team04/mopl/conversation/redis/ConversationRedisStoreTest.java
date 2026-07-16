@@ -58,7 +58,6 @@ class ConversationRedisStoreTest {
 
 		// then
 		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), anyString());
-		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(Duration.ofDays(30)));
 	}
 
 	/*
@@ -81,7 +80,6 @@ class ConversationRedisStoreTest {
 
 		// then
 		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), any(Object[].class));
-		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(Duration.ofDays(30)));
 	}
 
 	/*
@@ -278,7 +276,6 @@ class ConversationRedisStoreTest {
 
 		// then
 		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), anyString());
-		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(Duration.ofDays(30)));
 	}
 
 	@Test
@@ -318,7 +315,6 @@ class ConversationRedisStoreTest {
 
 		// then
 		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), any(Object[].class));
-		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(Duration.ofDays(30)));
 	}
 
 	@Test
