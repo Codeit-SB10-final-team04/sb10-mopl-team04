@@ -31,9 +31,11 @@ import com.team04.mopl.directmessage.dto.response.CursorResponseDirectMessageDto
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
+import com.team04.mopl.directmessage.event.DirectMessageReadEvent;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
+import com.team04.mopl.directmessage.redis.DirectMessageRedisStore;
 import com.team04.mopl.directmessage.repository.DirectMessageRepository;
 import com.team04.mopl.user.entity.User;
 
@@ -53,16 +55,19 @@ class DirectMessageServiceTest {
 	private DirectMessageMapper directMessageMapper;
 
 	@Mock
+	private DirectMessageRedisStore directMessageRedisStore;
+
+	@Mock
 	private ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
 	private DirectMessageService directMessageService;
 
 	/*
-    =========================
-       DM 생성 (전송)
-    =========================
-     */
+	=========================
+	   DM 생성 (전송)
+	=========================
+	 */
 	@Test
 	@DisplayName("성공: 조건이 모두 맞으면 DM을 생성하고 저장한 후 DTO를 반환한다.")
 	void create_Success() {
@@ -102,9 +107,14 @@ class DirectMessageServiceTest {
 		DirectMessageDto result = directMessageService.create(conversationId, request, senderId);
 
 		ArgumentCaptor<DirectMessageCreatedEvent> captor = ArgumentCaptor.forClass(DirectMessageCreatedEvent.class);
-		verify(eventPublisher).publishEvent(captor.capture());
 
-		DirectMessageCreatedEvent published = captor.getValue();
+		verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
+
+		DirectMessageCreatedEvent published = captor.getAllValues().stream()
+			.filter(e -> e instanceof DirectMessageCreatedEvent)
+			.map(e -> (DirectMessageCreatedEvent)e)
+			.findFirst()
+			.orElseThrow();
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
@@ -113,6 +123,7 @@ class DirectMessageServiceTest {
 		assertThat(published.directMessageDto()).isEqualTo(expectedDto);
 
 		verify(directMessageRepository).save(directMessage);
+		verify(directMessageRedisStore, never()).addDirectMessage(any(), any(), any());
 	}
 
 	@Test
@@ -188,11 +199,11 @@ class DirectMessageServiceTest {
 
 	/*
 	=========================
-		DM 읽음 처리 생성
+	   DM 읽음 처리 생성
 	=========================
 	 */
 	@Test
-	@DisplayName("성공: 조건이 모두 맞으면 DM 읽음 처리가 정상 수행된다")
+	@DisplayName("성공: 조건이 모두 맞으면 DM 읽음 처리가 정상 수행되고 읽음 이벤트를 발행한다.")
 	void markAsRead_Success() {
 		// given
 		UUID conversationId = UUID.randomUUID();
@@ -220,7 +231,15 @@ class DirectMessageServiceTest {
 		directMessageService.markAsRead(conversationId, directMessageId, requestUserId);
 
 		// then
-		verify(directMessage).markAsRead(); // 읽음 처리 메서드가 호출되었는지 확인
+		verify(directMessage).markAsRead();
+
+		ArgumentCaptor<DirectMessageReadEvent> captor = ArgumentCaptor.forClass(DirectMessageReadEvent.class);
+		verify(eventPublisher).publishEvent(captor.capture());
+
+		DirectMessageReadEvent event = captor.getValue();
+		assertThat(event.receiverId()).isEqualTo(requestUserId);
+		assertThat(event.conversationId()).isEqualTo(conversationId);
+		assertThat(event.directMessageId()).isEqualTo(directMessageId);
 	}
 
 	@Test
@@ -344,6 +363,7 @@ class DirectMessageServiceTest {
 
 		UUID directMessageId = UUID.randomUUID();
 		DirectMessage directMessage = mock(DirectMessage.class);
+		given(directMessage.getId()).willReturn(directMessageId);
 		given(directMessage.getConversation()).willReturn(conversation);
 		given(directMessage.getReceiver()).willReturn(actualReceiver);
 
@@ -353,7 +373,7 @@ class DirectMessageServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> directMessageService.markAsRead(conversationId, directMessageId, requestUserId))
-			.isInstanceOf(DirectMessageException.class); // DM_ACCESS_DENIED 기대
+			.isInstanceOf(DirectMessageException.class);
 	}
 
 	/*
@@ -362,8 +382,8 @@ class DirectMessageServiceTest {
 	=========================
 	 */
 	@Test
-	@DisplayName("성공: 조회 결과가 limit보다 많으면 hasNext=true로 설정하고 다음 커서를 계산하여 반환한다.")
-	void findAll_Success_HasNext() {
+	@DisplayName("성공: [Cache Hit] Redis에 개수가 캐싱되어 있으면 무거운 DB COUNT 쿼리를 생략한다.")
+	void findAll_Success_CacheHit() {
 		// given
 		UUID conversationId = UUID.randomUUID();
 		Conversation conversation = mock(Conversation.class);
@@ -387,6 +407,58 @@ class DirectMessageServiceTest {
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));
 
+		long cachedTotalCount = 15L;
+
+		given(directMessageRedisStore.getRoomMessageTotalCount(conversationId)).willReturn(cachedTotalCount);
+
+		// DM 목록 조회 결과
+		DirectMessage msg1 = mock(DirectMessage.class);
+		given(directMessageRepository.findDirectMessagesByCursor(conversationId, request)).willReturn(List.of(msg1));
+
+		CursorResponseDirectMessageDto expectedResponse = mock(CursorResponseDirectMessageDto.class);
+		given(directMessageMapper.toDtoList(anyList())).willReturn(List.of(mock(DirectMessageDto.class)));
+		given(directMessageMapper.toCursorPageResponse(anyList(), isNull(), isNull(), eq(false), eq(cachedTotalCount),
+			anyString(), anyString()))
+			.willReturn(expectedResponse);
+
+		// when
+		CursorResponseDirectMessageDto result = directMessageService.findAll(conversationId, request, requestUserId);
+
+		// then
+		assertThat(result).isEqualTo(expectedResponse);
+
+		verify(directMessageRepository, never()).findAllByConversationId(any());
+		verify(directMessageRedisStore, never()).initDirectMessages(any(), any());
+	}
+
+	@Test
+	@DisplayName("성공: [Cache Miss] 조회 결과가 limit보다 많으면 hasNext=true로 설정하고 Redis를 백필한다.")
+	void findAll_Success_HasNext_CacheMiss() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		Conversation conversation = mock(Conversation.class);
+		given(conversation.getId()).willReturn(conversationId);
+
+		UUID requestUserId = UUID.randomUUID();
+		User mockUser = mock(User.class);
+		given(mockUser.getId()).willReturn(requestUserId);
+
+		ConversationParticipant participant = mock(ConversationParticipant.class);
+		given(participant.getUser()).willReturn(mockUser);
+
+		DirectMessagePageRequest request = new DirectMessagePageRequest(
+			null,
+			null,
+			2,
+			SortDirection.DESCENDING,
+			"createdAt"
+		);
+
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));
+
+		given(directMessageRedisStore.getRoomMessageTotalCount(conversationId)).willReturn(null);
+
 		// DM 목록 조회 결과: 3개
 		DirectMessage msg1 = mock(DirectMessage.class);
 		DirectMessage msg2 = mock(DirectMessage.class);
@@ -399,7 +471,7 @@ class DirectMessageServiceTest {
 
 		given(directMessageRepository.findDirectMessagesByCursor(conversationId, request)).willReturn(
 			List.of(msg1, msg2, msg3));
-		given(directMessageRepository.countDirectMessage(conversationId, request)).willReturn(3L);
+		given(directMessageRepository.findAllByConversationId(conversationId)).willReturn(List.of(msg1, msg2, msg3));
 
 		CursorResponseDirectMessageDto expectedResponse = CursorResponseDirectMessageDto.builder()
 			.data(Collections.emptyList())
@@ -423,11 +495,14 @@ class DirectMessageServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedResponse);
+
+		verify(directMessageRepository, times(1)).findAllByConversationId(conversationId);
+		verify(directMessageRedisStore, times(1)).initDirectMessages(eq(conversationId), anyList());
 	}
 
 	@Test
-	@DisplayName("성공: 조회 결과가 빈 리스트일 경우 다음 커서가 null인 빈 응답을 반환한다.")
-	void findAll_Success_EmptyList() {
+	@DisplayName("성공: [Cache Miss] 조회 결과가 빈 리스트일 경우 다음 커서가 null인 빈 응답을 반환하고 빈 리스트를 백필한다.")
+	void findAll_Success_EmptyList_CacheMiss() {
 		// given
 		UUID conversationId = UUID.randomUUID();
 		Conversation conversation = mock(Conversation.class);
@@ -450,8 +525,11 @@ class DirectMessageServiceTest {
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));
+
+		given(directMessageRedisStore.getRoomMessageTotalCount(conversationId)).willReturn(null);
+
 		given(directMessageRepository.findDirectMessagesByCursor(conversationId, request)).willReturn(List.of());
-		given(directMessageRepository.countDirectMessage(conversationId, request)).willReturn(0L);
+		given(directMessageRepository.findAllByConversationId(conversationId)).willReturn(List.of());
 		given(directMessageMapper.toDtoList(anyList())).willReturn(List.of());
 
 		CursorResponseDirectMessageDto expectedResponse = CursorResponseDirectMessageDto.builder()
@@ -473,6 +551,9 @@ class DirectMessageServiceTest {
 
 		// then
 		assertThat(result).isNotNull();
+
+		verify(directMessageRepository, times(1)).findAllByConversationId(conversationId);
+		verify(directMessageRedisStore, times(1)).initDirectMessages(conversationId, List.of());
 	}
 
 	@Test
