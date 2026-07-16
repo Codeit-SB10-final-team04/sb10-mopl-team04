@@ -1,10 +1,10 @@
 package com.team04.mopl.directmessage.redis;
 
-import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -27,11 +27,15 @@ public class DirectMessageRedisStore {
 	private static final String GLOBAL_UNREAD_COUNT_KEY = "dm:unread:global:%s";        // 특정 사용자가 읽지 않은 모든 DM 개수
 	private static final String EMPTY_DM_ROOM_KEY = "dm:room:empty:%s";                 // DM이 존재하지 않는 대화방
 
-	// 원자적 업데이트: 자바 스크립트를 하나의 명령어로 취급
-	private static final String ADD_DM_SCRIPT = """
-		    redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
+	// 원자적 추가
+	private static final String ADD_DM_AND_INCR_SCRIPT = """
+		    local added = redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
 		    redis.call('DEL', KEYS[2])
-		    return 1
+		    if added > 0 then
+		        redis.call('INCR', KEYS[3])
+		        redis.call('INCR', KEYS[4])
+		    end
+		    return added
 		""";
 
 	// 원자적 감소
@@ -48,16 +52,20 @@ public class DirectMessageRedisStore {
 	private final StringRedisTemplate stringRedisTemplate;
 
 	// [DM 생성] DM 추가
-	public void addDirectMessage(UUID conversationId, DirectMessageDto directMessageDto) {
+	public void addDirectMessage(UUID conversationId, UUID receiverId, DirectMessageDto directMessageDto) {
 		// DM Key 생성: 빈 대화방 및 DM 저장 대화방
 		String key = String.format(DM_ROOM_KEY, conversationId);
 		String emptyKey = String.format(EMPTY_DM_ROOM_KEY, conversationId);
+
+		// 특정 사용자의 안 읽음 DM 개수 Key 생성: 특정 대화방 및 전체 대화방
+		String unreadKey = String.format(UNREAD_COUNT_KEY, receiverId, conversationId);
+		String globalKey = String.format(GLOBAL_UNREAD_COUNT_KEY, receiverId);
 
 		long timestamp = directMessageDto.createdAt().toEpochMilli();
 
 		// 스크립트 생성
 		DefaultRedisScript<Long> script = new DefaultRedisScript<>(
-			ADD_DM_SCRIPT,
+			ADD_DM_AND_INCR_SCRIPT,
 			Long.class
 		);
 
@@ -70,22 +78,9 @@ public class DirectMessageRedisStore {
 		);
 
 		// 메모리 관리: 최대 7일 보관
-		stringRedisTemplate.expire(key, Duration.ofDays(7));
-	}
-
-	// [DM 생성] 특정 사용자의 특정 대화방 안 읽음 DM 개수 증가
-	public void incrementUnreadCount(UUID receiverId, UUID conversationId) {
-		// 특정 사용자의 안 읽음 DM 개수 Key 생성: 특정 대화방 및 전체 대화방
-		String key = String.format(UNREAD_COUNT_KEY, receiverId, conversationId);
-		String globalKey = String.format(GLOBAL_UNREAD_COUNT_KEY, receiverId);
-
-		// 안 읽음 개수 증가
-		stringRedisTemplate.opsForValue().increment(key);
-		stringRedisTemplate.opsForValue().increment(globalKey);
-
-		// 최대 7일 보관
-		stringRedisTemplate.expire(key, Duration.ofDays(7));
-		stringRedisTemplate.expire(globalKey, Duration.ofDays(7));
+		stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
+		stringRedisTemplate.expire(unreadKey, 7, TimeUnit.DAYS);
+		stringRedisTemplate.expire(globalKey, 7, TimeUnit.DAYS);
 	}
 
 	// [DM 읽음 상태 생성] 특정 사용자의 특정 대화방 및 전체 대화방 안 읽은 개수 감소
@@ -177,7 +172,7 @@ public class DirectMessageRedisStore {
 			String emptyKey = String.format(EMPTY_DM_ROOM_KEY, conversationId);
 
 			// DB 반복 조회 방지: 10분동안 빈 대화방 상태 유지
-			stringRedisTemplate.opsForValue().set(emptyKey, "1", Duration.ofMinutes(10));
+			stringRedisTemplate.opsForValue().set(emptyKey, "1", 10, TimeUnit.MINUTES);
 
 			return;
 		}
@@ -197,7 +192,7 @@ public class DirectMessageRedisStore {
 		stringRedisTemplate.opsForZSet().add(key, tuples);
 
 		// 최대 7일 보관
-		stringRedisTemplate.expire(key, Duration.ofDays(7));
+		stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
 	}
 
 	// 공통 메서드: 특정 대화방의 캐시 상태를 확인하여 Enum으로 반환
