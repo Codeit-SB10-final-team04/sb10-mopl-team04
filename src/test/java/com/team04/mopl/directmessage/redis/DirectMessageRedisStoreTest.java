@@ -86,6 +86,7 @@ class DirectMessageRedisStoreTest {
 
 		// then
 		verify(valueOperations, times(2)).increment(anyString());
+		verify(stringRedisTemplate, times(2)).expire(anyString(), eq(Duration.ofDays(7)));
 	}
 
 	@Test

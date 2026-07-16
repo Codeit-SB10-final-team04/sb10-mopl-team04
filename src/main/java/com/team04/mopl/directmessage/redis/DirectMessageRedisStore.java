@@ -82,6 +82,10 @@ public class DirectMessageRedisStore {
 		// 안 읽음 개수 증가
 		stringRedisTemplate.opsForValue().increment(key);
 		stringRedisTemplate.opsForValue().increment(globalKey);
+
+		// 최대 7일 보관
+		stringRedisTemplate.expire(key, Duration.ofDays(7));
+		stringRedisTemplate.expire(globalKey, Duration.ofDays(7));
 	}
 
 	// [DM 읽음 상태 생성] 특정 사용자의 특정 대화방 및 전체 대화방 안 읽은 개수 감소
