@@ -22,6 +22,9 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
 	// 특정 수신자의 마지막 이벤트 메시지 단건 조회
 	Optional<DirectMessage> findByIdAndReceiverId(UUID id, UUID receiverId);
 
+	// 특정 대화방에서 발행된 DM 다건 조회
+	List<DirectMessage> findAllByConversationId(UUID conversationId);
+
 	// 안 읽음 메시지 존재 유무
 	boolean existsByConversationIdAndReceiverIdAndReadFalse(UUID conversationId, UUID receiverId);
 
