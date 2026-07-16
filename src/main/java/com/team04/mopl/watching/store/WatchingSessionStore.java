@@ -78,6 +78,28 @@ public class WatchingSessionStore {
 		return ''
 		""", String.class);
 
+	// Lua: sessions Set 전체 삭제 + 강제 정리 (DISCONNECT 시 좀비 세션 방지)
+	// KEYS: [1]sessions [2]info [3]count [4]userContents [5]watchers
+	// ARGV: [1]contentId [2]userId
+	// 반환: "id|joinedAt" = 세션 존재했으면, "" = 이미 없었음
+	private static final DefaultRedisScript<String> FORCE_REMOVE_WATCHER_SCRIPT = new DefaultRedisScript<>("""
+		local size = redis.call('SCARD', KEYS[1])
+		if size == 0 then
+			return ''
+		end
+		local id = redis.call('HGET', KEYS[2], 'id')
+		local joinedAt = redis.call('HGET', KEYS[2], 'joinedAt')
+		redis.call('DEL', KEYS[1])
+		redis.call('DEL', KEYS[2])
+		redis.call('DECR', KEYS[3])
+		redis.call('SREM', KEYS[4], ARGV[1])
+		redis.call('SREM', KEYS[5], ARGV[2])
+		if id and joinedAt then
+			return id .. '|' .. joinedAt
+		end
+		return ''
+		""", String.class);
+
 	public Optional<WatchingSessionInfo> addWatcher(UUID contentId, UUID userId) {
 		return addWatcher(contentId, userId, "default");
 	}
@@ -98,6 +120,29 @@ public class WatchingSessionStore {
 			contentId.toString(), userId.toString());
 
 		return "1".equals(result) ? Optional.of(info) : Optional.empty();
+	}
+
+	// 강제 퇴장: sessions Set 전체 삭제 (DISCONNECT 시 좀비 세션 방지)
+	public Optional<WatchingSessionInfo> forceRemoveWatcher(UUID contentId, UUID userId) {
+		List<String> keys = Arrays.asList(
+			String.format(SESSIONS_KEY, contentId, userId),
+			String.format(INFO_KEY, contentId, userId),
+			String.format(COUNT_KEY, contentId),
+			String.format(USER_CONTENTS_KEY, userId),
+			String.format(WATCHERS_KEY, contentId)
+		);
+
+		String result = redisTemplate.execute(FORCE_REMOVE_WATCHER_SCRIPT, keys,
+			contentId.toString(), userId.toString());
+
+		if (result != null && !result.isEmpty()) {
+			String[] parts = result.split("\\|", 2);
+			return Optional.of(new WatchingSessionInfo(
+				UUID.fromString(parts[0]),
+				Instant.parse(parts[1])
+			));
+		}
+		return Optional.empty();
 	}
 
 	public Optional<WatchingSessionInfo> removeWatcher(UUID contentId, UUID userId) {
