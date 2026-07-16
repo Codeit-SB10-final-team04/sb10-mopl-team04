@@ -15,7 +15,7 @@ public class ConversationRedisSyncListener {
 
 	private final ConversationRedisSyncProcessor conversationRedisSyncProcessor;
 
-	@Async("enventTaskExecutor")
+	@Async("eventTaskExecutor")
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	public void onConversationCreated(ConversationCreatedEvent conversationCreatedEvent) {
 		conversationRedisSyncProcessor.syncRedisOnConversationCreated(conversationCreatedEvent);

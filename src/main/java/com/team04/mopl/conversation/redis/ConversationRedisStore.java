@@ -62,9 +62,6 @@ public class ConversationRedisStore {
 			List.of(key, emptyKey),
 			conversationId.toString()
 		);
-
-		// 최대 30일 보관
-		stringRedisTemplate.expire(key, Duration.ofDays(30));
 	}
 
 	// [대화 생성] 특정 대화방의 참여자 목록 추가
@@ -90,9 +87,6 @@ public class ConversationRedisStore {
 			List.of(key, emptyKey),
 			(Object[])participantIdStrings
 		);
-
-		// 최대 30일 보관
-		stringRedisTemplate.expire(key, Duration.ofDays(30));
 	}
 
 	// [대화 조회] 특정 대화방의 ID 단건 조회
