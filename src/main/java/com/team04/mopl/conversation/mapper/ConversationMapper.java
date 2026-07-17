@@ -21,7 +21,7 @@ public interface ConversationMapper {
 	ConversationDto toDto(
 		Conversation conversation,
 		UserSummary with,
-		DirectMessageDto latestMessage,
+		DirectMessageDto lastestMessage,
 		boolean hasUnread
 	);
 
