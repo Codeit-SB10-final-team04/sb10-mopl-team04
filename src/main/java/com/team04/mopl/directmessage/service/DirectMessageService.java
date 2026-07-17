@@ -191,7 +191,7 @@ public class DirectMessageService {
 			directMessageRedisStore.initDirectMessages(conversation.getId(), allMessages);
 		}
 
-		// 5. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기
+		// 5. 다음 페이지 유무 확인 및 limit (기본값: 50) 만큼 자르기
 		boolean hasNext = directMessages.size() > directMessagePageRequest.limit();
 		List<DirectMessage> pagedDirectMessages = hasNext
 			? directMessages.subList(0, directMessagePageRequest.limit())
