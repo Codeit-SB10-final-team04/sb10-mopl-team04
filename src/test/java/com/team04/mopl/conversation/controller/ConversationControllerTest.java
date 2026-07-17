@@ -180,7 +180,7 @@ class ConversationControllerTest {
 			"https://profile.img"
 		);
 
-		DirectMessageDto latestMessage = new DirectMessageDto(
+		DirectMessageDto lastestMessage = new DirectMessageDto(
 			UUID.randomUUID(),
 			conversationId,
 			Instant.now(),
@@ -192,7 +192,7 @@ class ConversationControllerTest {
 		ConversationDto response = ConversationDto.builder()
 			.id(conversationId)
 			.with(withUser)
-			.latestMessage(latestMessage)
+			.lastestMessage(lastestMessage)
 			.hasUnread(false)
 			.build();
 
@@ -206,7 +206,7 @@ class ConversationControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(conversationId.toString()))
 			.andExpect(jsonPath("$.with.name").value("상대방"))
-			.andExpect(jsonPath("$.latestMessage.content").value("안녕"))
+			.andExpect(jsonPath("$.lastestMessage.content").value("안녕"))
 			.andExpect(jsonPath("$.hasUnread").value(false));
 	}
 

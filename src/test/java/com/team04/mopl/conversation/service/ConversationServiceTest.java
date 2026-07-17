@@ -200,7 +200,7 @@ class ConversationServiceTest {
 	 */
 	@Test
 	@DisplayName("성공: 메시지가 존재하는 대화방을 조회하면 상대방 정보와 마지막 메시지를 조립하여 반환한다.")
-	void findConversationById_WithLatestMessage_Success() {
+	void findConversationById_WithLastestMessage_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
 
@@ -212,8 +212,8 @@ class ConversationServiceTest {
 		Conversation conversation = mock(Conversation.class);
 		given(conversation.getId()).willReturn(conversationId);
 
-		DirectMessage latestMessage = mock(DirectMessage.class);
-		DirectMessageDto latestMessageDto = mock(DirectMessageDto.class);
+		DirectMessage lastestMessage = mock(DirectMessage.class);
+		DirectMessageDto lastestMessageDto = mock(DirectMessageDto.class);
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 
@@ -222,11 +222,11 @@ class ConversationServiceTest {
 		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
 
 		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId)).willReturn(
-			Optional.of(latestMessage));
-		given(directMessageMapper.toDto(latestMessage)).willReturn(latestMessageDto);
+			Optional.of(lastestMessage));
+		given(directMessageMapper.toDto(lastestMessage)).willReturn(lastestMessageDto);
 
 		ConversationDto expectedDto = mock(ConversationDto.class);
-		given(conversationMapper.toDto(eq(conversation), any(UserSummary.class), eq(latestMessageDto), eq(false)))
+		given(conversationMapper.toDto(eq(conversation), any(UserSummary.class), eq(lastestMessageDto), eq(false)))
 			.willReturn(expectedDto);
 
 		// when
@@ -234,7 +234,7 @@ class ConversationServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(conversationMapper).toDto(eq(conversation), any(UserSummary.class), eq(latestMessageDto), eq(false));
+		verify(conversationMapper).toDto(eq(conversation), any(UserSummary.class), eq(lastestMessageDto), eq(false));
 	}
 
 	@Test
@@ -434,7 +434,7 @@ class ConversationServiceTest {
 
 		// N+3 방어 로직
 		given(conversationParticipantRepository.findByConversationIdIn(anyList())).willReturn(List.of());
-		given(directMessageRepository.findLatestMessagesByConversationIds(anyList())).willReturn(List.of());
+		given(directMessageRepository.findLastestMessagesByConversationIds(anyList())).willReturn(List.of());
 		given(directMessageRepository.findUnreadConversationIds(anyList(), eq(requestUserId)))
 			.willReturn(Set.of());
 
@@ -502,7 +502,7 @@ class ConversationServiceTest {
 		assertThat(result).isNotNull();
 		assertThat(result).isEqualTo(expectedResponse);
 		verify(conversationParticipantRepository, never()).findByConversationIdIn(anyList());
-		verify(directMessageRepository, never()).findLatestMessagesByConversationIds(anyList());
+		verify(directMessageRepository, never()).findLastestMessagesByConversationIds(anyList());
 	}
 
 	@Test
@@ -548,7 +548,7 @@ class ConversationServiceTest {
 			.willReturn(List.of(conv3, conv1, conv2));
 
 		given(conversationParticipantRepository.findByConversationIdIn(anyList())).willReturn(List.of());
-		given(directMessageRepository.findLatestMessagesByConversationIds(anyList())).willReturn(List.of());
+		given(directMessageRepository.findLastestMessagesByConversationIds(anyList())).willReturn(List.of());
 		given(directMessageRepository.findUnreadConversationIds(anyList(), eq(requestUserId))).willReturn(Set.of());
 
 		// when

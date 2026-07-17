@@ -408,18 +408,18 @@ public class ConversationService {
 		UserSummary with = getUserSummary(withUser);
 
 		// 2. 마지막 메시지 내용 조회
-		DirectMessageDto latestMessage = getLatestMessageEntity(conversation.getId())
+		DirectMessageDto lastestMessage = getLastestMessageEntity(conversation.getId())
 			.map(directMessageMapper::toDto)
 			.orElse(null);
 
 		// 3. 안 읽음 여부 판단
 		boolean hasUnread = hasUnreadMessage(conversation.getId(), requestUserId);
 
-		return conversationMapper.toDto(conversation, with, latestMessage, hasUnread);
+		return conversationMapper.toDto(conversation, with, lastestMessage, hasUnread);
 	}
 
 	// 마지막 메시지 조회
-	private Optional<DirectMessage> getLatestMessageEntity(UUID conversationId) {
+	private Optional<DirectMessage> getLastestMessageEntity(UUID conversationId) {
 		return directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId);
 	}
 
@@ -446,7 +446,7 @@ public class ConversationService {
 		// 다건 조회: 대화 ID 목록에 해당하는 대화 상대 정보, 마지막 메시지, 안 읽음 여부 한 번에 조회
 		// 단건 조회와 마찬가지로 대화 목록 크기에 상관없이 총 3번의 쿼리문만 발생하여, N+3 문제 해결
 		Map<UUID, User> withUserMap = getWithUserMap(conversationIds, requestUserId);
-		Map<UUID, DirectMessage> latestMessageMap = getLatestMessageMap(conversationIds);
+		Map<UUID, DirectMessage> lastestMessageMap = getLastestMessageMap(conversationIds);
 		Set<UUID> unreadConversationIds = getUnreadConversationIds(conversationIds, requestUserId);
 
 		return conversations.stream()
@@ -460,9 +460,9 @@ public class ConversationService {
 					: null;
 
 				// 마지막 메시지 조회
-				DirectMessage latestMessage = latestMessageMap.get(conversationId);
-				DirectMessageDto latestDto = (latestMessage != null)
-					? directMessageMapper.toDto(latestMessage)
+				DirectMessage lastestMessage = lastestMessageMap.get(conversationId);
+				DirectMessageDto latestDto = (lastestMessage != null)
+					? directMessageMapper.toDto(lastestMessage)
 					: null;
 
 				// 안 읽음 여부 판단
@@ -487,12 +487,12 @@ public class ConversationService {
 	}
 
 	// 마지막 메시지 조회: 각 대화방에 속한 가장 최근 메시지를 Map으로 반환
-	private Map<UUID, DirectMessage> getLatestMessageMap(List<UUID> conversationIds) {
-		return directMessageRepository.findLatestMessagesByConversationIds(conversationIds).stream()
+	private Map<UUID, DirectMessage> getLastestMessageMap(List<UUID> conversationIds) {
+		return directMessageRepository.findLastestMessagesByConversationIds(conversationIds).stream()
 			.collect(
 				Collectors.toMap(
-					latestMessage -> latestMessage.getConversation().getId(),
-					latestMessage -> latestMessage,
+					lastestMessage -> lastestMessage.getConversation().getId(),
+					lastestMessage -> lastestMessage,
 					// 두 개 이상의 메시시의 생성 시간이 같은 경우, 기존값을 유지하여 DuplicationKeyException 방지
 					(existing, replacement) -> existing
 				)
