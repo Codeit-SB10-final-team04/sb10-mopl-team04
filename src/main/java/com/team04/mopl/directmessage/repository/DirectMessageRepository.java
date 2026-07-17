@@ -78,17 +78,16 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
 	);
 
 	// DM 읽음 처리: 마지막으로 수신한 메시지를 포함한 그 이전의 메시지 일괄 읽음 처리
-	@Modifying
-	@Query("SELECT dm FROM DirectMessage dm "
-		+ "WHERE dm.conversation.id IN :conversationIds "
-		+ "AND NOT EXISTS ("
-		+ "    SELECT 1 FROM DirectMessage dm2 "
-		+ "    WHERE dm2.conversation.id = dm.conversation.id "
-		+ "    AND (dm2.createdAt > dm.createdAt OR (dm2.createdAt = dm.createdAt AND dm2.id > dm.id))"
-		+ ")")
-	void markAllAsRead(
+	@Modifying(clearAutomatically = true)
+	@Query("UPDATE DirectMessage m SET m.read = true, m.readAt = :now "
+		+ "WHERE m.conversation.id = :conversationId "
+		+ "AND m.receiver.id = :receiverId "
+		+ "AND m.read = false "
+		+ "AND m.createdAt <= :createdAt")
+	int markAllAsRead(
 		@Param("conversationId") UUID conversationId,
 		@Param("receiverId") UUID receiverId,
+		@Param("createdAt") Instant createdAt,
 		@Param("now") Instant now
 	);
 }

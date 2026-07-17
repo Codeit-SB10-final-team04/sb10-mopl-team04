@@ -203,8 +203,8 @@ class DirectMessageServiceTest {
 	=========================
 	 */
 	@Test
-	@DisplayName("성공: 조건이 모두 맞으면 DM 읽음 처리가 정상 수행되고 읽음 이벤트를 발행한다.")
-	void markAsRead_Success() {
+	@DisplayName("성공: 수신자가 호출하여 업데이트된 데이터가 있으면 읽음 이벤트를 발행한다.")
+	void markAsRead_Success_Receiver_PublishesEvent() {
 		// given
 		UUID conversationId = UUID.randomUUID();
 		Conversation conversation = mock(Conversation.class);
@@ -217,6 +217,7 @@ class DirectMessageServiceTest {
 		UUID directMessageId = UUID.randomUUID();
 		DirectMessage directMessage = mock(DirectMessage.class);
 		given(directMessage.getConversation()).willReturn(conversation);
+		given(directMessage.getCreatedAt()).willReturn(Instant.now());
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 		given(directMessageRepository.findById(directMessageId)).willReturn(Optional.of(directMessage));
@@ -226,11 +227,17 @@ class DirectMessageServiceTest {
 		given(conversationParticipantRepository.findByConversationId(conversationId))
 			.willReturn(List.of(participant));
 
+		// DB 업데이트 개수가 1개 발생했다고 가정
+		given(directMessageRepository.markAllAsRead(eq(conversationId), eq(requestUserId), any(Instant.class),
+			any(Instant.class)))
+			.willReturn(1);
+
 		// when
 		directMessageService.markAsRead(conversationId, directMessageId, requestUserId);
 
 		// then
-		verify(directMessageRepository).markAllAsRead(eq(conversationId), eq(requestUserId), any(Instant.class));
+		verify(directMessageRepository).markAllAsRead(eq(conversationId), eq(requestUserId), any(Instant.class),
+			any(Instant.class));
 
 		ArgumentCaptor<DirectMessageReadEvent> captor = ArgumentCaptor.forClass(DirectMessageReadEvent.class);
 		verify(eventPublisher).publishEvent(captor.capture());
@@ -239,6 +246,45 @@ class DirectMessageServiceTest {
 		assertThat(event.receiverId()).isEqualTo(requestUserId);
 		assertThat(event.conversationId()).isEqualTo(conversationId);
 		assertThat(event.directMessageId()).isEqualTo(directMessageId);
+	}
+
+	@Test
+	@DisplayName("성공: 송신자가 호출하여 업데이트된 데이터가 0개면 에러 없이 통과하되 이벤트는 발행하지 않는다.")
+	void markAsRead_Success_Sender_NoEventPublished() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		Conversation conversation = mock(Conversation.class);
+		given(conversation.getId()).willReturn(conversationId);
+
+		UUID requestUserId = UUID.randomUUID();
+		User sender = mock(User.class);
+		given(sender.getId()).willReturn(requestUserId);
+
+		UUID directMessageId = UUID.randomUUID();
+		DirectMessage directMessage = mock(DirectMessage.class);
+		given(directMessage.getConversation()).willReturn(conversation);
+		given(directMessage.getCreatedAt()).willReturn(Instant.now());
+
+		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
+		given(directMessageRepository.findById(directMessageId)).willReturn(Optional.of(directMessage));
+
+		ConversationParticipant participant = mock(ConversationParticipant.class);
+		given(participant.getUser()).willReturn(sender);
+		given(conversationParticipantRepository.findByConversationId(conversationId))
+			.willReturn(List.of(participant));
+
+		// DB 업데이트 개수가 0개라고 가정
+		given(directMessageRepository.markAllAsRead(eq(conversationId), eq(requestUserId), any(Instant.class),
+			any(Instant.class)))
+			.willReturn(0);
+
+		// when
+		directMessageService.markAsRead(conversationId, directMessageId, requestUserId);
+
+		// then
+		verify(directMessageRepository).markAllAsRead(eq(conversationId), eq(requestUserId), any(Instant.class),
+			any(Instant.class));
+		verify(eventPublisher, never()).publishEvent(any());
 	}
 
 	@Test

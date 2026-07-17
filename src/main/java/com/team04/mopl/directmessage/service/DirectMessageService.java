@@ -143,21 +143,24 @@ public class DirectMessageService {
 		validateMessageInConversation(directMessage, conversation.getId());
 
 		// 5. DM 읽음 처리 및 저장
-		directMessageRepository.markAllAsRead(
+		int updatedCount = directMessageRepository.markAllAsRead(
 			conversationId,
 			requestUserId,
+			directMessage.getCreatedAt(),
 			Instant.now()
 		);
 
 		// 6. 읽음 처리 Redis 동기화를 위한 이벤트 발행
-		eventPublisher.publishEvent(new DirectMessageReadEvent(
-			requestUserId,
-			conversationId,
-			directMessageId
-		));
+		if (updatedCount > 0) {
+			eventPublisher.publishEvent(new DirectMessageReadEvent(
+				requestUserId,
+				conversationId,
+				directMessageId
+			));
+		}
 
-		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}, readStatus={}",
-			conversationId, directMessageId, directMessage.isRead());
+		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}, updatedCount={}",
+			conversationId, directMessageId, updatedCount);
 	}
 
 	// DM 목록 조회 (정렬 + 커서 페이지네이션)
