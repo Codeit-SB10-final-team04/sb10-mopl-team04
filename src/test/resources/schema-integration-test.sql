@@ -17,19 +17,6 @@ CREATE TABLE IF NOT EXISTS users
     PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS auth_sessions
-(
-    session_id         UUID                     NOT NULL,
-    user_id            UUID                     NOT NULL UNIQUE,
-    refresh_token_hash TEXT                     NOT NULL,
-    access_expires_at  TIMESTAMP WITH TIME ZONE NOT NULL,
-    refresh_expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    last_refreshed_at  TIMESTAMP WITH TIME ZONE,
-    updated_at         TIMESTAMP WITH TIME ZONE NOT NULL,
-    PRIMARY KEY (session_id),
-    CONSTRAINT fk_auth_sessions_user FOREIGN KEY (user_id) REFERENCES users (id)
-);
-
 CREATE TABLE IF NOT EXISTS temporary_passwords
 (
     user_id       UUID                     NOT NULL,
