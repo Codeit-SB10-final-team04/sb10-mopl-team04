@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -74,5 +75,17 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
 		@Param("lastId") UUID lastId,
 		@Param("createdAt") Instant createdAt,
 		Pageable pageable
+	);
+
+	// DM 읽음 처리: 마지막으로 수신한 메시지를 포함한 그 이전의 메시지 일괄 읽음 처리
+	@Modifying
+	@Query("UPDATE DirectMessage m SET m.read = true, m.readAt = :now "
+		+ "WHERE m.conversation.id = :conversationId "
+		+ "AND m.receiver.id = :receiverId "
+		+ "AND m.read = false")
+	void markAllAsRead(
+		@Param("conversationId") UUID conversationId,
+		@Param("receiverId") UUID receiverId,
+		@Param("now") Instant now
 	);
 }
