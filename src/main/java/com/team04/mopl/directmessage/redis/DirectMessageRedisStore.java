@@ -27,6 +27,8 @@ public class DirectMessageRedisStore {
 	private static final String GLOBAL_UNREAD_COUNT_KEY = "dm:unread:global:%s";        // 특정 사용자가 읽지 않은 모든 DM 개수
 	private static final String EMPTY_DM_ROOM_KEY = "dm:room:empty:%s";                 // DM이 존재하지 않는 대화방
 
+	private static final int MAX_CACHE_MESSAGES = 500;
+
 	// 원자적 추가
 	private static final String ADD_DM_AND_INCR_SCRIPT = """
 		    local added = redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
@@ -39,14 +41,15 @@ public class DirectMessageRedisStore {
 		""";
 
 	// 원자적 감소
-	private static final String DECREMENT_UNREAD_SCRIPT = """
-		    local count = tonumber(redis.call('GET', KEYS[1]))
-		    if count and count > 0 then
-		        redis.call('DECR', KEYS[1])
-		        redis.call('DECR', KEYS[2])
-		        return 1
+	private static final String RESET_UNREAD_SCRIPT = """
+		    local roomCount = tonumber(redis.call('GET', KEYS[1]) or '0')
+		    if roomCount > 0 then
+		        -- 1. 글로벌 카운트에서 이 방의 안 읽음 개수만큼 한 번에 빼기
+		        redis.call('DECRBY', KEYS[2], roomCount)
+		        -- 2. 이 방의 안 읽음 카운트는 0이 되었으므로 키 삭제
+		        redis.call('DEL', KEYS[1])
 		    end
-		    return 0
+		    return roomCount
 		""";
 
 	private final StringRedisTemplate stringRedisTemplate;
@@ -77,10 +80,11 @@ public class DirectMessageRedisStore {
 			directMessageDto.id().toString()
 		);
 
-		// 메모리 관리: 최대 7일 보관
-		stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
-		stringRedisTemplate.expire(unreadKey, 7, TimeUnit.DAYS);
-		stringRedisTemplate.expire(globalKey, 7, TimeUnit.DAYS);
+		// 메모리 관리: 메시지 최대 개수 유지
+		stringRedisTemplate.opsForZSet().removeRange(key, 0, -(MAX_CACHE_MESSAGES + 1));
+
+		// 캐시 TTL 갱신
+		refreshTtl(key, unreadKey, globalKey);
 	}
 
 	// [DM 읽음 상태 생성] 특정 사용자의 특정 대화방 및 전체 대화방 안 읽은 개수 감소
@@ -91,7 +95,7 @@ public class DirectMessageRedisStore {
 
 		// 스크립트 생성
 		DefaultRedisScript<Long> script = new DefaultRedisScript<>(
-			DECREMENT_UNREAD_SCRIPT,
+			RESET_UNREAD_SCRIPT,
 			Long.class
 		);
 
@@ -100,6 +104,9 @@ public class DirectMessageRedisStore {
 			script,
 			List.of(key, globalKey)
 		);
+
+		// 전체 카운트 TTL 연장
+		refreshTtl(globalKey);
 	}
 
 	// [DM 목록 조회] 특정 대화방의 DM ID 목록 조회
@@ -116,6 +123,9 @@ public class DirectMessageRedisStore {
 
 		// 특정 대화방 Key 생성
 		String key = String.format(DM_ROOM_KEY, conversationId);
+
+		// TTL 연장
+		refreshTtl(key);
 
 		// 특정 시점 (CreatedAt) 이전의 DM 내림차순 조회
 		return stringRedisTemplate.opsForZSet().reverseRangeByScore(
@@ -154,6 +164,9 @@ public class DirectMessageRedisStore {
 		// 특정 대화방의 Key 생성
 		String key = String.format(DM_ROOM_KEY, conversationId);
 
+		// TTL 연장
+		refreshTtl(key);
+
 		// Set 전체 크기 반환
 		return stringRedisTemplate.opsForZSet().zCard(key);
 	}
@@ -180,8 +193,12 @@ public class DirectMessageRedisStore {
 		// 특정 대화방의 Key 생성
 		String key = String.format(DM_ROOM_KEY, conversationId);
 
+		// 메시지 개수 제한
+		int skipCount = Math.max(0, messages.size() - MAX_CACHE_MESSAGES);
+
 		// List 목록을 Tuple Set 타입으로 변환
 		Set<ZSetOperations.TypedTuple<String>> tuples = messages.stream()
+			.skip(skipCount)
 			.map(message -> ZSetOperations.TypedTuple.of(
 				message.getId().toString(),
 				(double)message.getCreatedAt().toEpochMilli()
@@ -192,7 +209,7 @@ public class DirectMessageRedisStore {
 		stringRedisTemplate.opsForZSet().add(key, tuples);
 
 		// 최대 7일 보관
-		stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
+		refreshTtl(key);
 	}
 
 	// 공통 메서드: 특정 대화방의 캐시 상태를 확인하여 Enum으로 반환
@@ -210,5 +227,12 @@ public class DirectMessageRedisStore {
 		}
 
 		return CacheState.MISS;
+	}
+
+	// 공통 메서드: TTL 갱신
+	private void refreshTtl(String... keys) {
+		for (String key : keys) {
+			stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
+		}
 	}
 }
