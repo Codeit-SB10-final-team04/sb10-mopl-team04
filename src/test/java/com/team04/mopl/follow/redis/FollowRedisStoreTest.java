@@ -55,7 +55,6 @@ class FollowRedisStoreTest {
 
 		// then
 		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), any(), any(), any());
-		verify(stringRedisTemplate, times(2)).expire(anyString(), eq(7L), eq(TimeUnit.DAYS));
 	}
 
 	@Test
@@ -76,72 +75,11 @@ class FollowRedisStoreTest {
 		// then
 		verify(stringRedisTemplate, times(1)).execute(
 			any(RedisScript.class),
-			argThat(keys -> keys.size() == 3 && keys.get(2).equals(expectedEmptyKey)),
+			argThat(keys -> keys.size() == 4 && keys.get(2).equals(expectedEmptyKey)),
 			anyString(),
 			anyString(),
 			anyString()
 		);
-	}
-
-	/*
-	============================
-	   특정 사용자 팔로우 여부 조회
-	============================
-	 */
-	@Test
-	@DisplayName("성공: Redis ZSET에 Key가 존재하고 스코어가 존재하면 팔로우 중인 것으로 판단(true)한다.")
-	void isFollowing_True_Success() {
-		// given
-		UUID followerId = UUID.randomUUID();
-		UUID followeeId = UUID.randomUUID();
-
-		given(stringRedisTemplate.hasKey(anyString())).willReturn(true);
-		given(stringRedisTemplate.opsForZSet()).willReturn(zSetOperations);
-		given(zSetOperations.score(anyString(), eq(followeeId.toString())))
-			.willReturn(1623456789.0);
-
-		// when
-		Boolean result = followRedisStore.isFollowing(followerId, followeeId);
-
-		// then
-		assertThat(result).isTrue();
-	}
-
-	@Test
-	@DisplayName("성공: Redis ZSET에 Key가 존재하지만 스코어가 없으면 팔로우하지 않는 것으로 판단(false)한다.")
-	void isFollowing_False_Success() {
-		// given
-		UUID followerId = UUID.randomUUID();
-		UUID followeeId = UUID.randomUUID();
-
-		given(stringRedisTemplate.hasKey(anyString())).willReturn(true);
-		given(stringRedisTemplate.opsForZSet()).willReturn(zSetOperations);
-		given(zSetOperations.score(anyString(), eq(followeeId.toString())))
-			.willReturn(null);
-
-		// when
-		Boolean result = followRedisStore.isFollowing(followerId, followeeId);
-
-		// then
-		assertThat(result).isFalse();
-	}
-
-	@Test
-	@DisplayName("성공: Redis ZSET에 Key 자체가 존재하지 않으면 Cache Miss(null)를 반환한다.")
-	void isFollowing_CacheMiss_ReturnsNull() {
-		// given
-		UUID followerId = UUID.randomUUID();
-		UUID followeeId = UUID.randomUUID();
-
-		// 캐시 없음
-		given(stringRedisTemplate.hasKey(anyString())).willReturn(false);
-
-		// when
-		Boolean result = followRedisStore.isFollowing(followerId, followeeId);
-
-		// then
-		assertThat(result).isNull();
-		verify(stringRedisTemplate, never()).opsForZSet();
 	}
 
 	/*
@@ -229,7 +167,6 @@ class FollowRedisStoreTest {
 
 		// then
 		verify(zSetOperations, times(1)).add(anyString(), anySet());
-		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(7L), eq(TimeUnit.DAYS));
 	}
 
 	@Test

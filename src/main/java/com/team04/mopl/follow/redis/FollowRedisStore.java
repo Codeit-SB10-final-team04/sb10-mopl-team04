@@ -29,7 +29,10 @@ public class FollowRedisStore {
 		    local isNew = redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
 		    if isNew == 1 then
 		        redis.call('ZADD', KEYS[2], ARGV[1], ARGV[3])
-		        redis.call('DEL', KEYS[3])
+		        redis.call('DEL', KEYS[4])
+		        -- 추가될 때마다 만료 시간 갱신 (7일 = 604800초)
+		        redis.call('EXPIRE', KEYS[1], 604800)
+		        redis.call('EXPIRE', KEYS[2], 604800)
 		        return 1
 		    end
 		    return 0
@@ -61,34 +64,15 @@ public class FollowRedisStore {
 			Long.class
 		);
 
-		// 스크립트 실행
 		stringRedisTemplate.execute(
 			script,
-			List.of(followingKey, followersKey, emptyKey),
+			List.of(followingKey, followersKey, emptyKey, emptyKey),
 			String.valueOf(timestamp),
 			followeeId.toString(),
 			followerId.toString()
 		);
-
-		// 메모리 관리: 최대 7일 보관
-		stringRedisTemplate.expire(followingKey, 7, TimeUnit.DAYS);
-		stringRedisTemplate.expire(followersKey, 7, TimeUnit.DAYS);
 	}
-
-	// [사용자의 특정 사용자 팔로우 여부 조회] 팔로우 여부 반환
-	public Boolean isFollowing(UUID followerId, UUID followeeId) {
-		// 팔로잉 Key 생성
-		String followingKey = String.format(FOLLOWING_KEY, followerId);
-
-		// 유효성 검증: 캐시 존재 유무
-		if (Boolean.FALSE.equals(stringRedisTemplate.hasKey(followingKey))) {
-			return null;
-		}
-
-		// 값이 존재하면 시간 반환, 존재하지 않으면 null 반환
-		return stringRedisTemplate.opsForZSet().score(followingKey, followeeId.toString()) != null;
-	}
-
+	
 	// [특정 유저의 팔로우 수 조회] 특정 사용자의 팔로워 수 조회
 	public Long getFollowerCount(UUID followeeId) {
 		// 캐시 상태 조회
