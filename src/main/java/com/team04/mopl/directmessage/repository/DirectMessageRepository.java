@@ -40,7 +40,7 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
 		+ "    WHERE dm2.conversation.id = dm.conversation.id"
 		+ ") "
 		+ "AND dm.conversation.id IN :conversationIds")
-	List<DirectMessage> findLatestMessagesByConversationIds(@Param("conversationIds") List<UUID> conversationIds);
+	List<DirectMessage> findLastestMessagesByConversationIds(@Param("conversationIds") List<UUID> conversationIds);
 
 	// 안 읽음 여부 다건 조회: 대화 ID 목록에 대당하는 대화방의 안 읽음 여부 조회
 	@Query("SELECT DISTINCT dm.conversation.id FROM DirectMessage dm "
@@ -79,10 +79,13 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
 
 	// DM 읽음 처리: 마지막으로 수신한 메시지를 포함한 그 이전의 메시지 일괄 읽음 처리
 	@Modifying
-	@Query("UPDATE DirectMessage m SET m.read = true, m.readAt = :now "
-		+ "WHERE m.conversation.id = :conversationId "
-		+ "AND m.receiver.id = :receiverId "
-		+ "AND m.read = false")
+	@Query("SELECT dm FROM DirectMessage dm "
+		+ "WHERE dm.conversation.id IN :conversationIds "
+		+ "AND NOT EXISTS ("
+		+ "    SELECT 1 FROM DirectMessage dm2 "
+		+ "    WHERE dm2.conversation.id = dm.conversation.id "
+		+ "    AND (dm2.createdAt > dm.createdAt OR (dm2.createdAt = dm.createdAt AND dm2.id > dm.id))"
+		+ ")")
 	void markAllAsRead(
 		@Param("conversationId") UUID conversationId,
 		@Param("receiverId") UUID receiverId,
