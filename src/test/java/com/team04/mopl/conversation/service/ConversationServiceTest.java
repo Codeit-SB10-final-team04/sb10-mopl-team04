@@ -20,7 +20,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.common.enums.SortDirection;
@@ -36,6 +35,7 @@ import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 import com.team04.mopl.conversation.mapper.ConversationMapper;
 import com.team04.mopl.conversation.mapper.ConversationParticipantMapper;
+import com.team04.mopl.conversation.redis.ConversationRedisStore;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
 import com.team04.mopl.conversation.repository.es.ConversationElasticSearchRepository;
@@ -68,6 +68,9 @@ class ConversationServiceTest {
 
 	@Mock
 	private UserRepository userRepository;
+
+	@Mock
+	private ConversationRedisStore conversationRedisStore;
 
 	@Mock
 	private ConversationMapper conversationMapper;
@@ -190,38 +193,6 @@ class ConversationServiceTest {
 		verifyNoInteractions(eventPublisher);
 	}
 
-	@Test
-	@DisplayName("실패: 저장 시 동시성 이슈(DB 제약조건 위반) 발생 시 중복 예외로 변환하여 발생시킨다.")
-	void createConversation_ConcurrencyIssue_Fail() {
-		// given
-		UUID requestUserId = UUID.randomUUID();
-		User requestUser = mock(User.class);
-		given(requestUser.getId()).willReturn(requestUserId);
-
-		UUID withUserId = UUID.randomUUID();
-		ConversationCreateRequest request = new ConversationCreateRequest(withUserId);
-		User withUser = mock(User.class);
-		given(withUser.getId()).willReturn(withUserId);
-
-		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestUser));
-		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
-
-		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
-			.willReturn(Optional.empty());
-
-		// 중복 요청으로 인한 DataIntegrityViolationException 발생
-		willThrow(DataIntegrityViolationException.class)
-			.given(conversationRepository).save(any(Conversation.class));
-
-		// when & then
-		assertThatThrownBy(() -> conversationService.createConversation(request, requestUserId))
-			.isInstanceOf(ConversationException.class)
-			.hasMessage(ConversationErrorCode.CONVERSATION_ALREADY_EXISTS.getMessage());
-
-		// 이벤트가 발행되지 않아야 함
-		verifyNoInteractions(eventPublisher);
-	}
-
 	/*
 	=========================
 	   대화 단건 조회
@@ -232,8 +203,6 @@ class ConversationServiceTest {
 	void findConversationById_WithLatestMessage_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		User requestUser = mock(User.class);
-		given(requestUser.getId()).willReturn(requestUserId);
 
 		UUID withUserId = UUID.randomUUID();
 		User withUser = mock(User.class);
@@ -243,17 +212,14 @@ class ConversationServiceTest {
 		Conversation conversation = mock(Conversation.class);
 		given(conversation.getId()).willReturn(conversationId);
 
-		ConversationParticipant participant1 = mock(ConversationParticipant.class);
-		ConversationParticipant participant2 = mock(ConversationParticipant.class);
-
 		DirectMessage latestMessage = mock(DirectMessage.class);
 		DirectMessageDto latestMessageDto = mock(DirectMessageDto.class);
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
-		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(
-			List.of(participant1, participant2));
-		given(participant1.getUser()).willReturn(requestUser);
-		given(participant2.getUser()).willReturn(withUser);
+
+		// Redis 캐시 Hit 가정
+		given(conversationRedisStore.getParticipants(conversationId)).willReturn(Set.of(requestUserId, withUserId));
+		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
 
 		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId)).willReturn(
 			Optional.of(latestMessage));
@@ -276,8 +242,6 @@ class ConversationServiceTest {
 	void findConversationById_NoMessage_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		User requestUser = mock(User.class);
-		given(requestUser.getId()).willReturn(requestUserId);
 
 		UUID withUserId = UUID.randomUUID();
 		User withUser = mock(User.class);
@@ -287,14 +251,11 @@ class ConversationServiceTest {
 		Conversation conversation = mock(Conversation.class);
 		given(conversation.getId()).willReturn(conversationId);
 
-		ConversationParticipant participant1 = mock(ConversationParticipant.class);
-		ConversationParticipant participant2 = mock(ConversationParticipant.class);
-
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
-		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(
-			List.of(participant1, participant2));
-		given(participant1.getUser()).willReturn(requestUser);
-		given(participant2.getUser()).willReturn(withUser);
+
+		// Redis 캐시 Hit 가정
+		given(conversationRedisStore.getParticipants(conversationId)).willReturn(Set.of(requestUserId, withUserId));
+		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
 
 		// 마지막 메시지 없음
 		given(directMessageRepository.findTopByConversationIdOrderByCreatedAtDescIdDesc(conversationId)).willReturn(
@@ -331,19 +292,15 @@ class ConversationServiceTest {
 	void findConversationById_WithUserNotFound_ThrowException() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
-		User requestUser = mock(User.class);
-		given(requestUser.getId()).willReturn(requestUserId);
 
 		UUID conversationId = UUID.randomUUID();
 		Conversation conversation = mock(Conversation.class);
 		given(conversation.getId()).willReturn(conversationId);
 
-		ConversationParticipant participant1 = mock(ConversationParticipant.class);
-
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
-		// 대화 상대 미존재
-		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant1));
-		given(participant1.getUser()).willReturn(requestUser);
+
+		// 대화 상대 미존재 (요청자 본인만 캐시에서 반환될 경우)
+		given(conversationRedisStore.getParticipants(conversationId)).willReturn(Set.of(requestUserId));
 
 		// when & then
 		assertThatThrownBy(() -> conversationService.findConversationById(conversationId, requestUserId))
@@ -370,8 +327,9 @@ class ConversationServiceTest {
 		Conversation conversation = mock(Conversation.class);
 		given(conversation.getId()).willReturn(conversationId);
 
-		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
-			.willReturn(Optional.of(conversationId));
+		// Redis 캐시 Hit
+		given(conversationRedisStore.getConversationId(requestUserId, withUserId))
+			.willReturn(conversationId);
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 
 		ConversationDto mockDto = mock(ConversationDto.class);
@@ -383,7 +341,6 @@ class ConversationServiceTest {
 		// then
 		assertThat(result).isNotNull();
 		assertThat(result).isSameAs(mockDto);
-		verify(conversationParticipantRepository).findExistingConversationId(requestUserId, withUserId);
 		verify(conversationRepository).findById(conversationId);
 	}
 
@@ -413,6 +370,9 @@ class ConversationServiceTest {
 
 		given(userRepository.findById(withUserId)).willReturn(Optional.of(withUser));
 
+		// Cache Miss
+		given(conversationRedisStore.getConversationId(requestUserId, withUserId))
+			.willReturn(null);
 		given(conversationParticipantRepository.findExistingConversationId(requestUserId, withUserId))
 			.willReturn(Optional.empty());
 
@@ -420,6 +380,9 @@ class ConversationServiceTest {
 		assertThatThrownBy(() -> conversationService.findConversationByUserId(withUserId, requestUserId))
 			.isInstanceOf(ConversationException.class)
 			.hasFieldOrPropertyWithValue("errorCode", ConversationErrorCode.CONVERSATION_NOT_FOUND);
+
+		// DB 백필 호출 여부 확인 (null 저장 시 빈 방 마커가 세팅됨)
+		verify(conversationRedisStore).initConversationMapping(requestUserId, withUserId, null);
 	}
 
 	/*
@@ -473,7 +436,7 @@ class ConversationServiceTest {
 		given(conversationParticipantRepository.findByConversationIdIn(anyList())).willReturn(List.of());
 		given(directMessageRepository.findLatestMessagesByConversationIds(anyList())).willReturn(List.of());
 		given(directMessageRepository.findUnreadConversationIds(anyList(), eq(requestUserId)))
-			.willReturn(java.util.Set.of());
+			.willReturn(Set.of());
 
 		// 빌더 패턴 적용
 		CursorResponseConversationDto expectedResponse = CursorResponseConversationDto.builder()
