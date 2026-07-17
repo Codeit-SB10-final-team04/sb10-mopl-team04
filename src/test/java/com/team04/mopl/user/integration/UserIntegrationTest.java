@@ -1,5 +1,6 @@
 package com.team04.mopl.user.integration;
 
+import static com.team04.mopl.support.ErrorResponseAssertions.assertErrorResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -16,8 +18,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
@@ -30,17 +32,23 @@ import org.springframework.web.context.WebApplicationContext;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.support.IntegrationTestBase;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.entity.UserRole;
+import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.repository.UserRepository;
 
+import jakarta.persistence.EntityManager;
+
 @Transactional
-class UserManagementIntegrationTest extends IntegrationTestBase {
+class UserIntegrationTest extends IntegrationTestBase {
 
 	private static final String DEFAULT_PASSWORD = "password123";
 	private static final String CHANGED_PASSWORD = "changedPassword123";
+
+	private final Set<UUID> createdUserIds = new HashSet<>();
 
 	private MockMvc mockMvc;
 
@@ -54,13 +62,13 @@ class UserManagementIntegrationTest extends IntegrationTestBase {
 	private UserRepository userRepository;
 
 	@Autowired
+	private EntityManager entityManager;
+
+	@Autowired
 	private PasswordEncoder passwordEncoder;
 
 	@Autowired
 	private AuthSessionStore authSessionStore;
-
-	@Autowired
-	private StringRedisTemplate redisTemplate;
 
 	@BeforeEach
 	void setUpMockMvc() {
@@ -71,11 +79,7 @@ class UserManagementIntegrationTest extends IntegrationTestBase {
 
 	@AfterEach
 	void tearDown() {
-		Set<String> keys = redisTemplate.keys("mopl:{auth-session}:*");
-
-		if (keys != null && !keys.isEmpty()) {
-			redisTemplate.delete(keys);
-		}
+		createdUserIds.forEach(authSessionStore::deleteByUserId);
 	}
 
 	@Test
@@ -118,13 +122,16 @@ class UserManagementIntegrationTest extends IntegrationTestBase {
 		String accessToken = accessTokenFrom(signIn(user.getEmail(), DEFAULT_PASSWORD).andReturn());
 
 		// when & then
-		mockMvc.perform(get("/api/users")
+		assertErrorResponse(
+			mockMvc.perform(get("/api/users")
 				.header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
 				.param("limit", "20")
 				.param("sortDirection", "ASCENDING")
-				.param("sortBy", "email"))
-			.andExpect(status().isForbidden())
-			.andExpect(jsonPath("$.exceptionName").value("AuthException"));
+				.param("sortBy", "email")),
+			HttpStatus.FORBIDDEN,
+			"AuthException",
+			AuthErrorCode.AUTH_ACCESS_DENIED.getMessage()
+		);
 	}
 
 	@Test
@@ -179,15 +186,57 @@ class UserManagementIntegrationTest extends IntegrationTestBase {
 			.andExpect(status().isNoContent());
 
 		// then
+		flushAndClear();
 		User updatedTarget = userRepository.findById(target.getId()).orElseThrow();
 
 		assertThat(updatedTarget.getRole()).isEqualTo(UserRole.ADMIN);
 		assertThat(authSessionStore.findByUserId(target.getId())).isEmpty();
 
+		assertErrorResponse(
+			mockMvc.perform(get("/api/users/{userId}", target.getId())
+				.header(HttpHeaders.AUTHORIZATION, bearer(targetAccessToken))),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_SESSION_INVALID.getMessage()
+		);
+	}
+
+	@Test
+	@DisplayName("일반 사용자가 다른 사용자의 권한 변경을 요청하면 403을 반환하고 대상 상태를 유지한다")
+	void updateRole_returnForbiddenAndPreserveTarget_whenRequesterIsNotAdmin() throws Exception {
+		// given
+		User requester = createUser("권한변경요청자", uniqueEmail("role-requester"),
+			DEFAULT_PASSWORD, UserRole.USER, false);
+		User target = createUser("권한변경대상", uniqueEmail("role-denied-target"),
+			DEFAULT_PASSWORD, UserRole.USER, false);
+		String targetAccessToken = accessTokenFrom(signIn(target.getEmail(), DEFAULT_PASSWORD).andReturn());
+		String requesterAccessToken = accessTokenFrom(signIn(requester.getEmail(), DEFAULT_PASSWORD).andReturn());
+
+		// when & then
+		assertErrorResponse(
+			mockMvc.perform(patch("/api/users/{userId}/role", target.getId())
+				.with(csrf())
+				.header(HttpHeaders.AUTHORIZATION, bearer(requesterAccessToken))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"role": "ADMIN"
+					}
+					""")),
+			HttpStatus.FORBIDDEN,
+			"AuthException",
+			AuthErrorCode.AUTH_ACCESS_DENIED.getMessage()
+		);
+
+		flushAndClear();
+		User unchangedTarget = userRepository.findById(target.getId()).orElseThrow();
+
+		assertThat(unchangedTarget.getRole()).isEqualTo(UserRole.USER);
+		assertThat(authSessionStore.findByUserId(target.getId())).isPresent();
+
 		mockMvc.perform(get("/api/users/{userId}", target.getId())
 				.header(HttpHeaders.AUTHORIZATION, bearer(targetAccessToken)))
-			.andExpect(status().isUnauthorized())
-			.andExpect(jsonPath("$.exceptionName").value("AuthException"));
+			.andExpect(status().isOk());
 	}
 
 	@Test
@@ -212,18 +261,64 @@ class UserManagementIntegrationTest extends IntegrationTestBase {
 			.andExpect(status().isNoContent());
 
 		// then
+		flushAndClear();
 		User lockedTarget = userRepository.findById(target.getId()).orElseThrow();
 
 		assertThat(lockedTarget.isLocked()).isTrue();
 		assertThat(authSessionStore.findByUserId(target.getId())).isEmpty();
 
+		assertErrorResponse(
+			mockMvc.perform(get("/api/users/{userId}", target.getId())
+				.header(HttpHeaders.AUTHORIZATION, bearer(targetAccessToken))),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_SESSION_INVALID.getMessage()
+		);
+
+		assertErrorResponse(
+			signIn(target.getEmail(), DEFAULT_PASSWORD),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_LOCKED_ACCOUNT.getMessage()
+		);
+	}
+
+	@Test
+	@DisplayName("일반 사용자가 다른 사용자의 계정 잠금을 요청하면 403을 반환하고 대상 상태를 유지한다")
+	void updateLocked_returnForbiddenAndPreserveTarget_whenRequesterIsNotAdmin() throws Exception {
+		// given
+		User requester = createUser("잠금요청자", uniqueEmail("lock-requester"),
+			DEFAULT_PASSWORD, UserRole.USER, false);
+		User target = createUser("잠금대상", uniqueEmail("lock-denied-target"),
+			DEFAULT_PASSWORD, UserRole.USER, false);
+		String targetAccessToken = accessTokenFrom(signIn(target.getEmail(), DEFAULT_PASSWORD).andReturn());
+		String requesterAccessToken = accessTokenFrom(signIn(requester.getEmail(), DEFAULT_PASSWORD).andReturn());
+
+		// when & then
+		assertErrorResponse(
+			mockMvc.perform(patch("/api/users/{userId}/locked", target.getId())
+				.with(csrf())
+				.header(HttpHeaders.AUTHORIZATION, bearer(requesterAccessToken))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"locked": true
+					}
+					""")),
+			HttpStatus.FORBIDDEN,
+			"AuthException",
+			AuthErrorCode.AUTH_ACCESS_DENIED.getMessage()
+		);
+
+		flushAndClear();
+		User unchangedTarget = userRepository.findById(target.getId()).orElseThrow();
+
+		assertThat(unchangedTarget.isLocked()).isFalse();
+		assertThat(authSessionStore.findByUserId(target.getId())).isPresent();
+
 		mockMvc.perform(get("/api/users/{userId}", target.getId())
 				.header(HttpHeaders.AUTHORIZATION, bearer(targetAccessToken)))
-			.andExpect(status().isUnauthorized());
-
-		signIn(target.getEmail(), DEFAULT_PASSWORD)
-			.andExpect(status().isUnauthorized())
-			.andExpect(jsonPath("$.exceptionName").value("AuthException"));
+			.andExpect(status().isOk());
 	}
 
 	@Test
@@ -246,21 +341,73 @@ class UserManagementIntegrationTest extends IntegrationTestBase {
 			.andExpect(status().isNoContent());
 
 		// then
+		flushAndClear();
 		User updatedUser = userRepository.findById(user.getId()).orElseThrow();
 
 		assertThat(passwordEncoder.matches(CHANGED_PASSWORD, updatedUser.getPasswordHashForAuthentication())).isTrue();
 		assertThat(authSessionStore.findByUserId(user.getId())).isEmpty();
 
-		mockMvc.perform(get("/api/users/{userId}", user.getId())
-				.header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
-			.andExpect(status().isUnauthorized());
+		assertErrorResponse(
+			mockMvc.perform(get("/api/users/{userId}", user.getId())
+				.header(HttpHeaders.AUTHORIZATION, bearer(accessToken))),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_SESSION_INVALID.getMessage()
+		);
 
-		signIn(user.getEmail(), DEFAULT_PASSWORD)
-			.andExpect(status().isUnauthorized());
+		assertErrorResponse(
+			signIn(user.getEmail(), DEFAULT_PASSWORD),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_INVALID_CREDENTIALS.getMessage()
+		);
 
 		signIn(user.getEmail(), CHANGED_PASSWORD)
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.userDto.id").value(user.getId().toString()));
+	}
+
+	@Test
+	@DisplayName("다른 사용자의 비밀번호 변경을 요청하면 403을 반환하고 비밀번호와 세션을 유지한다")
+	void updatePassword_returnForbiddenAndPreserveTarget_whenRequesterIsNotOwner() throws Exception {
+		// given
+		User requester = createUser("비밀번호변경요청자", uniqueEmail("password-requester"),
+			DEFAULT_PASSWORD, UserRole.USER, false);
+		User target = createUser("비밀번호변경대상", uniqueEmail("password-denied-target"),
+			DEFAULT_PASSWORD, UserRole.USER, false);
+		String targetAccessToken = accessTokenFrom(signIn(target.getEmail(), DEFAULT_PASSWORD).andReturn());
+		String requesterAccessToken = accessTokenFrom(signIn(requester.getEmail(), DEFAULT_PASSWORD).andReturn());
+
+		// when & then
+		assertErrorResponse(
+			mockMvc.perform(patch("/api/users/{userId}/password", target.getId())
+				.with(csrf())
+				.header(HttpHeaders.AUTHORIZATION, bearer(requesterAccessToken))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+						"password": "%s"
+					}
+					""".formatted(CHANGED_PASSWORD))),
+			HttpStatus.FORBIDDEN,
+			"UserException",
+			UserErrorCode.USER_PASSWORD_ACCESS_DENIED.getMessage()
+		)
+			.andExpect(jsonPath("$.details.userId").value(target.getId().toString()))
+			.andExpect(jsonPath("$.details.currentUserId").value(requester.getId().toString()));
+
+		flushAndClear();
+		User unchangedTarget = userRepository.findById(target.getId()).orElseThrow();
+
+		assertThat(passwordEncoder.matches(DEFAULT_PASSWORD,
+			unchangedTarget.getPasswordHashForAuthentication())).isTrue();
+		assertThat(passwordEncoder.matches(CHANGED_PASSWORD,
+			unchangedTarget.getPasswordHashForAuthentication())).isFalse();
+		assertThat(authSessionStore.findByUserId(target.getId())).isPresent();
+
+		mockMvc.perform(get("/api/users/{userId}", target.getId())
+				.header(HttpHeaders.AUTHORIZATION, bearer(targetAccessToken)))
+			.andExpect(status().isOk());
 	}
 
 	private ResultActions signIn(
@@ -289,7 +436,15 @@ class UserManagementIntegrationTest extends IntegrationTestBase {
 			.locked(locked)
 			.build();
 
-		return userRepository.saveAndFlush(user);
+		User savedUser = userRepository.saveAndFlush(user);
+		createdUserIds.add(savedUser.getId());
+
+		return savedUser;
+	}
+
+	private void flushAndClear() {
+		entityManager.flush();
+		entityManager.clear();
 	}
 
 	private String accessTokenFrom(MvcResult result) throws Exception {
