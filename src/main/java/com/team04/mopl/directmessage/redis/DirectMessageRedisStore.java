@@ -42,14 +42,13 @@ public class DirectMessageRedisStore {
 
 	// 원자적 감소
 	private static final String RESET_UNREAD_SCRIPT = """
-		    local roomCount = tonumber(redis.call('GET', KEYS[1]) or '0')
-		    if roomCount > 0 then
-		        -- 1. 글로벌 카운트에서 이 방의 안 읽음 개수만큼 한 번에 빼기
-		        redis.call('DECRBY', KEYS[2], roomCount)
-		        -- 2. 이 방의 안 읽음 카운트는 0이 되었으므로 키 삭제
+		    local val = redis.call('GET', KEYS[1])
+		    if val then
+		        redis.call('DECRBY', KEYS[2], tonumber(val))
 		        redis.call('DEL', KEYS[1])
+		        return tonumber(val)
 		    end
-		    return roomCount
+		    return 0
 		""";
 
 	private final StringRedisTemplate stringRedisTemplate;
@@ -79,12 +78,6 @@ public class DirectMessageRedisStore {
 			String.valueOf(timestamp),
 			directMessageDto.id().toString()
 		);
-
-		// 메모리 관리: 메시지 최대 개수 유지
-		stringRedisTemplate.opsForZSet().removeRange(key, 0, -(MAX_CACHE_MESSAGES + 1));
-
-		// 캐시 TTL 갱신
-		refreshTtl(key, unreadKey, globalKey);
 	}
 
 	// [DM 읽음 상태 생성] 특정 사용자의 특정 대화방 및 전체 대화방 안 읽은 개수 감소
@@ -104,9 +97,6 @@ public class DirectMessageRedisStore {
 			script,
 			List.of(key, globalKey)
 		);
-
-		// 전체 카운트 TTL 연장
-		refreshTtl(globalKey);
 	}
 
 	// [DM 목록 조회] 특정 대화방의 DM ID 목록 조회
@@ -123,9 +113,6 @@ public class DirectMessageRedisStore {
 
 		// 특정 대화방 Key 생성
 		String key = String.format(DM_ROOM_KEY, conversationId);
-
-		// TTL 연장
-		refreshTtl(key);
 
 		// 특정 시점 (CreatedAt) 이전의 DM 내림차순 조회
 		return stringRedisTemplate.opsForZSet().reverseRangeByScore(
@@ -164,9 +151,6 @@ public class DirectMessageRedisStore {
 		// 특정 대화방의 Key 생성
 		String key = String.format(DM_ROOM_KEY, conversationId);
 
-		// TTL 연장
-		refreshTtl(key);
-
 		// Set 전체 크기 반환
 		return stringRedisTemplate.opsForZSet().zCard(key);
 	}
@@ -193,12 +177,8 @@ public class DirectMessageRedisStore {
 		// 특정 대화방의 Key 생성
 		String key = String.format(DM_ROOM_KEY, conversationId);
 
-		// 메시지 개수 제한
-		int skipCount = Math.max(0, messages.size() - MAX_CACHE_MESSAGES);
-
 		// List 목록을 Tuple Set 타입으로 변환
 		Set<ZSetOperations.TypedTuple<String>> tuples = messages.stream()
-			.skip(skipCount)
 			.map(message -> ZSetOperations.TypedTuple.of(
 				message.getId().toString(),
 				(double)message.getCreatedAt().toEpochMilli()
@@ -207,9 +187,6 @@ public class DirectMessageRedisStore {
 
 		// Redis 저장
 		stringRedisTemplate.opsForZSet().add(key, tuples);
-
-		// 최대 7일 보관
-		refreshTtl(key);
 	}
 
 	// 공통 메서드: 특정 대화방의 캐시 상태를 확인하여 Enum으로 반환
@@ -227,12 +204,5 @@ public class DirectMessageRedisStore {
 		}
 
 		return CacheState.MISS;
-	}
-
-	// 공통 메서드: TTL 갱신
-	private void refreshTtl(String... keys) {
-		for (String key : keys) {
-			stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
-		}
 	}
 }
