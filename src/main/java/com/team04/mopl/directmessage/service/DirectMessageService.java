@@ -1,5 +1,6 @@
 package com.team04.mopl.directmessage.service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -142,7 +143,11 @@ public class DirectMessageService {
 		validateMessageInConversation(directMessage, conversation.getId());
 
 		// 5. DM 읽음 처리 및 저장
-		directMessage.markAsRead();
+		directMessageRepository.markAllAsRead(
+			conversationId,
+			requestUserId,
+			Instant.now()
+		);
 
 		// 6. 읽음 처리 Redis 동기화를 위한 이벤트 발행
 		eventPublisher.publishEvent(new DirectMessageReadEvent(
@@ -151,8 +156,8 @@ public class DirectMessageService {
 			directMessageId
 		));
 
-		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}",
-			conversationId, directMessageId);
+		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}, readStatus={}",
+			conversationId, directMessageId, directMessage.isRead());
 	}
 
 	// DM 목록 조회 (정렬 + 커서 페이지네이션)
