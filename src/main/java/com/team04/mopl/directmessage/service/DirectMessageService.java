@@ -173,10 +173,9 @@ public class DirectMessageService {
 		validateParticipant(conversation.getId(), requestUserId);
 
 		// 3. 정렬 + 커서 기반 페이지네이션이 적용된 DM 리스트
-		List<DirectMessage> directMessages = directMessageRepository.findDirectMessagesByCursor(
-			conversation.getId(),
-			directMessagePageRequest
-		);
+		List<DirectMessage> directMessages = /*!StringUtils.hasText(directMessagePageRequest.cursor())
+			? fetchFirstPageMessages(conversation.getId(), requestUserId, directMessagePageRequest)
+			: */ directMessageRepository.findDirectMessagesByCursor(conversation.getId(), directMessagePageRequest);
 
 		// 4. DM 전체 개수 조회: Cache-Aside 로직 적용
 		Long totalCount = directMessageRedisStore.getRoomMessageTotalCount(conversation.getId());
