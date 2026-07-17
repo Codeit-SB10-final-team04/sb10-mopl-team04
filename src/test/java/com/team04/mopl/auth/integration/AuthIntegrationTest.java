@@ -1,5 +1,6 @@
 package com.team04.mopl.auth.integration;
 
+import static com.team04.mopl.support.ErrorResponseAssertions.assertErrorResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -17,8 +19,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
@@ -31,6 +33,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.repository.TemporaryPasswordRepository;
 import com.team04.mopl.auth.service.TemporaryPasswordGenerator;
 import com.team04.mopl.auth.session.AuthSessionStore;
@@ -47,6 +50,8 @@ class AuthIntegrationTest extends IntegrationTestBase {
 	private static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH_TOKEN";
 	private static final String DEFAULT_PASSWORD = "password123";
 	private static final String TEMPORARY_PASSWORD = "tempPassword123";
+
+	private final Set<UUID> createdUserIds = new HashSet<>();
 
 	private MockMvc mockMvc;
 
@@ -68,9 +73,6 @@ class AuthIntegrationTest extends IntegrationTestBase {
 	@Autowired
 	private AuthSessionStore authSessionStore;
 
-	@Autowired
-	private StringRedisTemplate redisTemplate;
-
 	@MockitoBean
 	private TemporaryPasswordGenerator temporaryPasswordGenerator;
 
@@ -83,11 +85,7 @@ class AuthIntegrationTest extends IntegrationTestBase {
 
 	@AfterEach
 	void tearDown() {
-		Set<String> keys = redisTemplate.keys("mopl:{auth-session}:*");
-
-		if (keys != null && !keys.isEmpty()) {
-			redisTemplate.delete(keys);
-		}
+		createdUserIds.forEach(authSessionStore::deleteByUserId);
 	}
 
 	@Test
@@ -123,9 +121,12 @@ class AuthIntegrationTest extends IntegrationTestBase {
 		User user = createUser("로그인실패사용자", uniqueEmail("invalid-password"), DEFAULT_PASSWORD, UserRole.USER, false);
 
 		// when & then
-		signIn(user.getEmail(), "wrongPassword123")
-			.andExpect(status().isUnauthorized())
-			.andExpect(jsonPath("$.exceptionName").value("AuthException"));
+		assertErrorResponse(
+			signIn(user.getEmail(), "wrongPassword123"),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_INVALID_CREDENTIALS.getMessage()
+		);
 
 		assertThat(authSessionStore.findByUserId(user.getId())).isEmpty();
 	}
@@ -137,9 +138,12 @@ class AuthIntegrationTest extends IntegrationTestBase {
 		User user = createUser("잠긴사용자", uniqueEmail("locked"), DEFAULT_PASSWORD, UserRole.USER, true);
 
 		// when & then
-		signIn(user.getEmail(), DEFAULT_PASSWORD)
-			.andExpect(status().isUnauthorized())
-			.andExpect(jsonPath("$.exceptionName").value("AuthException"));
+		assertErrorResponse(
+			signIn(user.getEmail(), DEFAULT_PASSWORD),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_LOCKED_ACCOUNT.getMessage()
+		);
 
 		assertThat(authSessionStore.findByUserId(user.getId())).isEmpty();
 	}
@@ -152,8 +156,12 @@ class AuthIntegrationTest extends IntegrationTestBase {
 		String accessToken = accessTokenFrom(signIn(user.getEmail(), DEFAULT_PASSWORD).andReturn());
 
 		// when & then
-		mockMvc.perform(get("/api/users/{userId}", user.getId()))
-			.andExpect(status().isUnauthorized());
+		assertErrorResponse(
+			mockMvc.perform(get("/api/users/{userId}", user.getId())),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_UNAUTHORIZED.getMessage()
+		);
 
 		mockMvc.perform(get("/api/users/{userId}", user.getId())
 				.header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
@@ -173,10 +181,13 @@ class AuthIntegrationTest extends IntegrationTestBase {
 		String newAccessToken = accessTokenFrom(signIn(user.getEmail(), DEFAULT_PASSWORD).andReturn());
 
 		// then
-		mockMvc.perform(get("/api/users/{userId}", user.getId())
-				.header(HttpHeaders.AUTHORIZATION, bearer(oldAccessToken)))
-			.andExpect(status().isUnauthorized())
-			.andExpect(jsonPath("$.exceptionName").value("AuthException"));
+		assertErrorResponse(
+			mockMvc.perform(get("/api/users/{userId}", user.getId())
+				.header(HttpHeaders.AUTHORIZATION, bearer(oldAccessToken))),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_SESSION_INVALID.getMessage()
+		);
 
 		mockMvc.perform(get("/api/users/{userId}", user.getId())
 				.header(HttpHeaders.AUTHORIZATION, bearer(newAccessToken)))
@@ -205,9 +216,13 @@ class AuthIntegrationTest extends IntegrationTestBase {
 				.contains("Max-Age=0"));
 		assertThat(authSessionStore.findByUserId(user.getId())).isEmpty();
 
-		mockMvc.perform(get("/api/users/{userId}", user.getId())
-				.header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
-			.andExpect(status().isUnauthorized());
+		assertErrorResponse(
+			mockMvc.perform(get("/api/users/{userId}", user.getId())
+				.header(HttpHeaders.AUTHORIZATION, bearer(accessToken))),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_SESSION_INVALID.getMessage()
+		);
 	}
 
 	@Test
@@ -232,11 +247,14 @@ class AuthIntegrationTest extends IntegrationTestBase {
 
 		assertThat(newRefreshToken).isNotBlank().isNotEqualTo(oldRefreshToken);
 
-		mockMvc.perform(post("/api/auth/refresh")
+		assertErrorResponse(
+			mockMvc.perform(post("/api/auth/refresh")
 				.with(csrf())
-				.cookie(new Cookie(REFRESH_TOKEN_COOKIE_NAME, oldRefreshToken)))
-			.andExpect(status().isUnauthorized())
-			.andExpect(jsonPath("$.exceptionName").value("AuthException"));
+				.cookie(new Cookie(REFRESH_TOKEN_COOKIE_NAME, oldRefreshToken))),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_INVALID_REFRESH_TOKEN.getMessage()
+		);
 
 		mockMvc.perform(get("/api/users/{userId}", user.getId())
 				.header(HttpHeaders.AUTHORIZATION, bearer(newAccessToken)))
@@ -247,10 +265,13 @@ class AuthIntegrationTest extends IntegrationTestBase {
 	@DisplayName("refresh token 쿠키가 없으면 토큰 재발급 요청은 401을 반환한다")
 	void refresh_returnUnauthorized_whenRefreshTokenCookieIsMissing() throws Exception {
 		// when & then
-		mockMvc.perform(post("/api/auth/refresh")
-				.with(csrf()))
-			.andExpect(status().isUnauthorized())
-			.andExpect(jsonPath("$.exceptionName").value("AuthException"));
+		assertErrorResponse(
+			mockMvc.perform(post("/api/auth/refresh")
+				.with(csrf())),
+			HttpStatus.UNAUTHORIZED,
+			"AuthException",
+			AuthErrorCode.AUTH_MISSING_REFRESH_TOKEN.getMessage()
+		);
 	}
 
 	@Test
@@ -305,7 +326,10 @@ class AuthIntegrationTest extends IntegrationTestBase {
 			.locked(locked)
 			.build();
 
-		return userRepository.saveAndFlush(user);
+		User savedUser = userRepository.saveAndFlush(user);
+		createdUserIds.add(savedUser.getId());
+
+		return savedUser;
 	}
 
 	private String accessTokenFrom(MvcResult result) throws Exception {
