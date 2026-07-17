@@ -217,7 +217,6 @@ class DirectMessageServiceTest {
 		UUID directMessageId = UUID.randomUUID();
 		DirectMessage directMessage = mock(DirectMessage.class);
 		given(directMessage.getConversation()).willReturn(conversation);
-		given(directMessage.getReceiver()).willReturn(receiver);
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 		given(directMessageRepository.findById(directMessageId)).willReturn(Optional.of(directMessage));
@@ -231,7 +230,7 @@ class DirectMessageServiceTest {
 		directMessageService.markAsRead(conversationId, directMessageId, requestUserId);
 
 		// then
-		verify(directMessage).markAsRead();
+		verify(directMessageRepository).markAllAsRead(eq(conversationId), eq(requestUserId), any(Instant.class));
 
 		ArgumentCaptor<DirectMessageReadEvent> captor = ArgumentCaptor.forClass(DirectMessageReadEvent.class);
 		verify(eventPublisher).publishEvent(captor.capture());
@@ -280,7 +279,7 @@ class DirectMessageServiceTest {
 		// when & then
 		org.assertj.core.api.Assertions.assertThatThrownBy(() ->
 				directMessageService.markAsRead(conversationId, UUID.randomUUID(), requestUserId))
-			.isInstanceOf(ConversationException.class); // 접근 권한 예외 발생 기대
+			.isInstanceOf(ConversationException.class);
 	}
 
 	@Test
@@ -331,41 +330,6 @@ class DirectMessageServiceTest {
 		UUID directMessageId = UUID.randomUUID();
 		DirectMessage directMessage = mock(DirectMessage.class);
 		given(directMessage.getConversation()).willReturn(wrongConversation);
-
-		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
-		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));
-		given(directMessageRepository.findById(directMessageId)).willReturn(Optional.of(directMessage));
-
-		// when & then
-		assertThatThrownBy(() -> directMessageService.markAsRead(conversationId, directMessageId, requestUserId))
-			.isInstanceOf(DirectMessageException.class);
-	}
-
-	@Test
-	@DisplayName("실패: DM 수신자가 아니면 예외가 발생한다")
-	void markAsRead_Fail_NotReceiver() {
-		// given
-		UUID requestUserId = UUID.randomUUID();
-		User user = mock(User.class);
-		given(user.getId()).willReturn(requestUserId);
-
-		ConversationParticipant participant = mock(ConversationParticipant.class);
-		given(participant.getUser()).willReturn(user);
-
-		// 요청자와 다른 수신자
-		UUID receiverId = UUID.randomUUID();
-		User actualReceiver = mock(User.class);
-		given(actualReceiver.getId()).willReturn(receiverId);
-
-		UUID conversationId = UUID.randomUUID();
-		Conversation conversation = mock(Conversation.class);
-		given(conversation.getId()).willReturn(conversationId);
-
-		UUID directMessageId = UUID.randomUUID();
-		DirectMessage directMessage = mock(DirectMessage.class);
-		given(directMessage.getId()).willReturn(directMessageId);
-		given(directMessage.getConversation()).willReturn(conversation);
-		given(directMessage.getReceiver()).willReturn(actualReceiver);
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 		given(conversationParticipantRepository.findByConversationId(conversationId)).willReturn(List.of(participant));

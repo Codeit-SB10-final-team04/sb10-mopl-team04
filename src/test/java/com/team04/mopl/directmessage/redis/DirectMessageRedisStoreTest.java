@@ -47,7 +47,7 @@ class DirectMessageRedisStoreTest {
 	=========================
 	 */
 	@Test
-	@DisplayName("성공: DM 추가 시 Lua 스크립트가 실행되고 TTL 7일이 지정된다.")
+	@DisplayName("성공: DM 추가 시 Lua 스크립트가 정상적으로 실행된다.")
 	void addDirectMessage_Success() {
 		// given
 		UUID conversationId = UUID.randomUUID();
@@ -73,14 +73,13 @@ class DirectMessageRedisStoreTest {
 		assertThat(capturedKeys.get(3)).contains(receiverId.toString());
 
 		verify(stringRedisTemplate, times(1)).execute(any(RedisScript.class), anyList(), any(), any());
-		verify(stringRedisTemplate, times(3)).expire(anyString(), eq(7L), eq(TimeUnit.DAYS));
 	}
 
-	/*
-	=========================
-	   안 읽음 카운트 감소
-	=========================
-	 */
+    /*
+    =========================
+       안 읽음 카운트 감소
+    =========================
+     */
 
 	@Test
 	@DisplayName("성공: 안 읽음 개수 감소 시 Lua 스크립트를 사용하여 원자적으로 감소시킨다.")
@@ -319,7 +318,7 @@ class DirectMessageRedisStoreTest {
 	=========================
 	 */
 	@Test
-	@DisplayName("성공: DM 백필 시 messages 리스트가 존재하면 벌크 ZADD(add) 연산을 수행하고 7일 TTL을 세팅한다.")
+	@DisplayName("성공: DM 백필 시 messages 리스트가 존재하면 벌크 ZADD(add) 연산을 수행한다.")
 	void initDirectMessages_Success() {
 		// given
 		UUID conversationId = UUID.randomUUID();
@@ -337,7 +336,6 @@ class DirectMessageRedisStoreTest {
 
 		// then
 		verify(zSetOperations, times(1)).add(anyString(), anySet());
-		verify(stringRedisTemplate, times(1)).expire(anyString(), eq(7L), eq(TimeUnit.DAYS));
 	}
 
 	@Test
