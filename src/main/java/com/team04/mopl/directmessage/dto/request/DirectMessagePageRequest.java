@@ -31,7 +31,7 @@ public record DirectMessagePageRequest(
 
 		// 페이지 내 요소 개수 기본값 및 유효성 검증 (1 ~ 100)
 		if (limit == null) {
-			limit = 10;
+			limit = 50;
 		} else if (limit <= 0 || limit > 100) {
 			throw new DirectMessageException(DirectMessageErrorCode.DM_INVALID_FORMAT)
 				.addDetail("limit", String.valueOf(limit));

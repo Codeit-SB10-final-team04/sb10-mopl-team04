@@ -27,6 +27,8 @@ public class DirectMessageRedisStore {
 	private static final String GLOBAL_UNREAD_COUNT_KEY = "dm:unread:global:%s";        // 특정 사용자가 읽지 않은 모든 DM 개수
 	private static final String EMPTY_DM_ROOM_KEY = "dm:room:empty:%s";                 // DM이 존재하지 않는 대화방
 
+	private static final int MAX_CACHE_MESSAGES = 500;
+
 	// 원자적 추가
 	private static final String ADD_DM_AND_INCR_SCRIPT = """
 		    local added = redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
@@ -39,12 +41,12 @@ public class DirectMessageRedisStore {
 		""";
 
 	// 원자적 감소
-	private static final String DECREMENT_UNREAD_SCRIPT = """
-		    local count = tonumber(redis.call('GET', KEYS[1]))
-		    if count and count > 0 then
-		        redis.call('DECR', KEYS[1])
-		        redis.call('DECR', KEYS[2])
-		        return 1
+	private static final String RESET_UNREAD_SCRIPT = """
+		    local val = redis.call('GET', KEYS[1])
+		    if val then
+		        redis.call('DECRBY', KEYS[2], tonumber(val))
+		        redis.call('DEL', KEYS[1])
+		        return tonumber(val)
 		    end
 		    return 0
 		""";
@@ -76,11 +78,6 @@ public class DirectMessageRedisStore {
 			String.valueOf(timestamp),
 			directMessageDto.id().toString()
 		);
-
-		// 메모리 관리: 최대 7일 보관
-		stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
-		stringRedisTemplate.expire(unreadKey, 7, TimeUnit.DAYS);
-		stringRedisTemplate.expire(globalKey, 7, TimeUnit.DAYS);
 	}
 
 	// [DM 읽음 상태 생성] 특정 사용자의 특정 대화방 및 전체 대화방 안 읽은 개수 감소
@@ -91,7 +88,7 @@ public class DirectMessageRedisStore {
 
 		// 스크립트 생성
 		DefaultRedisScript<Long> script = new DefaultRedisScript<>(
-			DECREMENT_UNREAD_SCRIPT,
+			RESET_UNREAD_SCRIPT,
 			Long.class
 		);
 
@@ -190,9 +187,6 @@ public class DirectMessageRedisStore {
 
 		// Redis 저장
 		stringRedisTemplate.opsForZSet().add(key, tuples);
-
-		// 최대 7일 보관
-		stringRedisTemplate.expire(key, 7, TimeUnit.DAYS);
 	}
 
 	// 공통 메서드: 특정 대화방의 캐시 상태를 확인하여 Enum으로 반환
