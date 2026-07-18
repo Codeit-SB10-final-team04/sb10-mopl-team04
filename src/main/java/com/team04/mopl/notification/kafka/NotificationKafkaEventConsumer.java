@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.notification.dto.response.NotificationDto;
@@ -183,6 +184,32 @@ public class NotificationKafkaEventConsumer {
 			title,
 			content,
 			NotificationType.ROLE_CHANGE,
+			NotificationLevel.INFO
+		);
+	}
+
+	// DM 생성 시 해당 사용자에게 알림을 보내는 listener
+	@KafkaListener(topics = NotificationKafkaTopics.DIRECT_MESSAGE_CREATED)
+	public void consumeDirectMessageCreatedEvent(String kafkaEvent) {
+		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
+			NotificationKafkaTopics.DIRECT_MESSAGE_CREATED, DirectMessageCreatedEvent.class.getSimpleName());
+
+		DirectMessageCreatedEvent event = deserialize(kafkaEvent, DirectMessageCreatedEvent.class);
+
+		// title
+		String title = "새 DM 알림";
+
+		// content
+		String content = String.format("[%s] 님이 DM을 보냈습니다.",
+			event.directMessageDto().sender().name());
+
+		// 알림 저장 및 실시간 전송
+		saveAndPublishNotifications(
+			Set.of(event.receiverId()),
+			event.eventId(),
+			title,
+			content,
+			NotificationType.DM,
 			NotificationLevel.INFO
 		);
 	}
