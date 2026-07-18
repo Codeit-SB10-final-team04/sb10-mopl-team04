@@ -17,6 +17,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.common.dto.UserSummary;
+import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
+import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.notification.dto.response.NotificationDto;
@@ -282,6 +285,70 @@ class NotificationKafkaEventConsumerTest {
 			"권한 변경 알림",
 			content,
 			NotificationType.ROLE_CHANGE,
+			NotificationLevel.INFO
+		);
+		verify(notificationRealtimePublisher).publish(notificationDto);
+	}
+
+	@Test
+	@DisplayName("DM 생성 이벤트를 소비하면 해당 사용자에게 알림을 저장하고 실시간 전송한다.")
+	void consumeDirectMessageCreatedEvent_saveNotificationAndPublishRealtimeNotification_whenValidRequest() throws
+		Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID senderId = UUID.randomUUID();
+		UUID receiverId = UUID.randomUUID();
+		UUID directMessageId = UUID.randomUUID();
+		UserSummary senderSummary = new UserSummary(
+			senderId,
+			"송신자",
+			"https://profile.sender"
+		);
+		UserSummary receiverSummary = new UserSummary(
+			receiverId,
+			"수신자",
+			"https://profile.receiver"
+		);
+		String content = "[송신자] 님이 DM을 보냈습니다.";
+
+		DirectMessageDto directMessageDto = new DirectMessageDto(
+			directMessageId,
+			UUID.randomUUID(),
+			Instant.now(),
+			senderSummary,
+			receiverSummary,
+			"안녕하세요."
+		);
+
+		DirectMessageCreatedEvent event = DirectMessageCreatedEvent.of(
+			receiverId,
+			directMessageId,
+			directMessageDto
+		);
+
+		NotificationDto notificationDto = createNotificationDto(receiverId);
+
+		when(objectMapper.readValue(kafkaEvent, DirectMessageCreatedEvent.class))
+			.thenReturn(event);
+		when(notificationService.saveNotificationList(
+			Set.of(receiverId),
+			event.eventId(),
+			"새 DM 알림",
+			content,
+			NotificationType.DM,
+			NotificationLevel.INFO
+		)).thenReturn(List.of(notificationDto));
+
+		// when
+		notificationKafkaEventConsumer.consumeDirectMessageCreatedEvent(kafkaEvent);
+
+		// then
+		verify(notificationService).saveNotificationList(
+			Set.of(receiverId),
+			event.eventId(),
+			"새 DM 알림",
+			content,
+			NotificationType.DM,
 			NotificationLevel.INFO
 		);
 		verify(notificationRealtimePublisher).publish(notificationDto);

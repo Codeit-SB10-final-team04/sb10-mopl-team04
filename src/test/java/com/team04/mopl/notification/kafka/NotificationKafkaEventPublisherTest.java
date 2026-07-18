@@ -17,6 +17,8 @@ import org.springframework.kafka.support.SendResult;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
+import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
@@ -151,6 +153,29 @@ class NotificationKafkaEventPublisherTest {
 
 		// then
 		verify(kafkaTemplate).send(NotificationKafkaTopics.USER_ROLE_CHANGED, payload);
+	}
+
+	@Test
+	@DisplayName("DM 생성 이벤트를 받으면 DM 생성 topic으로 Kafka 이벤트를 발행한다.")
+	void publishDirectMessageCreatedEvent_sendKafkaEvent_whenValidEvent() throws Exception {
+		// given
+		DirectMessageCreatedEvent event = DirectMessageCreatedEvent.of(
+			UUID.randomUUID(),
+			UUID.randomUUID(),
+			mock(DirectMessageDto.class)
+		);
+
+		String payload = "{\"event\":\"directMessageCreated\"}";
+
+		when(objectMapper.writeValueAsString(event))
+			.thenReturn(payload);
+		stubKafkaSend(NotificationKafkaTopics.DIRECT_MESSAGE_CREATED, payload);
+
+		// when
+		notificationKafkaEventPublisher.publishDirectMessageCreatedEvent(event);
+
+		// then
+		verify(kafkaTemplate).send(NotificationKafkaTopics.DIRECT_MESSAGE_CREATED, payload);
 	}
 
 	@Test
