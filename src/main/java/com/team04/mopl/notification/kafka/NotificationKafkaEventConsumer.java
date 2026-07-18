@@ -62,6 +62,7 @@ public class NotificationKafkaEventConsumer {
 		// 알림 저장 및 실시간 전송
 		saveAndPublishNotifications(
 			Set.of(event.playlistOwnerId()),
+			event.eventId(),
 			title,
 			content,
 			NotificationType.SUBSCRIBE,
@@ -93,6 +94,7 @@ public class NotificationKafkaEventConsumer {
 		// 알림 저장 및 실시간 전송
 		saveAndPublishNotifications(
 			subscriberIds,
+			event.eventId(),
 			title,
 			content,
 			NotificationType.CONTENT_ADD,
@@ -117,6 +119,7 @@ public class NotificationKafkaEventConsumer {
 		// 알림 저장 및 실시간 전송
 		saveAndPublishNotifications(
 			Set.of(event.followeeId()),
+			event.eventId(),
 			title,
 			content,
 			NotificationType.FOLLOW,
@@ -148,6 +151,7 @@ public class NotificationKafkaEventConsumer {
 		// 알림 저장 및 실시간 전송
 		saveAndPublishNotifications(
 			followerIds,
+			event.eventId(),
 			title,
 			content,
 			NotificationType.FOLLOWING_ACTIVITY,
@@ -175,6 +179,7 @@ public class NotificationKafkaEventConsumer {
 		// 알림 저장 및 실시간 전송
 		saveAndPublishNotifications(
 			Set.of(event.userId()),
+			event.eventId(),
 			title,
 			content,
 			NotificationType.ROLE_CHANGE,
@@ -195,6 +200,7 @@ public class NotificationKafkaEventConsumer {
 
 	private void saveAndPublishNotifications(
 		Set<UUID> receiverIds,
+		UUID sourceEventId,
 		String title,
 		String content,
 		NotificationType type,
@@ -210,6 +216,7 @@ public class NotificationKafkaEventConsumer {
 
 		List<NotificationDto> notificationDtoList = notificationService.saveNotificationList(
 			receiverIds,
+			sourceEventId,
 			title,
 			content,
 			type,

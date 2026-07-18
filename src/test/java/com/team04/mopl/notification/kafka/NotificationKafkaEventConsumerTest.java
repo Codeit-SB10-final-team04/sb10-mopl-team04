@@ -76,6 +76,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(event);
 		when(notificationService.saveNotificationList(
 			Set.of(playlistOwnerId),
+			event.eventId(),
 			"새 플레이리스트 구독 알림",
 			content,
 			NotificationType.SUBSCRIBE,
@@ -88,6 +89,7 @@ class NotificationKafkaEventConsumerTest {
 		// then
 		verify(notificationService).saveNotificationList(
 			Set.of(playlistOwnerId),
+			event.eventId(),
 			"새 플레이리스트 구독 알림",
 			content,
 			NotificationType.SUBSCRIBE,
@@ -124,6 +126,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(Set.of(subscriberId1, subscriberId2));
 		when(notificationService.saveNotificationList(
 			Set.of(subscriberId1, subscriberId2),
+			event.eventId(),
 			"새 콘텐츠 추가 알림",
 			content,
 			NotificationType.CONTENT_ADD,
@@ -136,6 +139,7 @@ class NotificationKafkaEventConsumerTest {
 		// then
 		verify(notificationService).saveNotificationList(
 			Set.of(subscriberId1, subscriberId2),
+			event.eventId(),
 			"새 콘텐츠 추가 알림",
 			content,
 			NotificationType.CONTENT_ADD,
@@ -167,6 +171,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(event);
 		when(notificationService.saveNotificationList(
 			Set.of(followeeId),
+			event.eventId(),
 			"새 팔로우 알림",
 			content,
 			NotificationType.FOLLOW,
@@ -179,6 +184,7 @@ class NotificationKafkaEventConsumerTest {
 		// then
 		verify(notificationService).saveNotificationList(
 			Set.of(followeeId),
+			event.eventId(),
 			"새 팔로우 알림",
 			content,
 			NotificationType.FOLLOW,
@@ -214,6 +220,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(Set.of(followerId1, followerId2));
 		when(notificationService.saveNotificationList(
 			Set.of(followerId1, followerId2),
+			event.eventId(),
 			"새 활동 알림",
 			content,
 			NotificationType.FOLLOWING_ACTIVITY,
@@ -226,6 +233,7 @@ class NotificationKafkaEventConsumerTest {
 		// then
 		verify(notificationService).saveNotificationList(
 			Set.of(followerId1, followerId2),
+			event.eventId(),
 			"새 활동 알림",
 			content,
 			NotificationType.FOLLOWING_ACTIVITY,
@@ -257,6 +265,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(event);
 		when(notificationService.saveNotificationList(
 			Set.of(userId),
+			event.eventId(),
 			"권한 변경 알림",
 			content,
 			NotificationType.ROLE_CHANGE,
@@ -269,6 +278,7 @@ class NotificationKafkaEventConsumerTest {
 		// then
 		verify(notificationService).saveNotificationList(
 			Set.of(userId),
+			event.eventId(),
 			"권한 변경 알림",
 			content,
 			NotificationType.ROLE_CHANGE,
@@ -305,6 +315,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(Set.of(subscriberId1, subscriberId2));
 		when(notificationService.saveNotificationList(
 			Set.of(subscriberId1, subscriberId2),
+			event.eventId(),
 			"새 콘텐츠 추가 알림",
 			content,
 			NotificationType.CONTENT_ADD,
@@ -320,6 +331,7 @@ class NotificationKafkaEventConsumerTest {
 
 		verify(notificationService).saveNotificationList(
 			Set.of(subscriberId1, subscriberId2),
+			event.eventId(),
 			"새 콘텐츠 추가 알림",
 			content,
 			NotificationType.CONTENT_ADD,
@@ -346,6 +358,7 @@ class NotificationKafkaEventConsumerTest {
 
 		verify(notificationService, never()).saveNotificationList(
 			anySet(),
+			any(UUID.class),
 			anyString(),
 			anyString(),
 			any(NotificationType.class),
