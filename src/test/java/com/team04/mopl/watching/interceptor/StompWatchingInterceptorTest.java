@@ -54,13 +54,13 @@ class StompWatchingInterceptorTest {
 		accessor.setSubscriptionId("sub-0");
 		Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
 
-		when(watchingSessionService.join(contentId, userId)).thenReturn(Optional.of(change));
+		when(watchingSessionService.join(eq(contentId), eq(userId), anyString())).thenReturn(Optional.of(change));
 
 		// when
 		interceptor.preSend(message, channel);
 
 		// then
-		verify(watchingSessionService).join(contentId, userId);
+		verify(watchingSessionService).join(eq(contentId), eq(userId), anyString());
 		verify(eventPublisher).publishEvent(any(WatchingSessionEvent.class));
 		verify(subscriptionStore).register(anyString(), eq("sub-0"), eq("/sub/contents/" + contentId + "/watch"));
 	}
@@ -123,13 +123,13 @@ class StompWatchingInterceptorTest {
 		when(subscriptionStore.getDestination(sessionId, "sub-0"))
 			.thenReturn(Optional.of("/sub/contents/" + contentId + "/watch"));
 		when(webSocketSessionStore.getUserId(sessionId)).thenReturn(Optional.of(userId));
-		when(watchingSessionService.leave(contentId, userId)).thenReturn(Optional.of(change));
+		when(watchingSessionService.leave(eq(contentId), eq(userId), anyString())).thenReturn(Optional.of(change));
 
 		// when
 		interceptor.preSend(message, channel);
 
 		// then
-		verify(watchingSessionService).leave(contentId, userId);
+		verify(watchingSessionService).leave(eq(contentId), eq(userId), anyString());
 		verify(eventPublisher).publishEvent(any(WatchingSessionEvent.class));
 		verify(subscriptionStore).remove(sessionId, "sub-0");
 	}
@@ -154,18 +154,17 @@ class StompWatchingInterceptorTest {
 		interceptor.preSend(message, channel);
 
 		// then
-		verify(watchingSessionService, never()).leave(any(), any());
+		verify(watchingSessionService, never()).leave(any(), any(), anyString());
 		verify(subscriptionStore).remove(sessionId, "sub-1");
 	}
 
 	@Test
-	@DisplayName("DISCONNECT 시 모든 시청 세션 정리 및 스토어 정리")
-	void handleDisconnect_cleansUpEverything() {
+	@DisplayName("DISCONNECT 시 지연 퇴장 예약 및 스토어 정리")
+	void handleDisconnect_schedulesLeaveAndCleansUp() {
 		// given
 		UUID userId = UUID.randomUUID();
 		UUID contentId = UUID.randomUUID();
 		String sessionId = "session-1";
-		WatchingSessionChange change = mock(WatchingSessionChange.class);
 
 		StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.DISCONNECT);
 		accessor.setSessionId(sessionId);
@@ -174,14 +173,12 @@ class StompWatchingInterceptorTest {
 
 		when(webSocketSessionStore.getUserId(sessionId)).thenReturn(Optional.of(userId));
 		when(watchingSessionService.getWatchingContentIds(userId)).thenReturn(Set.of(contentId));
-		when(watchingSessionService.leave(contentId, userId)).thenReturn(Optional.of(change));
 
 		// when
 		interceptor.preSend(message, channel);
 
 		// then
-		verify(watchingSessionService).leave(contentId, userId);
-		verify(eventPublisher).publishEvent(any(WatchingSessionEvent.class));
+		verify(watchingSessionService).scheduleLeave(eq(contentId), eq(userId), anyString(), any());
 		verify(subscriptionStore).removeAllBySession(sessionId);
 		verify(webSocketSessionStore).remove(sessionId);
 	}

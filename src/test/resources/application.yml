@@ -1,4 +1,21 @@
 spring:
+  # ===================================================================
+  # [ES 설정 비활성화 안내]
+  # 로컬 테스트 및 CI/CD 환경에서 매번 Docker(Elasticsearch)를 띄우는
+  # 오버헤드를 방지하기 위해 테스트 환경에서는 ES 자동 설정을 제외합니다.
+  #
+  # 실제 ES 쿼리 검증이 필요한 통합 테스트는 향후 Testcontainers를
+  # 도입하여 별도의 프로파일(예: test-integration)에서 진행할 예정입니다.
+  # ===================================================================
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchClientAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration
+      - org.opensearch.spring.boot.autoconfigure.OpenSearchRestClientAutoConfiguration
+      - org.opensearch.spring.boot.autoconfigure.OpenSearchRestHighLevelClientAutoConfiguration
+      - org.opensearch.data.client.config.OpenSearchDataAutoConfiguration
+      - org.redisson.spring.starter.RedissonAutoConfigurationV2
   batch:
     job:
       enabled: false
@@ -47,6 +64,32 @@ spring:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-client-id
+            client-secret: test-google-client-secret
+            scope:
+              - openid
+              - email
+              - profile
+          kakao:
+            client-id: test-kakao-client-id
+            client-secret: test-kakao-client-secret
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            client-authentication-method: client_secret_post
+            scope:
+              - profile_nickname
+              - profile_image
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
 
 # 더미 값 추가
 tmdb:
@@ -81,6 +124,9 @@ review:
     retention-days: 1
 
 mopl:
+  redis:
+    pubsub:
+      enabled: false
   jwt:
     secret: test-secret-key-must-be-at-least-32-bytes
     issuer: mopl

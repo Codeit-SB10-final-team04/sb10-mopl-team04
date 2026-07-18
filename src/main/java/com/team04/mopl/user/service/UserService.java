@@ -1,9 +1,16 @@
 package com.team04.mopl.user.service;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -14,8 +21,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import com.team04.mopl.auth.service.TemporaryPasswordService;
-import com.team04.mopl.user.dto.request.ChangePasswordRequest;
+import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.common.storage.FileStorage;
+import com.team04.mopl.user.dto.request.ChangePasswordRequest;
 import com.team04.mopl.user.dto.request.UserCreateRequest;
 import com.team04.mopl.user.dto.request.UserUpdateRequest;
 import com.team04.mopl.user.dto.response.UserDto;
@@ -53,6 +61,7 @@ public class UserService {
 	private final PasswordEncoder passwordEncoder;
 	private final FileStorage fileStorage;
 	private final TemporaryPasswordService temporaryPasswordService;
+	private final AuthSessionStore authSessionStore;
 
 	// 회원가입
 	@Transactional
@@ -149,6 +158,9 @@ public class UserService {
 		user.updatePasswordHash(passwordHash);
 		temporaryPasswordService.deleteTemporaryPassword(userId);
 
+		// 비밀번호 변경 이후 인증 세션 무효화
+		authSessionStore.deleteByUserId(userId);
+
 		log.info("[USER_PASSWORD_UPDATE] 비밀번호 변경 및 임시 비밀번호 삭제 완료: userId={}", userId);
 	}
 
@@ -192,6 +204,8 @@ public class UserService {
 	private void validateProfileImage(MultipartFile image) {
 		validateProfileImageSize(image);
 		validateProfileImageContentType(image);
+		// 실제 이미지로 디코딩 가능한지 검증
+		validateProfileImageReadable(image);
 	}
 
 	// 프로필 이미지 크기 검증
@@ -224,6 +238,58 @@ public class UserService {
 				"contentType", String.valueOf(contentType),
 				"allowedContentTypes", ALLOWED_PROFILE_IMAGE_CONTENT_TYPES
 			)
+		);
+	}
+
+	// ImageReader로 이미지 헤더의 크기를 확인해 전체 픽셀 디코딩 없이 실제 이미지 여부를 검증
+	private void validateProfileImageReadable(MultipartFile image) {
+		try (
+			InputStream inputStream = image.getInputStream();
+			ImageInputStream imageInputStream = ImageIO.createImageInputStream(inputStream)
+		) {
+			if (imageInputStream == null) {
+				throw invalidProfileImage("지원하지 않거나 손상된 이미지 파일입니다.");
+			}
+
+			Iterator<ImageReader> imageReaders = ImageIO.getImageReaders(imageInputStream);
+
+			if (!imageReaders.hasNext()) {
+				throw invalidProfileImage("지원하지 않거나 손상된 이미지 파일입니다.");
+			}
+
+			ImageReader imageReader = imageReaders.next();
+			imageInputStream.seek(0);
+
+			try {
+				// 픽셀 데이터 로드 생략 및 메타데이터 무시 설정을 통해 OOM 방어 및 성능 최적화
+				imageReader.setInput(imageInputStream, true, true);
+
+				if (imageReader.getWidth(0) > 0 && imageReader.getHeight(0) > 0) {
+					return;
+				}
+			} finally {
+				imageReader.dispose();
+			}
+		} catch (IOException exception) {
+			log.warn(
+				"[USER_PROFILE_UPDATE] 프로필 이미지 파일 판독 실패: filename={}, contentType={}, sizeBytes={}",
+				image.getOriginalFilename(),
+				image.getContentType(),
+				image.getSize(),
+				exception
+			);
+
+			throw invalidProfileImage("이미지 파일을 읽을 수 없습니다.");
+		}
+
+		throw invalidProfileImage("지원하지 않거나 손상된 이미지 파일입니다.");
+	}
+
+	// 프로필 이미지 실패 예외
+	private UserException invalidProfileImage(String reason) {
+		return new UserException(
+			UserErrorCode.USER_INVALID_PROFILE_IMAGE,
+			Map.of("reason", reason)
 		);
 	}
 

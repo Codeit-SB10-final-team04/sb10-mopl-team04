@@ -8,6 +8,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
+import com.team04.mopl.directmessage.service.DirectMessageRestoreService;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.service.NotificationRestoreService;
 import com.team04.mopl.sse.event.SseEventNames;
@@ -22,11 +24,11 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class SseService {
 
-	private final SseEmitterRepository sseEmitterRepository;
-	private final NotificationRestoreService notificationRestoreService;
-
 	// SSE 연결 유지 시간 (현재: 1시간)
 	private static final long TIMEOUT = 60L * 60L * 1000L;
+	private final SseEmitterRepository sseEmitterRepository;
+	private final NotificationRestoreService notificationRestoreService;
+	private final DirectMessageRestoreService directMessageRestoreService;
 
 	// SseEmitter 객체 생성
 	public SseEmitter connect(UUID receiverId, UUID lastEventId) {
@@ -112,7 +114,22 @@ public class SseService {
 		}
 	}
 
+	// 복원 메서드: 분기
 	private void restoreLostEvents(UUID receiverId, UUID lastEventId, SseEmitter sseEmitter) {
+		// 1. DM 복원
+		boolean isDirectMessageSuccess = restoreDirectMessages(receiverId, lastEventId, sseEmitter);
+
+		// DM 복원 도중 오류 발생 시, 알림 복원 없이 종료
+		if (!isDirectMessageSuccess) {
+			return;
+		}
+
+		// 2. 알림 복원
+		restoreNotifications(receiverId, lastEventId, sseEmitter);
+	}
+
+	// 알림 복원 메서드
+	private void restoreNotifications(UUID receiverId, UUID lastEventId, SseEmitter sseEmitter) {
 		// lastEventId 이후의 이벤트 가져오기
 		List<NotificationDto> afterNotificationDtoList =
 			notificationRestoreService.findUnreadNotificationsAfter(receiverId, lastEventId);
@@ -133,6 +150,29 @@ public class SseService {
 				return;
 			}
 		}
+	}
+
+	// DM 복원 메서드
+	private boolean restoreDirectMessages(UUID receiverId, UUID lastEventId, SseEmitter sseEmitter) {
+		List<DirectMessageDto> missedDms = directMessageRestoreService.findUnreadMessagesAfter(receiverId, lastEventId);
+
+		for (DirectMessageDto directMessageDto : missedDms) {
+			try {
+				sendEvent(
+					sseEmitter,
+					directMessageDto.id(),
+					SseEventNames.DIRECT_MESSAGES,
+					directMessageDto
+				);
+			} catch (Exception e) {
+				log.warn("[SSE_SEND_FAILED] SSE 쪽지 전송 실패: receiverId={}, eventId={}",
+					receiverId, directMessageDto.id(), e);
+				sseEmitter.completeWithError(e);
+				sseEmitterRepository.remove(receiverId, sseEmitter);
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private void sendEvent(

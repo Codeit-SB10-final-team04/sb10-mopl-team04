@@ -32,16 +32,21 @@ import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.auth.security.handler.AuthSessionLogoutHandler;
 import com.team04.mopl.auth.security.handler.LoginFailureHandler;
 import com.team04.mopl.auth.security.handler.LoginSuccessHandler;
+import com.team04.mopl.auth.security.handler.OAuth2LoginFailureHandler;
+import com.team04.mopl.auth.security.handler.OAuth2LoginSuccessHandler;
 import com.team04.mopl.auth.security.handler.RestAccessDeniedHandler;
 import com.team04.mopl.auth.security.handler.RestAuthenticationEntryPoint;
 import com.team04.mopl.auth.security.handler.RestLogoutSuccessHandler;
 import com.team04.mopl.auth.security.jwt.JwtExpiredTokenValidator;
 import com.team04.mopl.auth.security.jwt.JwtProperties;
+import com.team04.mopl.auth.security.oauth2.MoplOAuth2UserService;
+import com.team04.mopl.auth.security.oauth2.MoplOidcUserService;
+import com.team04.mopl.auth.security.oauth2.OAuth2Properties;
 import com.team04.mopl.auth.security.provider.MoplAuthenticationProvider;
 
 @EnableMethodSecurity
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, OAuth2Properties.class})
 public class SecurityConfig {
 
 	@Bean
@@ -50,6 +55,10 @@ public class SecurityConfig {
 		MoplAuthenticationProvider moplAuthenticationProvider,
 		LoginSuccessHandler loginSuccessHandler,
 		LoginFailureHandler loginFailureHandler,
+		MoplOAuth2UserService moplOAuth2UserService,
+		MoplOidcUserService moplOidcUserService,
+		OAuth2LoginSuccessHandler oauth2LoginSuccessHandler,
+		OAuth2LoginFailureHandler oauth2LoginFailureHandler,
 		AuthSessionLogoutHandler authSessionLogoutHandler,
 		RestLogoutSuccessHandler restLogoutSuccessHandler,
 		JwtAuthenticationFilter jwtAuthenticationFilter,
@@ -80,6 +89,13 @@ public class SecurityConfig {
 				.successHandler(loginSuccessHandler)
 				.failureHandler(loginFailureHandler))
 
+			.oauth2Login(oauth2Login -> oauth2Login
+				.userInfoEndpoint(userInfoEndpoint -> userInfoEndpoint
+					.userService(moplOAuth2UserService)
+					.oidcUserService(moplOidcUserService))
+				.successHandler(oauth2LoginSuccessHandler)
+				.failureHandler(oauth2LoginFailureHandler))
+
 			// 로그아웃 요청
 			.logout(logout -> logout
 				.logoutRequestMatcher(request ->
@@ -106,6 +122,8 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll() // CSRF 토큰 조회
 				.requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll() // 비밀번호 초기화
 				.requestMatchers(
+					"/oauth2/**",
+					"/login/oauth2/**",
 					"/ws/**",
 					"/swagger-ui/**",
 					"/v3/api-docs/**",
@@ -115,7 +133,9 @@ public class SecurityConfig {
 					"/",
 					"/index.html",
 					"/favicon.svg",
-					"/assets/**"
+					"/assets/**",
+					"/static/**",
+					"/placeholder-movie.png"
 				).permitAll()
 				.anyRequest().authenticated())
 

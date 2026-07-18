@@ -3,11 +3,13 @@ package com.team04.mopl;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class MoplApplicationTests {
+import com.team04.mopl.support.ElasticsearchMockingSupport;
 
-    @Test
-    void contextLoads() {
-    }
+@SpringBootTest
+class MoplApplicationTests extends ElasticsearchMockingSupport {
+
+	@Test
+	void contextLoads() {
+	}
 
 }

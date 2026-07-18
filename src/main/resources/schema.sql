@@ -103,20 +103,6 @@ CREATE TABLE social_accounts (
                                  CONSTRAINT uq_social_accounts_provider UNIQUE (social_provider, provider_user_id)
 );
 
-CREATE TABLE auth_sessions (
-                               user_id             UUID        NOT NULL,
-                               session_id          UUID        NOT NULL,
-                               refresh_token_hash  TEXT        NOT NULL,
-                               access_expires_at   TIMESTAMPTZ NOT NULL,
-                               refresh_expires_at  TIMESTAMPTZ NOT NULL,
-                               last_refreshed_at   TIMESTAMPTZ NULL,
-                               updated_at          TIMESTAMPTZ NOT NULL,
-
-                               CONSTRAINT pk_auth_sessions PRIMARY KEY (session_id),
-                               CONSTRAINT fk_auth_sessions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-                               CONSTRAINT uq_auth_sessions_user UNIQUE (user_id)
-);
-
 CREATE TABLE notifications (
                                id              UUID            NOT NULL,
                                receiver_id     UUID            NOT NULL,
@@ -300,3 +286,16 @@ CREATE INDEX idx_users_is_locked_id
 
 CREATE INDEX idx_users_role_id
     ON users (role, id);
+
+-- direct_messages
+
+CREATE INDEX idx_direct_messages_id
+    ON direct_messages (conversation_id, created_at, id);
+
+-- conversation
+
+CREATE INDEX idx_conversation_participant_user_id
+    ON conversation_participants (user_id);
+
+CREATE INDEX idx_conversations_created_at_id
+    ON conversations (created_at, id);

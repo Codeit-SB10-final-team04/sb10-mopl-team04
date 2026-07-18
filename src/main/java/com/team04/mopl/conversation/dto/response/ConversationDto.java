@@ -11,7 +11,7 @@ import lombok.Builder;
 public record ConversationDto(
 	UUID id,
 	UserSummary with,
-	DirectMessageDto latestMessage,
+	DirectMessageDto lastestMessage,
 	boolean hasUnread
 ) {
 }

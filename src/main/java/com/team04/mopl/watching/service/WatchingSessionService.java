@@ -8,6 +8,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,61 +43,134 @@ import lombok.extern.slf4j.Slf4j;
 // watcherCount는 DB가 아닌 인메모리 Store(WatchingSessionStore)에서 집계
 // 시청 세션은 WebSocket 연결과 수명이 같은 일시적 데이터이므로 DB 영속화 불필요
 // ContentDto 반환 시 인메모리 watcherCount를 합쳐서 내려줌 (ContentMapper 참고)
-// TODO: 다중 서버(스케일 아웃) 환경에서는 WatchingSessionStore를 Redis로 교체 필요
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WatchingSessionService {
 
+	private static final long DISCONNECT_GRACE_PERIOD_SECONDS = 3;
+
 	private final WatchingSessionStore watchingSessionStore;
 	private final UserRepository userRepository;
 	private final ContentRepository contentRepository;
+	private final ScheduledExecutorService disconnectScheduler = Executors.newSingleThreadScheduledExecutor();
+	private final ConcurrentHashMap<String, ScheduledFuture<?>> pendingDisconnects = new ConcurrentHashMap<>();
 
-	// 시청 세션 입장 처리, 이미 시청 중이면 empty 반환
-	public Optional<WatchingSessionChange> join(UUID contentId, UUID userId) {
-		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 시작: contentId={}, userId={}", contentId, userId);
+	// 시청 세션 입장 (sessionId로 멀티탭 참조 카운팅)
+	// 첫 탭이면 JOIN 브로드캐스트, 추가 탭이면 empty
+	// 재연결(새로고침) 시 대기 중인 퇴장 예약이 있으면 취소
+	public Optional<WatchingSessionChange> join(UUID contentId, UUID userId, String sessionId) {
+		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 시작: contentId={}, userId={}, sessionId={}",
+			contentId, userId, sessionId);
 
-		// 검증을 먼저 수행 - 실패 시 Store에 좀비 시청자가 남는 것을 방지
+		cancelPendingDisconnect(contentId, userId);
+
 		User user = getUserOrThrow(userId);
 		Content content = getContentOrThrow(contentId);
 
-		Optional<WatchingSessionInfo> added = watchingSessionStore.addWatcher(contentId, userId);
+		Optional<WatchingSessionInfo> added = watchingSessionStore.addWatcher(contentId, userId, sessionId);
 
 		if (added.isEmpty()) {
-			log.debug("[WATCHING_SESSION_JOIN] 이미 시청 중인 사용자: contentId={}, userId={}", contentId, userId);
+			log.debug("[WATCHING_SESSION_JOIN] 추가 탭 입장 (브로드캐스트 없음): contentId={}, userId={}",
+				contentId, userId);
 			return Optional.empty();
 		}
 
 		WatchingSessionChange change = createChange(ChangeType.JOIN, user, content, added.get());
 
-		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 완료: contentId={}, userId={}, watcherCount={}",
+		log.info("[WATCHING_SESSION_JOIN] 첫 탭 입장 완료: contentId={}, userId={}, watcherCount={}",
 			contentId, userId, change.watcherCount());
 
 		return Optional.of(change);
 	}
 
-	// 시청 세션 퇴장 처리, 시청 중이 아니었으면 empty 반환
-	public Optional<WatchingSessionChange> leave(UUID contentId, UUID userId) {
-		log.info("[WATCHING_SESSION_LEAVE] 시청 세션 퇴장 시작: contentId={}, userId={}", contentId, userId);
+	// 시청 세션 퇴장 (sessionId로 멀티탭 참조 카운팅)
+	// 마지막 탭이면 LEAVE 브로드캐스트, 아직 남았으면 empty
+	public Optional<WatchingSessionChange> leave(UUID contentId, UUID userId, String sessionId) {
+		log.info("[WATCHING_SESSION_LEAVE] 시청 세션 퇴장 시작: contentId={}, userId={}, sessionId={}",
+			contentId, userId, sessionId);
 
-		// 검증을 먼저 수행 - 실패 시에도 Store 상태가 변경되지 않도록 보장
 		User user = getUserOrThrow(userId);
 		Content content = getContentOrThrow(contentId);
 
-		Optional<WatchingSessionInfo> removed = watchingSessionStore.removeWatcher(contentId, userId);
+		Optional<WatchingSessionInfo> removed = watchingSessionStore.removeWatcher(contentId, userId, sessionId);
 
 		if (removed.isEmpty()) {
-			log.debug("[WATCHING_SESSION_LEAVE] 시청 중이 아닌 사용자: contentId={}, userId={}", contentId, userId);
+			log.debug("[WATCHING_SESSION_LEAVE] 탭 닫힘 (아직 시청 중): contentId={}, userId={}", contentId, userId);
 			return Optional.empty();
 		}
 
 		WatchingSessionChange change = createChange(ChangeType.LEAVE, user, content, removed.get());
 
-		log.info("[WATCHING_SESSION_LEAVE] 시청 세션 퇴장 완료: contentId={}, userId={}, watcherCount={}",
+		log.info("[WATCHING_SESSION_LEAVE] 마지막 탭 퇴장 완료: contentId={}, userId={}, watcherCount={}",
 			contentId, userId, change.watcherCount());
 
 		return Optional.of(change);
+	}
+
+	// DISCONNECT 시 즉시 퇴장하지 않고 일정 시간 대기 후 강제 퇴장 (재연결 대비)
+	// 강제 퇴장: sessionId 상관없이 해당 유저의 모든 세션을 정리 (좀비 세션 방지)
+	public void scheduleLeave(UUID contentId, UUID userId, String sessionId,
+		java.util.function.Consumer<WatchingSessionChange> onLeave) {
+
+		String key = toDisconnectKey(contentId, userId);
+
+		log.debug("[WATCHING_SESSION_DISCONNECT] 퇴장 예약: contentId={}, userId={}, {}초 후 실행",
+			contentId, userId, DISCONNECT_GRACE_PERIOD_SECONDS);
+
+		ScheduledFuture<?> future = disconnectScheduler.schedule(() -> {
+			try {
+				forceLeave(contentId, userId)
+					.ifPresent(onLeave);
+			} catch (Exception e) {
+				log.error("[WATCHING_SESSION_DISCONNECT] 지연 퇴장 실패: contentId={}, userId={}",
+					contentId, userId, e);
+			} finally {
+				pendingDisconnects.remove(key);
+			}
+		}, DISCONNECT_GRACE_PERIOD_SECONDS, TimeUnit.SECONDS);
+
+		ScheduledFuture<?> prev = pendingDisconnects.put(key, future);
+		if (prev != null) {
+			prev.cancel(false);
+		}
+	}
+
+	// 강제 퇴장: sessionId 무관하게 해당 유저의 모든 세션 정리
+	private Optional<WatchingSessionChange> forceLeave(UUID contentId, UUID userId) {
+		log.info("[WATCHING_SESSION_FORCE_LEAVE] 강제 퇴장: contentId={}, userId={}", contentId, userId);
+
+		User user = getUserOrThrow(userId);
+		Content content = getContentOrThrow(contentId);
+
+		Optional<WatchingSessionInfo> removed = watchingSessionStore.forceRemoveWatcher(contentId, userId);
+
+		if (removed.isEmpty()) {
+			log.debug("[WATCHING_SESSION_FORCE_LEAVE] 이미 퇴장 상태: contentId={}, userId={}", contentId, userId);
+			return Optional.empty();
+		}
+
+		WatchingSessionChange change = createChange(ChangeType.LEAVE, user, content, removed.get());
+
+		log.info("[WATCHING_SESSION_FORCE_LEAVE] 강제 퇴장 완료: contentId={}, userId={}, watcherCount={}",
+			contentId, userId, change.watcherCount());
+
+		return Optional.of(change);
+	}
+
+	private void cancelPendingDisconnect(UUID contentId, UUID userId) {
+		String key = toDisconnectKey(contentId, userId);
+		ScheduledFuture<?> pending = pendingDisconnects.remove(key);
+		if (pending != null) {
+			pending.cancel(false);
+			log.info("[WATCHING_SESSION_JOIN] 퇴장 예약 취소 (재연결 감지): contentId={}, userId={}",
+				contentId, userId);
+		}
+	}
+
+	private String toDisconnectKey(UUID contentId, UUID userId) {
+		return contentId + ":" + userId;
 	}
 
 	// 특정 유저가 시청 중인 모든 contentId 조회

@@ -20,6 +20,20 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 	Optional<Notification> findByIdAndReceiverId(UUID notificationId, UUID receiverId);
 
 	@Query(value = """
+		SELECT n
+		FROM Notification AS n
+		WHERE n.receiver.id = :receiverId
+			AND n.readAt IS NULL
+			AND n.createdAt >= :timeLimit
+		ORDER BY n.createdAt ASC, n.id ASC
+		""")
+	List<Notification> findRecentUnreadNotifications(
+		@Param("receiverId") UUID receiverId,
+		@Param("timeLimit") Instant timeLimit,
+		Pageable pageable
+	);
+
+	@Query(value = """
 		SELECT n 
 		FROM Notification AS n
 		WHERE n.receiver.id = :receiverId

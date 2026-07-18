@@ -180,7 +180,7 @@ class ConversationControllerTest {
 			"https://profile.img"
 		);
 
-		DirectMessageDto latestMessage = new DirectMessageDto(
+		DirectMessageDto lastestMessage = new DirectMessageDto(
 			UUID.randomUUID(),
 			conversationId,
 			Instant.now(),
@@ -192,7 +192,7 @@ class ConversationControllerTest {
 		ConversationDto response = ConversationDto.builder()
 			.id(conversationId)
 			.with(withUser)
-			.latestMessage(latestMessage)
+			.lastestMessage(lastestMessage)
 			.hasUnread(false)
 			.build();
 
@@ -206,7 +206,7 @@ class ConversationControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(conversationId.toString()))
 			.andExpect(jsonPath("$.with.name").value("상대방"))
-			.andExpect(jsonPath("$.latestMessage.content").value("안녕"))
+			.andExpect(jsonPath("$.lastestMessage.content").value("안녕"))
 			.andExpect(jsonPath("$.hasUnread").value(false));
 	}
 
@@ -410,16 +410,14 @@ class ConversationControllerTest {
 		);
 		mockSecurityContext(mockUserDetails);
 
-		given(conversationService.findAll(any(ConversationPageRequest.class), eq(requesterUserId)))
-			.willThrow(new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT));
-
 		// when & then
 		mockMvc.perform(get("/api/conversations")
 				.param("cursor", "invalid-cursor-string")
 				.contentType(MediaType.APPLICATION_JSON))
 			.andDo(print())
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.message").value(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage()));
+			.andExpect(jsonPath("$.message").value("요청 파라미터 유효성 검사에 실패했습니다."))
+			.andExpect(jsonPath("$.details._global").value("잘못된 형태의 값이 입력되었습니다."));
 	}
 
 	@Test

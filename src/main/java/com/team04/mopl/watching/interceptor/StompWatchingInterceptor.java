@@ -97,7 +97,7 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 				subscriptionStore.register(sessionId, subscriptionId, destination);
 			}
 
-			watchingSessionService.join(contentId, userId)
+			watchingSessionService.join(contentId, userId, sessionId)
 				.ifPresent(change -> eventPublisher.publishEvent(new WatchingSessionEvent(contentId, change)));
 		} else if ("chat".equals(type)) {
 			// 시청 세션에 참여한 사용자만 채팅 구독 가능
@@ -146,7 +146,7 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 					UUID contentId = UUID.fromString(matcher.group(1));
 					UUID userId = getUserIdFromSession(sessionId);
 
-					watchingSessionService.leave(contentId, userId)
+					watchingSessionService.leave(contentId, userId, sessionId)
 						.ifPresent(change -> eventPublisher.publishEvent(
 							new WatchingSessionEvent(contentId, change)));
 				}
@@ -155,7 +155,7 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 			});
 	}
 
-	// DISCONNECT: 모든 시청 세션 정리 + 스토어 정리
+	// DISCONNECT: 즉시 퇴장하지 않고 지연 퇴장 예약 (새로고침 시 재연결 대비)
 	private void handleDisconnect(StompHeaderAccessor accessor) {
 		String sessionId = accessor.getSessionId();
 
@@ -165,18 +165,17 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 
 		webSocketSessionStore.getUserId(sessionId)
 			.ifPresent(userId -> {
-				// 시청 중인 모든 콘텐츠에서 퇴장 처리
 				watchingSessionService.getWatchingContentIds(userId)
 					.forEach(contentId ->
-						watchingSessionService.leave(contentId, userId)
-							.ifPresent(change -> eventPublisher.publishEvent(
+						watchingSessionService.scheduleLeave(contentId, userId, sessionId,
+							change -> eventPublisher.publishEvent(
 								new WatchingSessionEvent(contentId, change)))
 					);
 
 				subscriptionStore.removeAllBySession(sessionId);
 				webSocketSessionStore.remove(sessionId);
 
-				log.info("[WATCHING_SESSION_DISCONNECT] WebSocket 연결 종료 정리 완료: sessionId={}, userId={}",
+				log.info("[WATCHING_SESSION_DISCONNECT] WebSocket 연결 종료, 퇴장 예약 완료: sessionId={}, userId={}",
 					sessionId, userId);
 			});
 	}

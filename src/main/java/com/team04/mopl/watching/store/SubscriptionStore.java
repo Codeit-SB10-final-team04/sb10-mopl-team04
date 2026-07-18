@@ -1,38 +1,59 @@
 package com.team04.mopl.watching.store;
 
+import java.util.Collections;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
-// 구독 ID ↔ destination 매핑을 관리하는 인메모리 저장소
-// UNSUBSCRIBE 프레임에는 destination이 없고 구독 ID만 오므로, 어떤 콘텐츠인지 역추적하기 위해 필요
-// 키: "sessionId:subscriptionId", 값: destination
-// TODO: 다중 서버 환경에서는 Redis로 교체 필요
+import lombok.RequiredArgsConstructor;
+
+// 구독 ID ↔ destination 매핑을 관리하는 Redis 저장소
+// 키 구조:
+//   stomp:sub:{sessionId}:{subscriptionId} → destination (TTL 24시간)
+//   stomp:sub-index:{sessionId} → Set<subscriptionId> (KEYS 대신 역인덱스)
 @Component
+@RequiredArgsConstructor
 public class SubscriptionStore {
 
-	private final ConcurrentHashMap<String, String> subscriptionMap = new ConcurrentHashMap<>();
+	private final StringRedisTemplate redisTemplate;
+	private static final String KEY_PREFIX = "stomp:sub:";
+	private static final String INDEX_PREFIX = "stomp:sub-index:";
+
+	private static final DefaultRedisScript<Boolean> EXPIRE_SCRIPT = new DefaultRedisScript<>(
+		"return redis.call('EXPIRE', KEYS[1], ARGV[1])", Boolean.class
+	);
 
 	public void register(String sessionId, String subscriptionId, String destination) {
-		subscriptionMap.put(toKey(sessionId, subscriptionId), destination);
+		redisTemplate.opsForValue().set(toKey(sessionId, subscriptionId), destination, 24, TimeUnit.HOURS);
+		redisTemplate.opsForSet().add(INDEX_PREFIX + sessionId, subscriptionId);
+		redisTemplate.execute(EXPIRE_SCRIPT, Collections.singletonList(INDEX_PREFIX + sessionId), "86400");
 	}
 
 	public Optional<String> getDestination(String sessionId, String subscriptionId) {
-		return Optional.ofNullable(subscriptionMap.get(toKey(sessionId, subscriptionId)));
+		return Optional.ofNullable(redisTemplate.opsForValue().get(toKey(sessionId, subscriptionId)));
 	}
 
 	public void remove(String sessionId, String subscriptionId) {
-		subscriptionMap.remove(toKey(sessionId, subscriptionId));
+		redisTemplate.delete(toKey(sessionId, subscriptionId));
+		redisTemplate.opsForSet().remove(INDEX_PREFIX + sessionId, subscriptionId);
 	}
 
-	// 특정 세션의 모든 구독 제거 (DISCONNECT 시 사용)
+	// KEYS 명령 대신 역인덱스 Set으로 세션의 모든 구독 제거
 	public void removeAllBySession(String sessionId) {
-		String prefix = sessionId + ":";
-		subscriptionMap.keySet().removeIf(key -> key.startsWith(prefix));
+		Set<String> subscriptionIds = redisTemplate.opsForSet().members(INDEX_PREFIX + sessionId);
+		if (subscriptionIds != null) {
+			for (String subId : subscriptionIds) {
+				redisTemplate.delete(toKey(sessionId, subId));
+			}
+		}
+		redisTemplate.delete(INDEX_PREFIX + sessionId);
 	}
 
 	private String toKey(String sessionId, String subscriptionId) {
-		return sessionId + ":" + subscriptionId;
+		return KEY_PREFIX + sessionId + ":" + subscriptionId;
 	}
 }
