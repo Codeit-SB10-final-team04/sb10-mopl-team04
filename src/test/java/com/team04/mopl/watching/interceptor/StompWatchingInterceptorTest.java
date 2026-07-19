@@ -119,7 +119,6 @@ class StompWatchingInterceptorTest {
 	void handleDisconnect_cleansUp() {
 		// given
 		String sessionId = "session-1";
-		WatchingSessionChange change = mock(WatchingSessionChange.class);
 
 		StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.DISCONNECT);
 		accessor.setSessionId(sessionId);
