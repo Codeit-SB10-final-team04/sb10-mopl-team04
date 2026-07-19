@@ -3,6 +3,7 @@ package com.team04.mopl.support;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -16,6 +17,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 // PostgreSQL + Redis 컨테이너를 static으로 공유하여 테스트 클래스 간 재시작 방지
 @SpringBootTest
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestPropertySource(properties = {
 	"spring.jpa.hibernate.ddl-auto=none",
 	"spring.jpa.properties.hibernate.dialect=com.team04.mopl.config.PostgresTestDialect",
