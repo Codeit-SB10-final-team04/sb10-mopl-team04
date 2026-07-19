@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +71,11 @@ public class PlaylistServiceIntegrationTest extends IntegrationTestBase {
 
 	@Autowired
 	private PlaylistContentService playlistContentService;
+
+	@AfterEach
+	void clearSecurityContext() {
+		SecurityContextHolder.clearContext();
+	}
 
 	@Test
 	@DisplayName("플레이리스트 생성 시 DTO를 반환하고 DB에 저장한다.")
