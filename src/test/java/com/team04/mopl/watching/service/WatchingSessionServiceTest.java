@@ -209,6 +209,19 @@ class WatchingSessionServiceTest {
 		assertThat(result.get().type()).isEqualTo(ChangeType.LEAVE);
 	}
 
+	@Test
+	@DisplayName("leaveBySessionId 시 매핑이 없으면 세션을 정리하고 empty를 반환한다")
+	void leaveBySessionId_removesSession_whenMappingMissing() {
+		String sessionId = "test-session";
+		when(watchingSessionStore.getUserId(sessionId)).thenReturn(Optional.empty());
+		when(watchingSessionStore.getContentId(sessionId)).thenReturn(Optional.empty());
+
+		Optional<WatchingSessionChange> result = watchingSessionService.leaveBySessionId(sessionId);
+
+		assertThat(result).isEmpty();
+		verify(watchingSessionStore).removeSession(sessionId);
+	}
+
 	private WatchingSessionPageRequest pageRequest(int limit, String cursor, UUID idAfter) {
 		return new WatchingSessionPageRequest(
 			null, cursor, idAfter, limit,
