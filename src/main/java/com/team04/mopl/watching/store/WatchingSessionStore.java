@@ -3,28 +3,27 @@ package com.team04.mopl.watching.store;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
+import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-// contentId별 시청 중인 유저와 세션 정보를 관리하는 Redis 저장소
-// 멀티탭 참조 카운팅: Lua 스크립트로 SADD + SCARD를 원자적으로 처리
+// 시청 세션 통합 Redis 저장소
 // 키 구조:
-//   watching:sessions:{contentId}:{userId} → Set<sessionId> (멀티탭)
-//   watching:info:{contentId}:{userId} → Hash {id, joinedAt}
-//   watching:count:{contentId} → String (시청자 수 카운터)
-//   watching:user-contents:{userId} → Set<contentId> (역인덱스)
-//   watching:watchers:{contentId} → Set<userId> (시청자 목록)
+//   watching:session:{sessionId}      → Hash {userId, contentId, joinedAt} (세션 매핑 + 메타)
+//   watching:viewers:{contentId}      → Sorted Set (member=userId, score=joinedAt millis) (시청자 목록)
+//   watching:user-sessions:{userId}   → Set<sessionId> (userId→sessionId 역참조)
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -32,194 +31,178 @@ public class WatchingSessionStore {
 
 	private final StringRedisTemplate redisTemplate;
 
-	private static final String SESSIONS_KEY = "watching:sessions:%s:%s";
-	private static final String INFO_KEY = "watching:info:%s:%s";
-	private static final String COUNT_KEY = "watching:count:%s";
-	private static final String USER_CONTENTS_KEY = "watching:user-contents:%s";
-	private static final String WATCHERS_KEY = "watching:watchers:%s";
+	private static final String SESSION_KEY = "watching:session:%s";
+	private static final String VIEWERS_KEY = "watching:viewers:%s";
+	private static final String USER_SESSIONS_KEY = "watching:user-sessions:%s";
+	private static final long TTL_SECONDS = 86400; // 24시간
 
-	// Lua: SADD + 첫 세션이면 info/count/역인덱스까지 원자적으로 처리
-	// KEYS: [1]sessions [2]info [3]count [4]userContents [5]watchers
-	// ARGV: [1]sessionId [2]infoId [3]joinedAt [4]contentId [5]userId
-	// 반환: "1" = 첫 세션(JOIN), "0" = 추가 탭
-	private static final DefaultRedisScript<String> ADD_WATCHER_SCRIPT = new DefaultRedisScript<>("""
-		redis.call('SADD', KEYS[1], ARGV[1])
-		local size = redis.call('SCARD', KEYS[1])
-		if size == 1 then
-			redis.call('HSET', KEYS[2], 'id', ARGV[2], 'joinedAt', ARGV[3])
-			redis.call('INCR', KEYS[3])
-			redis.call('SADD', KEYS[4], ARGV[4])
-			redis.call('SADD', KEYS[5], ARGV[5])
-			return '1'
+	// Lua: 세션 등록 + viewers 추가 (원자적)
+	// 반환: "1" = 첫 탭(JOIN), "0" = 추가 탭 또는 이미 등록됨
+	private static final DefaultRedisScript<String> JOIN_SCRIPT = new DefaultRedisScript<>("""
+		local existingContentId = redis.call('HGET', KEYS[1], 'contentId')
+		if existingContentId then
+			return '0'
 		end
-		return '0'
+		redis.call('HSET', KEYS[1], 'userId', ARGV[1], 'contentId', ARGV[2], 'joinedAt', ARGV[3])
+		redis.call('EXPIRE', KEYS[1], tonumber(ARGV[5]))
+		redis.call('SADD', KEYS[3], ARGV[4])
+		redis.call('EXPIRE', KEYS[3], tonumber(ARGV[5]))
+		if redis.call('ZSCORE', KEYS[2], ARGV[1]) then
+			return '0'
+		end
+		redis.call('ZADD', KEYS[2], tonumber(ARGV[3]), ARGV[1])
+		return '1'
 		""", String.class);
 
-	// Lua: SREM + 마지막 세션이면 info 조회 후 전체 정리까지 원자적으로 처리
-	// KEYS: [1]sessions [2]info [3]count [4]userContents [5]watchers
-	// ARGV: [1]sessionId [2]contentId [3]userId
-	// 반환: "id|joinedAt" = 마지막 세션(LEAVE), "" = 아직 탭 남음
-	private static final DefaultRedisScript<String> REMOVE_WATCHER_SCRIPT = new DefaultRedisScript<>("""
-		redis.call('SREM', KEYS[1], ARGV[1])
-		local size = redis.call('SCARD', KEYS[1])
-		if size == 0 then
-			local id = redis.call('HGET', KEYS[2], 'id')
-			local joinedAt = redis.call('HGET', KEYS[2], 'joinedAt')
-			redis.call('DEL', KEYS[1])
-			redis.call('DEL', KEYS[2])
-			redis.call('DECR', KEYS[3])
-			redis.call('SREM', KEYS[4], ARGV[2])
-			redis.call('SREM', KEYS[5], ARGV[3])
-			if id and joinedAt then
-				return id .. '|' .. joinedAt
-			end
-			return ''
+	// Lua: 세션 삭제 + 마지막 탭이면 viewers에서 제거 (원자적)
+	// 반환: joinedAt = 마지막 탭(LEAVE), "0" = 다른 탭 남음, "-1" = 세션 없음
+	private static final DefaultRedisScript<String> LEAVE_SCRIPT = new DefaultRedisScript<>("""
+		if redis.call('EXISTS', KEYS[1]) == 0 then
+			return '-1'
 		end
-		return ''
-		""", String.class);
-
-	// Lua: sessions Set 전체 삭제 + 강제 정리 (DISCONNECT 시 좀비 세션 방지)
-	// KEYS: [1]sessions [2]info [3]count [4]userContents [5]watchers
-	// ARGV: [1]contentId [2]userId
-	// 반환: "id|joinedAt" = 세션 존재했으면, "" = 이미 없었음
-	private static final DefaultRedisScript<String> FORCE_REMOVE_WATCHER_SCRIPT = new DefaultRedisScript<>("""
-		local size = redis.call('SCARD', KEYS[1])
-		if size == 0 then
-			return ''
-		end
-		local id = redis.call('HGET', KEYS[2], 'id')
-		local joinedAt = redis.call('HGET', KEYS[2], 'joinedAt')
+		local joinedAt = redis.call('HGET', KEYS[1], 'joinedAt')
 		redis.call('DEL', KEYS[1])
-		redis.call('DEL', KEYS[2])
-		redis.call('DECR', KEYS[3])
-		redis.call('SREM', KEYS[4], ARGV[1])
-		redis.call('SREM', KEYS[5], ARGV[2])
-		if id and joinedAt then
-			return id .. '|' .. joinedAt
+		redis.call('SREM', KEYS[3], ARGV[3])
+		local remaining = redis.call('SMEMBERS', KEYS[3])
+		for _, sid in ipairs(remaining) do
+			local cid = redis.call('HGET', 'watching:session:' .. sid, 'contentId')
+			if cid == ARGV[2] then
+				return '0'
+			end
 		end
-		return ''
+		redis.call('ZREM', KEYS[2], ARGV[1])
+		return joinedAt
 		""", String.class);
 
-	public Optional<WatchingSessionInfo> addWatcher(UUID contentId, UUID userId) {
-		return addWatcher(contentId, userId, "default");
-	}
+	// Lua: CONNECT 시 session Hash + user-sessions 등록 (원자적 + expire)
+	private static final DefaultRedisScript<String> REGISTER_SCRIPT = new DefaultRedisScript<>("""
+		redis.call('HSET', KEYS[1], 'userId', ARGV[1])
+		redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))
+		redis.call('SADD', KEYS[2], ARGV[2])
+		redis.call('EXPIRE', KEYS[2], tonumber(ARGV[3]))
+		return '1'
+		""", String.class);
 
-	public Optional<WatchingSessionInfo> addWatcher(UUID contentId, UUID userId, String sessionId) {
-		WatchingSessionInfo info = WatchingSessionInfo.create();
-
+	// CONNECT 시 최소 정보 저장 (userId만, contentId는 SUBSCRIBE 시 join에서 추가)
+	public void registerSession(String sessionId, UUID userId) {
 		List<String> keys = Arrays.asList(
-			String.format(SESSIONS_KEY, contentId, userId),
-			String.format(INFO_KEY, contentId, userId),
-			String.format(COUNT_KEY, contentId),
-			String.format(USER_CONTENTS_KEY, userId),
-			String.format(WATCHERS_KEY, contentId)
+			String.format(SESSION_KEY, sessionId),
+			String.format(USER_SESSIONS_KEY, userId)
 		);
 
-		String result = redisTemplate.execute(ADD_WATCHER_SCRIPT, keys,
-			sessionId, info.id().toString(), info.joinedAt().toString(),
-			contentId.toString(), userId.toString());
-
-		return "1".equals(result) ? Optional.of(info) : Optional.empty();
+		redisTemplate.execute(REGISTER_SCRIPT, keys,
+			userId.toString(), sessionId, String.valueOf(TTL_SECONDS));
 	}
 
-	// 강제 퇴장: sessions Set 전체 삭제 (DISCONNECT 시 좀비 세션 방지)
-	public Optional<WatchingSessionInfo> forceRemoveWatcher(UUID contentId, UUID userId) {
+	// 시청 세션 입장 (Lua 원자적 처리)
+	// 반환: 첫 탭이면 joinedAt, 추가 탭이면 empty
+	public Optional<Instant> join(String sessionId, UUID userId, UUID contentId) {
+		Instant joinedAt = Instant.now();
+		String joinedAtMillis = String.valueOf(joinedAt.toEpochMilli());
+
 		List<String> keys = Arrays.asList(
-			String.format(SESSIONS_KEY, contentId, userId),
-			String.format(INFO_KEY, contentId, userId),
-			String.format(COUNT_KEY, contentId),
-			String.format(USER_CONTENTS_KEY, userId),
-			String.format(WATCHERS_KEY, contentId)
+			String.format(SESSION_KEY, sessionId),
+			String.format(VIEWERS_KEY, contentId),
+			String.format(USER_SESSIONS_KEY, userId)
 		);
 
-		String result = redisTemplate.execute(FORCE_REMOVE_WATCHER_SCRIPT, keys,
-			contentId.toString(), userId.toString());
+		String result = redisTemplate.execute(JOIN_SCRIPT, keys,
+			userId.toString(), contentId.toString(), joinedAtMillis,
+			sessionId, String.valueOf(TTL_SECONDS));
 
-		if (result != null && !result.isEmpty()) {
-			String[] parts = result.split("\\|", 2);
-			return Optional.of(new WatchingSessionInfo(
-				UUID.fromString(parts[0]),
-				Instant.parse(parts[1])
-			));
+		return "1".equals(result) ? Optional.of(joinedAt) : Optional.empty();
+	}
+
+	// 시청 세션 퇴장 (Lua 원자적 처리)
+	// 반환: 마지막 탭이면 joinedAt, 다른 탭 남으면 empty
+	public Optional<Instant> leave(String sessionId, UUID userId, UUID contentId) {
+		List<String> keys = Arrays.asList(
+			String.format(SESSION_KEY, sessionId),
+			String.format(VIEWERS_KEY, contentId),
+			String.format(USER_SESSIONS_KEY, userId)
+		);
+
+		String result = redisTemplate.execute(LEAVE_SCRIPT, keys,
+			userId.toString(), contentId.toString(), sessionId);
+
+		if (result != null && !result.equals("0") && !result.equals("-1")) {
+			return Optional.of(Instant.ofEpochMilli(Long.parseLong(result)));
 		}
 		return Optional.empty();
 	}
 
-	public Optional<WatchingSessionInfo> removeWatcher(UUID contentId, UUID userId) {
-		return removeWatcher(contentId, userId, "default");
+	// session Hash에서 userId 조회
+	public Optional<UUID> getUserId(String sessionId) {
+		Object userId = redisTemplate.opsForHash().get(String.format(SESSION_KEY, sessionId), "userId");
+		return userId != null ? Optional.of(UUID.fromString(userId.toString())) : Optional.empty();
 	}
 
-	public Optional<WatchingSessionInfo> removeWatcher(UUID contentId, UUID userId, String sessionId) {
-		List<String> keys = Arrays.asList(
-			String.format(SESSIONS_KEY, contentId, userId),
-			String.format(INFO_KEY, contentId, userId),
-			String.format(COUNT_KEY, contentId),
-			String.format(USER_CONTENTS_KEY, userId),
-			String.format(WATCHERS_KEY, contentId)
-		);
-
-		String result = redisTemplate.execute(REMOVE_WATCHER_SCRIPT, keys,
-			sessionId, contentId.toString(), userId.toString());
-
-		if (result != null && !result.isEmpty()) {
-			String[] parts = result.split("\\|", 2);
-			return Optional.of(new WatchingSessionInfo(
-				UUID.fromString(parts[0]),
-				Instant.parse(parts[1])
-			));
-		}
-		return Optional.empty();
+	// session Hash에서 contentId 조회
+	public Optional<UUID> getContentId(String sessionId) {
+		Object contentId = redisTemplate.opsForHash().get(String.format(SESSION_KEY, sessionId), "contentId");
+		return contentId != null ? Optional.of(UUID.fromString(contentId.toString())) : Optional.empty();
 	}
 
-	// 시청자 수 조회 (카운터 기반, KEYS 명령 사용하지 않음)
-	public long getWatcherCount(UUID contentId) {
-		String value = redisTemplate.opsForValue().get(String.format(COUNT_KEY, contentId));
-		return value != null ? Long.parseLong(value) : 0;
+	// 세션 Hash 삭제 (방어적 정리용)
+	public void removeSession(String sessionId) {
+		redisTemplate.delete(String.format(SESSION_KEY, sessionId));
 	}
 
-	// 시청자 목록 조회 (watchers Set 기반, KEYS 명령 사용하지 않음)
-	public Map<UUID, WatchingSessionInfo> getWatchers(UUID contentId) {
-		Set<String> userIds = redisTemplate.opsForSet().members(String.format(WATCHERS_KEY, contentId));
-		if (userIds == null || userIds.isEmpty()) {
+	// 시청자 수 조회 (ZCARD)
+	public long getViewerCount(UUID contentId) {
+		Long count = redisTemplate.opsForZSet().zCard(String.format(VIEWERS_KEY, contentId));
+		return count != null ? count : 0;
+	}
+
+	// 시청자 목록 조회 (Sorted Set → Map<userId, joinedAt>)
+	public Map<UUID, Instant> getViewers(UUID contentId) {
+		Set<ZSetOperations.TypedTuple<String>> tuples = redisTemplate.opsForZSet()
+			.rangeWithScores(String.format(VIEWERS_KEY, contentId), 0, -1);
+
+		if (tuples == null || tuples.isEmpty()) {
 			return Map.of();
 		}
-		Map<UUID, WatchingSessionInfo> result = new HashMap<>();
-		for (String userIdStr : userIds) {
-			UUID userId = UUID.fromString(userIdStr);
-			getInfo(contentId, userId).ifPresent(info -> result.put(userId, info));
+
+		Map<UUID, Instant> result = new HashMap<>();
+		for (ZSetOperations.TypedTuple<String> tuple : tuples) {
+			if (tuple.getValue() != null && tuple.getScore() != null) {
+				result.put(
+					UUID.fromString(tuple.getValue()),
+					Instant.ofEpochMilli(tuple.getScore().longValue())
+				);
+			}
 		}
 		return result;
 	}
 
-	public boolean isWatching(UUID contentId, UUID userId) {
-		return Boolean.TRUE.equals(
-			redisTemplate.opsForSet().isMember(String.format(WATCHERS_KEY, contentId), userId.toString()));
+	// 시청 중인지 확인 (ZSCORE)
+	public boolean isViewing(UUID contentId, UUID userId) {
+		Double score = redisTemplate.opsForZSet()
+			.score(String.format(VIEWERS_KEY, contentId), userId.toString());
+		return score != null;
 	}
 
-	public Set<UUID> getWatchingContentIds(UUID userId) {
-		Set<String> members = redisTemplate.opsForSet().members(String.format(USER_CONTENTS_KEY, userId));
-		if (members == null) {
-			return Set.of();
+	// userId로 시청 중인 콘텐츠 조회 (user-sessions → 각 session Hash에서 contentId/joinedAt)
+	public Map<UUID, Instant> getSessionsByUserId(UUID userId) {
+		Set<String> sessionIds = redisTemplate.opsForSet()
+			.members(String.format(USER_SESSIONS_KEY, userId));
+
+		if (sessionIds == null || sessionIds.isEmpty()) {
+			return Map.of();
 		}
-		return members.stream().map(UUID::fromString).collect(Collectors.toSet());
-	}
 
-	public Map<UUID, WatchingSessionInfo> getWatchingSessions(UUID userId) {
-		Set<UUID> contentIds = getWatchingContentIds(userId);
-		Map<UUID, WatchingSessionInfo> result = new HashMap<>();
-		for (UUID contentId : contentIds) {
-			getInfo(contentId, userId).ifPresent(info -> result.put(contentId, info));
+		Map<UUID, Instant> result = new HashMap<>();
+		for (String sid : sessionIds) {
+			String sessionKey = String.format(SESSION_KEY, sid);
+			Object contentId = redisTemplate.opsForHash().get(sessionKey, "contentId");
+			Object joinedAt = redisTemplate.opsForHash().get(sessionKey, "joinedAt");
+			if (contentId != null && joinedAt != null) {
+				result.put(
+					UUID.fromString(contentId.toString()),
+					Instant.ofEpochMilli(Long.parseLong(joinedAt.toString()))
+				);
+			}
 		}
 		return result;
-	}
-
-	private Optional<WatchingSessionInfo> getInfo(UUID contentId, UUID userId) {
-		String infoKey = String.format(INFO_KEY, contentId, userId);
-		Object id = redisTemplate.opsForHash().get(infoKey, "id");
-		Object joinedAt = redisTemplate.opsForHash().get(infoKey, "joinedAt");
-		if (id == null || joinedAt == null) {
-			return Optional.empty();
-		}
-		return Optional.of(new WatchingSessionInfo(UUID.fromString(id.toString()), Instant.parse(joinedAt.toString())));
 	}
 }
