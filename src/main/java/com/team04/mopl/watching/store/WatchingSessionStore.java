@@ -51,6 +51,7 @@ public class WatchingSessionStore {
 			return '0'
 		end
 		redis.call('ZADD', KEYS[2], tonumber(ARGV[3]), ARGV[1])
+		redis.call('EXPIRE', KEYS[2], tonumber(ARGV[5]))
 		return '1'
 		""", String.class);
 
