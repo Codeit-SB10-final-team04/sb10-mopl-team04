@@ -11,6 +11,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import jakarta.annotation.PreDestroy;
+
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.stereotype.Service;
@@ -51,6 +53,11 @@ public class WatchingSessionService {
 	private final SimpUserRegistry simpUserRegistry;
 	private final ApplicationEventPublisher eventPublisher;
 	private final ScheduledExecutorService joinBroadcastScheduler = Executors.newScheduledThreadPool(2);
+
+	@PreDestroy
+	void shutdownScheduler() {
+		joinBroadcastScheduler.shutdown();
+	}
 
 	public WatchingSessionService(
 		WatchingSessionStore watchingSessionStore,
