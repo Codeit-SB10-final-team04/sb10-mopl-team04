@@ -30,7 +30,7 @@ import lombok.NoArgsConstructor;
 	name = "notifications",
 	uniqueConstraints = {
 		@UniqueConstraint(
-			name = "up_notifications_source_event_receiver",
+			name = "uq_notifications_source_event_receiver",
 			columnNames = {"source_event_id", "receiver_id"}
 		)
 	}
