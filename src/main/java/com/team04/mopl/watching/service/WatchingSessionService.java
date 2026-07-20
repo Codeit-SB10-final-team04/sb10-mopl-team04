@@ -6,14 +6,15 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import jakarta.annotation.PreDestroy;
+
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,51 +34,62 @@ import com.team04.mopl.watching.dto.request.WatchingSessionPageRequest;
 import com.team04.mopl.watching.dto.response.WatchingSessionChange;
 import com.team04.mopl.watching.dto.response.WatchingSessionDto;
 import com.team04.mopl.watching.enums.ChangeType;
-import com.team04.mopl.watching.store.WatchingSessionInfo;
+import com.team04.mopl.watching.event.WatchingSessionEvent;
 import com.team04.mopl.watching.store.WatchingSessionStore;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-// 시청 세션 비즈니스 로직 서비스
-// watcherCount는 DB가 아닌 인메모리 Store(WatchingSessionStore)에서 집계
-// 시청 세션은 WebSocket 연결과 수명이 같은 일시적 데이터이므로 DB 영속화 불필요
-// ContentDto 반환 시 인메모리 watcherCount를 합쳐서 내려줌 (ContentMapper 참고)
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WatchingSessionService {
 
-	private static final long DISCONNECT_GRACE_PERIOD_SECONDS = 3;
+	private static final long JOIN_BROADCAST_RETRY_INTERVAL_MS = 50;
+	private static final int JOIN_BROADCAST_MAX_RETRIES = 10;
 
 	private final WatchingSessionStore watchingSessionStore;
 	private final UserRepository userRepository;
 	private final ContentRepository contentRepository;
-	private final ScheduledExecutorService disconnectScheduler = Executors.newSingleThreadScheduledExecutor();
-	private final ConcurrentHashMap<String, ScheduledFuture<?>> pendingDisconnects = new ConcurrentHashMap<>();
+	private final SimpUserRegistry simpUserRegistry;
+	private final ApplicationEventPublisher eventPublisher;
+	private final ScheduledExecutorService joinBroadcastScheduler = Executors.newScheduledThreadPool(2);
 
-	// 시청 세션 입장 (sessionId로 멀티탭 참조 카운팅)
-	// 첫 탭이면 JOIN 브로드캐스트, 추가 탭이면 empty
-	// 재연결(새로고침) 시 대기 중인 퇴장 예약이 있으면 취소
+	@PreDestroy
+	void shutdownScheduler() {
+		joinBroadcastScheduler.shutdown();
+	}
+
+	public WatchingSessionService(
+		WatchingSessionStore watchingSessionStore,
+		UserRepository userRepository,
+		ContentRepository contentRepository,
+		@org.springframework.context.annotation.Lazy SimpUserRegistry simpUserRegistry,
+		ApplicationEventPublisher eventPublisher
+	) {
+		this.watchingSessionStore = watchingSessionStore;
+		this.userRepository = userRepository;
+		this.contentRepository = contentRepository;
+		this.simpUserRegistry = simpUserRegistry;
+		this.eventPublisher = eventPublisher;
+	}
+
+	// 시청 세션 입장
 	public Optional<WatchingSessionChange> join(UUID contentId, UUID userId, String sessionId) {
 		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 시작: contentId={}, userId={}, sessionId={}",
 			contentId, userId, sessionId);
 
-		cancelPendingDisconnect(contentId, userId);
-
 		User user = getUserOrThrow(userId);
 		Content content = getContentOrThrow(contentId);
 
-		Optional<WatchingSessionInfo> added = watchingSessionStore.addWatcher(contentId, userId, sessionId);
+		Optional<Instant> joinedAt = watchingSessionStore.join(sessionId, userId, contentId);
 
-		if (added.isEmpty()) {
+		if (joinedAt.isEmpty()) {
 			log.debug("[WATCHING_SESSION_JOIN] 추가 탭 입장 (브로드캐스트 없음): contentId={}, userId={}",
 				contentId, userId);
 			return Optional.empty();
 		}
 
-		WatchingSessionChange change = createChange(ChangeType.JOIN, user, content, added.get());
+		WatchingSessionChange change = createChange(ChangeType.JOIN, user, content, userId, joinedAt.get());
 
 		log.info("[WATCHING_SESSION_JOIN] 첫 탭 입장 완료: contentId={}, userId={}, watcherCount={}",
 			contentId, userId, change.watcherCount());
@@ -85,8 +97,55 @@ public class WatchingSessionService {
 		return Optional.of(change);
 	}
 
-	// 시청 세션 퇴장 (sessionId로 멀티탭 참조 카운팅)
-	// 마지막 탭이면 LEAVE 브로드캐스트, 아직 남았으면 empty
+	// 구독 등록 확인 후 JOIN 이벤트 publish (preSend 시점에는 구독 미등록 상태이므로 지연 publish)
+	public void publishJoinAfterSubscriptionReady(
+		String sessionId,
+		String destination,
+		UUID contentId,
+		WatchingSessionChange change
+	) {
+		scheduleJoinBroadcast(sessionId, destination, contentId, change, 0);
+	}
+
+	private void scheduleJoinBroadcast(
+		String sessionId,
+		String destination,
+		UUID contentId,
+		WatchingSessionChange change,
+		int attempt
+	) {
+		joinBroadcastScheduler.schedule(() -> {
+			try {
+				if (isSubscriptionReady(sessionId, destination)) {
+					eventPublisher.publishEvent(new WatchingSessionEvent(contentId, change));
+					log.debug("[WATCHING_SESSION_JOIN_BROADCAST] 구독 확인 후 JOIN publish: sessionId={}, attempt={}",
+						sessionId, attempt + 1);
+					return;
+				}
+
+				if (attempt + 1 >= JOIN_BROADCAST_MAX_RETRIES) {
+					log.warn("[WATCHING_SESSION_JOIN_BROADCAST] 구독 확인 실패, fallback publish: sessionId={}, destination={}",
+						sessionId, destination);
+					eventPublisher.publishEvent(new WatchingSessionEvent(contentId, change));
+					return;
+				}
+
+				scheduleJoinBroadcast(sessionId, destination, contentId, change, attempt + 1);
+			} catch (Exception e) {
+				log.error("[WATCHING_SESSION_JOIN_BROADCAST] JOIN 이벤트 publish 실패: sessionId={}", sessionId, e);
+			}
+		}, JOIN_BROADCAST_RETRY_INTERVAL_MS, TimeUnit.MILLISECONDS);
+	}
+
+	private boolean isSubscriptionReady(String sessionId, String destination) {
+		return simpUserRegistry.getUsers().stream()
+			.flatMap(user -> user.getSessions().stream())
+			.filter(session -> session.getId().equals(sessionId))
+			.flatMap(session -> session.getSubscriptions().stream())
+			.anyMatch(sub -> destination.equals(sub.getDestination()));
+	}
+
+	// 시청 세션 퇴장
 	public Optional<WatchingSessionChange> leave(UUID contentId, UUID userId, String sessionId) {
 		log.info("[WATCHING_SESSION_LEAVE] 시청 세션 퇴장 시작: contentId={}, userId={}, sessionId={}",
 			contentId, userId, sessionId);
@@ -94,14 +153,14 @@ public class WatchingSessionService {
 		User user = getUserOrThrow(userId);
 		Content content = getContentOrThrow(contentId);
 
-		Optional<WatchingSessionInfo> removed = watchingSessionStore.removeWatcher(contentId, userId, sessionId);
+		Optional<Instant> joinedAt = watchingSessionStore.leave(sessionId, userId, contentId);
 
-		if (removed.isEmpty()) {
+		if (joinedAt.isEmpty()) {
 			log.debug("[WATCHING_SESSION_LEAVE] 탭 닫힘 (아직 시청 중): contentId={}, userId={}", contentId, userId);
 			return Optional.empty();
 		}
 
-		WatchingSessionChange change = createChange(ChangeType.LEAVE, user, content, removed.get());
+		WatchingSessionChange change = createChange(ChangeType.LEAVE, user, content, userId, joinedAt.get());
 
 		log.info("[WATCHING_SESSION_LEAVE] 마지막 탭 퇴장 완료: contentId={}, userId={}, watcherCount={}",
 			contentId, userId, change.watcherCount());
@@ -109,78 +168,27 @@ public class WatchingSessionService {
 		return Optional.of(change);
 	}
 
-	// DISCONNECT 시 즉시 퇴장하지 않고 일정 시간 대기 후 강제 퇴장 (재연결 대비)
-	// 강제 퇴장: sessionId 상관없이 해당 유저의 모든 세션을 정리 (좀비 세션 방지)
-	public void scheduleLeave(UUID contentId, UUID userId, String sessionId,
-		java.util.function.Consumer<WatchingSessionChange> onLeave) {
+	// DISCONNECT용: sessionId만으로 퇴장 처리
+	public Optional<WatchingSessionChange> leaveBySessionId(String sessionId) {
+		Optional<UUID> userId = watchingSessionStore.getUserId(sessionId);
+		Optional<UUID> contentId = watchingSessionStore.getContentId(sessionId);
 
-		String key = toDisconnectKey(contentId, userId);
-
-		log.debug("[WATCHING_SESSION_DISCONNECT] 퇴장 예약: contentId={}, userId={}, {}초 후 실행",
-			contentId, userId, DISCONNECT_GRACE_PERIOD_SECONDS);
-
-		ScheduledFuture<?> future = disconnectScheduler.schedule(() -> {
-			try {
-				forceLeave(contentId, userId)
-					.ifPresent(onLeave);
-			} catch (Exception e) {
-				log.error("[WATCHING_SESSION_DISCONNECT] 지연 퇴장 실패: contentId={}, userId={}",
-					contentId, userId, e);
-			} finally {
-				pendingDisconnects.remove(key);
-			}
-		}, DISCONNECT_GRACE_PERIOD_SECONDS, TimeUnit.SECONDS);
-
-		ScheduledFuture<?> prev = pendingDisconnects.put(key, future);
-		if (prev != null) {
-			prev.cancel(false);
-		}
-	}
-
-	// 강제 퇴장: sessionId 무관하게 해당 유저의 모든 세션 정리
-	private Optional<WatchingSessionChange> forceLeave(UUID contentId, UUID userId) {
-		log.info("[WATCHING_SESSION_FORCE_LEAVE] 강제 퇴장: contentId={}, userId={}", contentId, userId);
-
-		User user = getUserOrThrow(userId);
-		Content content = getContentOrThrow(contentId);
-
-		Optional<WatchingSessionInfo> removed = watchingSessionStore.forceRemoveWatcher(contentId, userId);
-
-		if (removed.isEmpty()) {
-			log.debug("[WATCHING_SESSION_FORCE_LEAVE] 이미 퇴장 상태: contentId={}, userId={}", contentId, userId);
+		if (userId.isEmpty() || contentId.isEmpty()) {
+			watchingSessionStore.removeSession(sessionId);
 			return Optional.empty();
 		}
 
-		WatchingSessionChange change = createChange(ChangeType.LEAVE, user, content, removed.get());
-
-		log.info("[WATCHING_SESSION_FORCE_LEAVE] 강제 퇴장 완료: contentId={}, userId={}, watcherCount={}",
-			contentId, userId, change.watcherCount());
-
-		return Optional.of(change);
+		return leave(contentId.get(), userId.get(), sessionId);
 	}
 
-	private void cancelPendingDisconnect(UUID contentId, UUID userId) {
-		String key = toDisconnectKey(contentId, userId);
-		ScheduledFuture<?> pending = pendingDisconnects.remove(key);
-		if (pending != null) {
-			pending.cancel(false);
-			log.info("[WATCHING_SESSION_JOIN] 퇴장 예약 취소 (재연결 감지): contentId={}, userId={}",
-				contentId, userId);
-		}
-	}
-
-	private String toDisconnectKey(UUID contentId, UUID userId) {
-		return contentId + ":" + userId;
-	}
-
-	// 특정 유저가 시청 중인 모든 contentId 조회
-	public Set<UUID> getWatchingContentIds(UUID userId) {
-		return watchingSessionStore.getWatchingContentIds(userId);
-	}
-
-	// 특정 콘텐츠를 시청 중인지 확인
+	// 시청 중인지 확인
 	public boolean isWatching(UUID contentId, UUID userId) {
-		return watchingSessionStore.isWatching(contentId, userId);
+		return watchingSessionStore.isViewing(contentId, userId);
+	}
+
+	// 시청자 수 조회
+	public long getWatcherCount(UUID contentId) {
+		return watchingSessionStore.getViewerCount(contentId);
 	}
 
 	// 특정 콘텐츠의 시청 세션 목록 조회 (커서 페이지네이션)
@@ -189,7 +197,6 @@ public class WatchingSessionService {
 
 		List<WatchingSessionDto> sessions = getAllSessionsByContentId(contentId);
 
-		// 시청자 이름 필터
 		if (request.watcherNameLike() != null && !request.watcherNameLike().isBlank()) {
 			sessions = sessions.stream()
 				.filter(s -> s.watcher().name().contains(request.watcherNameLike()))
@@ -198,11 +205,10 @@ public class WatchingSessionService {
 
 		long totalCount = sessions.size();
 
-		// createdAt(입장 시각) 기준 정렬, 동일 시각은 id로 tie-break
 		boolean ascending = request.sortDirection() == SortDirection.ASCENDING;
 		Comparator<WatchingSessionDto> comparator = Comparator
 			.comparing(WatchingSessionDto::createdAt)
-			.thenComparing(dto -> dto.id().toString());
+			.thenComparing(WatchingSessionDto::id);
 
 		if (!ascending) {
 			comparator = comparator.reversed();
@@ -210,12 +216,11 @@ public class WatchingSessionService {
 
 		sessions = sessions.stream().sorted(comparator).toList();
 
-		// (createdAt, id) 복합 커서 필터: 커서 이후의 요소만 남김
 		if (request.cursor() != null && request.idAfter() != null) {
 			Instant cursorCreatedAt = parseCursor(request.cursor());
 
 			if (cursorCreatedAt != null) {
-				String cursorId = request.idAfter().toString();
+				UUID cursorId = request.idAfter();
 
 				sessions = sessions.stream()
 					.filter(s -> isAfterCursor(s, cursorCreatedAt, cursorId, ascending))
@@ -247,56 +252,48 @@ public class WatchingSessionService {
 		);
 	}
 
-	// 특정 사용자의 시청 세션 조회 (nullable), 여러 콘텐츠 시청 중이면 가장 최근 입장 세션 반환
+	// 특정 사용자의 시청 세션 조회 (가장 최근 입장 세션 반환)
 	public Optional<WatchingSessionDto> findByWatcherId(UUID watcherId) {
 		log.debug("[WATCHING_SESSION_FIND_BY_WATCHER] 유저 시청 세션 조회 시작: watcherId={}", watcherId);
 
-		Map<UUID, WatchingSessionInfo> watchingSessions = watchingSessionStore.getWatchingSessions(watcherId);
+		Map<UUID, Instant> sessions = watchingSessionStore.getSessionsByUserId(watcherId);
 
-		if (watchingSessions.isEmpty()) {
+		if (sessions.isEmpty()) {
 			return Optional.empty();
 		}
 
-		// 가장 최근에 입장한 세션 선택
-		Map.Entry<UUID, WatchingSessionInfo> latest = watchingSessions.entrySet().stream()
-			.max(Comparator.comparing(entry -> entry.getValue().joinedAt()))
+		Map.Entry<UUID, Instant> latest = sessions.entrySet().stream()
+			.max(Comparator.comparing(Map.Entry::getValue))
 			.orElseThrow();
 
 		UUID contentId = latest.getKey();
-		WatchingSessionInfo info = latest.getValue();
+		Instant joinedAt = latest.getValue();
 
 		User user = getUserOrThrow(watcherId);
 		Content content = getContentOrThrow(contentId);
 
 		return Optional.of(new WatchingSessionDto(
-			info.id(),
-			info.joinedAt(),
+			watcherId,
+			joinedAt,
 			new UserSummary(user.getId(), user.getName(), user.getProfileImageUrl()),
 			toContentSummary(content)
 		));
 	}
 
-	// 시청자 수 조회
-	public long getWatcherCount(UUID contentId) {
-		return watchingSessionStore.getWatcherCount(contentId);
-	}
-
-	// 특정 콘텐츠의 전체 시청 세션 목록 조회 (Store에 저장된 id/joinedAt 사용)
 	private List<WatchingSessionDto> getAllSessionsByContentId(UUID contentId) {
-		Map<UUID, WatchingSessionInfo> watchers = watchingSessionStore.getWatchers(contentId);
+		Map<UUID, Instant> viewers = watchingSessionStore.getViewers(contentId);
 
 		Content content = getContentOrThrow(contentId);
 		ContentSummary contentSummary = toContentSummary(content);
 
-		List<User> users = userRepository.findAllByIdInAndLockedFalse(watchers.keySet());
+		List<User> users = userRepository.findAllByIdInAndLockedFalse(viewers.keySet());
 
 		return users.stream()
 			.map(user -> {
-				WatchingSessionInfo info = watchers.get(user.getId());
-
+				Instant joinedAt = viewers.get(user.getId());
 				return new WatchingSessionDto(
-					info.id(),
-					info.joinedAt(),
+					user.getId(),
+					joinedAt,
 					new UserSummary(user.getId(), user.getName(), user.getProfileImageUrl()),
 					contentSummary
 				);
@@ -304,21 +301,15 @@ public class WatchingSessionService {
 			.toList();
 	}
 
-	// WatchingSessionChange 생성 (join/leave에서 이미 검증된 엔티티와 Store 세션 정보 사용)
 	private WatchingSessionChange createChange(
-		ChangeType type,
-		User user,
-		Content content,
-		WatchingSessionInfo info
+		ChangeType type, User user, Content content, UUID userId, Instant joinedAt
 	) {
 		UserSummary watcher = new UserSummary(user.getId(), user.getName(), user.getProfileImageUrl());
-
-		// 시청자 수는 인메모리 Store에서 집계
-		long watcherCount = watchingSessionStore.getWatcherCount(content.getId());
+		long watcherCount = watchingSessionStore.getViewerCount(content.getId());
 
 		WatchingSessionDto sessionDto = new WatchingSessionDto(
-			info.id(),
-			info.joinedAt(),
+			userId,
+			joinedAt,
 			watcher,
 			toContentSummary(content)
 		);
@@ -351,27 +342,20 @@ public class WatchingSessionService {
 		);
 	}
 
-	// 커서(createdAt 문자열) 파싱, 실패 시 null 반환 (첫 페이지로 처리)
 	private Instant parseCursor(String cursor) {
 		try {
 			return Instant.parse(cursor);
 		} catch (DateTimeParseException e) {
-			log.warn("[WATCHING_SESSION_CURSOR_PARSE_FAILED] 커서 파싱 실패, 첫 페이지로 처리: cursor={}", cursor);
+			log.warn("[WATCHING_SESSION_CURSOR_PARSE_FAILED] 커서 파싱 실패: cursor={}", cursor);
 			return null;
 		}
 	}
 
-	// (createdAt, id) 복합 비교로 커서 이후 요소인지 판단
-	private boolean isAfterCursor(
-		WatchingSessionDto session,
-		Instant cursorCreatedAt,
-		String cursorId,
-		boolean ascending
-	) {
+	private boolean isAfterCursor(WatchingSessionDto session, Instant cursorCreatedAt, UUID cursorId, boolean ascending) {
 		int createdAtCompare = session.createdAt().compareTo(cursorCreatedAt);
 
 		if (createdAtCompare == 0) {
-			int idCompare = session.id().toString().compareTo(cursorId);
+			int idCompare = session.id().compareTo(cursorId);
 			return ascending ? idCompare > 0 : idCompare < 0;
 		}
 
