@@ -81,11 +81,12 @@ public class DirectMessageService {
 		DirectMessageDto directMessageDto = directMessageMapper.toDto(newDirectMessage);
 
 		// 7. SSE 및 Redis 동기화를 위한 이벤트 발행
-		eventPublisher.publishEvent(new DirectMessageCreatedEvent(
-			receiver.getId(),
-			newDirectMessage.getId(),
-			directMessageDto
-		));
+		eventPublisher.publishEvent(DirectMessageCreatedEvent.of(
+				receiver.getId(),
+				directMessageDto.id(),
+				directMessageDto
+			)
+		);
 
 		log.info("[DM_CREATE] DM 생성 완료: conversationId={}, senderId={}, dmId={}",
 			conversationId, senderId, newDirectMessage.getId());
