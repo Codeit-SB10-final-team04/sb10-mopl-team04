@@ -1,11 +1,13 @@
 package com.team04.mopl.support;
 
+import org.redisson.api.RedissonClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -50,6 +52,9 @@ public abstract class RealtimeIntegrationTestBase {
 	static GenericContainer<?> redis =
 		new GenericContainer<>("redis:7-alpine")
 			.withExposedPorts(6379);
+
+	@MockitoBean
+	protected RedissonClient redissonClient;
 
 	@DynamicPropertySource
 	static void redisProperties(DynamicPropertyRegistry registry) {
