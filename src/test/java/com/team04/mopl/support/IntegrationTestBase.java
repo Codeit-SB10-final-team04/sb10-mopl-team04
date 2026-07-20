@@ -1,5 +1,6 @@
 package com.team04.mopl.support;
 
+import org.redisson.api.RedissonClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -44,6 +45,8 @@ public abstract class IntegrationTestBase {
 		.withExposedPorts(6379);
 	@MockitoBean
 	protected KafkaTemplate kafkaTemplate;
+	@MockitoBean
+	protected RedissonClient redissonClient;
 
 	@DynamicPropertySource
 	static void redisProperties(DynamicPropertyRegistry registry) {
