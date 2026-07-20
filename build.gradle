@@ -75,6 +75,9 @@ dependencies {
     // Elastic Search (OpenSearch)
     implementation("org.opensearch.client:spring-data-opensearch-starter:1.8.2")
 
+    // metric
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
