@@ -22,6 +22,7 @@ import {fileURLToPath} from 'node:url';
 const MIN_USER_COUNT = 100;
 const MAX_USER_COUNT = 200;
 const DEFAULT_PASSWORD = 'Mopl-load-2026!';
+const REQUEST_TIMEOUT_MS = 10_000;
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN';
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN';
 
@@ -46,6 +47,7 @@ const dataDirectory = path.resolve(scriptDirectory, '../data');
 const outputPath = path.join(dataDirectory, 'users.json');
 const temporaryOutputPath = `${outputPath}.tmp`;
 
+// 원격 서버 오시딩 방지를 위한 대상 주소 판별
 const isLocalTarget = () => {
   let targetUrl;
 
@@ -64,7 +66,10 @@ const isLocalTarget = () => {
   );
 };
 
+// 네트워크 요청 전 입력값과 원격 시딩 안전 조건 검증
 const validateConfiguration = () => {
+  const localTarget = isLocalTarget();
+
   if (
     !Number.isInteger(userCount) ||
     userCount < MIN_USER_COUNT ||
@@ -87,9 +92,15 @@ const validateConfiguration = () => {
     throw new Error('LOAD_TEST_PASSWORD는 8자 이상이어야 합니다.');
   }
 
-  if (!isLocalTarget() && !allowRemoteSeed) {
+  if (!localTarget && !allowRemoteSeed) {
     throw new Error(
       '원격 서버 시딩이 차단됐습니다. 실행하려면 ALLOW_REMOTE_SEED=true를 명시해야 합니다.',
+    );
+  }
+
+  if (!localTarget && password === DEFAULT_PASSWORD) {
+    throw new Error(
+      '원격 서버에는 기본 비밀번호를 사용할 수 없습니다. LOAD_TEST_PASSWORD를 직접 지정해야 합니다.',
     );
   }
 };
@@ -112,11 +123,34 @@ const readResponseBody = async (response) => {
 const bodyForError = (body) =>
   typeof body === 'string' ? body : JSON.stringify(body);
 
+// 응답 없는 서버에서 스크립트가 장시간 대기하지 않도록 요청 시간 제한
+const fetchWithTimeout = async (url, options = {}) => {
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+      throw new Error(
+        `HTTP 요청 시간이 ${REQUEST_TIMEOUT_MS / 1000}초를 초과했습니다: ${url}`,
+      );
+    }
+
+    throw new Error(`HTTP 요청에 실패했습니다: ${url}. ${error.message}`);
+  }
+};
+
 // CookieCsrfTokenRepository가 Set-Cookie로 발급한 토큰을 헤더와 쿠키에 재사용
 const requestCsrfToken = async () => {
-  const response = await fetch(`${baseUrl}/api/auth/csrf-token`);
-  const setCookie = response.headers.get('set-cookie') || '';
-  const tokenMatch = setCookie.match(/(?:^|,\s*)XSRF-TOKEN=([^;]+)/);
+  const response = await fetchWithTimeout(`${baseUrl}/api/auth/csrf-token`);
+  const setCookies =
+    typeof response.headers.getSetCookie === 'function'
+      ? response.headers.getSetCookie()
+      : [response.headers.get('set-cookie') || ''];
+  const tokenMatch = setCookies
+    .map((cookie) => cookie.match(/(?:^|,\s*)XSRF-TOKEN=([^;]+)/))
+    .find(Boolean);
 
   if (![200, 204].includes(response.status) || !tokenMatch) {
     throw new Error(
@@ -140,7 +174,7 @@ const login = async (email, csrfToken) => {
     username: email,
     password,
   });
-  const response = await fetch(`${baseUrl}/api/auth/sign-in`, {
+  const response = await fetchWithTimeout(`${baseUrl}/api/auth/sign-in`, {
     method: 'POST',
     headers: {
       ...csrfHeaders(csrfToken),
@@ -160,9 +194,16 @@ const login = async (email, csrfToken) => {
   return body;
 };
 
+// 다른 400 응답과 구분하기 위한 중복 이메일 응답 식별
+const isDuplicateEmailResponse = (response, body, email) =>
+  response.status === 400 &&
+  body?.exceptionName === 'UserException' &&
+  body?.message === '이미 사용 중인 이메일입니다.' &&
+  body?.details?.email === email;
+
 // 회원가입 성공 시 신규 사용자, 중복 이메일이면 기존 테스트 사용자를 재사용
 const createOrReuseUser = async (definition, csrfToken) => {
-  const response = await fetch(`${baseUrl}/api/users`, {
+  const response = await fetchWithTimeout(`${baseUrl}/api/users`, {
     method: 'POST',
     headers: {
       ...csrfHeaders(csrfToken),
@@ -175,8 +216,13 @@ const createOrReuseUser = async (definition, csrfToken) => {
     }),
   });
   const body = await readResponseBody(response);
+  const duplicateEmail = isDuplicateEmailResponse(
+    response,
+    body,
+    definition.email,
+  );
 
-  if (![201, 400].includes(response.status)) {
+  if (response.status !== 201 && !duplicateEmail) {
     throw new Error(
       `${definition.email} 사용자 생성에 실패했습니다. ` +
         `상태 코드=${response.status} 응답=${bodyForError(body)}`,
@@ -190,7 +236,7 @@ const createOrReuseUser = async (definition, csrfToken) => {
       jwt,
     };
   } catch (error) {
-    if (response.status === 400) {
+    if (duplicateEmail) {
       throw new Error(
         `${definition.email} 계정이 이미 존재하지만 재사용할 수 없습니다. ` +
           `다른 USER_PREFIX 또는 기존 비밀번호가 필요합니다. ${error.message}`,
@@ -215,6 +261,7 @@ const accessTokenExpiresAt = (accessToken) => {
   }
 };
 
+// 입력 순서를 유지하면서 서버 요청 수를 제한하는 병렬 처리
 const mapWithConcurrency = async (items, workerCount, mapper) => {
   const results = new Array(items.length);
   let nextIndex = 0;
@@ -242,6 +289,8 @@ const main = async () => {
 
   console.log(`${baseUrl} 대상 테스트 사용자 ${userCount}명 시딩 시작`);
   const csrfToken = await requestCsrfToken();
+
+  // 사용자 풀 구성
   const definitions = Array.from({length: userCount}, (_, index) => {
     const sequence = String(index + 1).padStart(3, '0');
 
@@ -280,6 +329,7 @@ const main = async () => {
     },
   );
 
+  // k6 시나리오에서 즉시 사용할 계정 정보와 JWT fixture 구성
   const fixture = {
     version: 1,
     generatedAt: new Date().toISOString(),

@@ -64,8 +64,14 @@ export const login = (email, password) => {
 };
 
 // 쓰기 API도 바로 호출할 수 있도록 Bearer 인증과 CSRF 정보를 함께 반환
-export const authHeaders = (accessToken) => ({
-  Authorization: `Bearer ${accessToken}`,
-  [CSRF_HEADER_NAME]: activeCsrfToken,
-  Cookie: `${CSRF_COOKIE_NAME}=${activeCsrfToken}`,
-});
+export const authHeaders = (accessToken) => {
+  if (!activeCsrfToken) {
+    fail('authHeaders 호출 전에 login() 실행이 필요합니다.');
+  }
+
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    [CSRF_HEADER_NAME]: activeCsrfToken,
+    Cookie: `${CSRF_COOKIE_NAME}=${activeCsrfToken}`,
+  };
+};
