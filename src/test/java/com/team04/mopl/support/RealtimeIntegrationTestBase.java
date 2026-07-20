@@ -29,17 +29,10 @@ import org.testcontainers.utility.DockerImageName;
 	"spring.kafka.consumer.group-id=mopl-notification-integration",
 	"spring.kafka.consumer.auto-offset-reset=earliest",
 	"spring.autoconfigure.exclude="
-		+ "org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchClientAutoConfiguration,"
-		+ "org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration,"
-		+ "org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration,"
-		+ "org.opensearch.spring.boot.autoconfigure.OpenSearchRestClientAutoConfiguration,"
-		+ "org.opensearch.spring.boot.autoconfigure.OpenSearchRestHighLevelClientAutoConfiguration,"
-		+ "org.opensearch.data.client.config.OpenSearchDataAutoConfiguration,"
 		+ "org.redisson.spring.starter.RedissonAutoConfigurationV2"
 })
 @SuppressWarnings("rawtypes")
-public abstract class RealtimeIntegrationTestBase
-	extends ElasticsearchMockingSupport {
+public abstract class RealtimeIntegrationTestBase {
 
 	@Container
 	@ServiceConnection
