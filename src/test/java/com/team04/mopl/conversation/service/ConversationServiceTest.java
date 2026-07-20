@@ -400,32 +400,25 @@ class ConversationServiceTest {
 		);
 
 		UUID conv1Id = UUID.randomUUID();
-		ConversationDocument doc1 = mock(ConversationDocument.class);
-		given(doc1.getId()).willReturn(conv1Id);
-
-		UUID conv2Id = UUID.randomUUID();
-		ConversationDocument doc2 = mock(ConversationDocument.class);
-		given(doc2.getId()).willReturn(conv2Id);
-		String mockCursorTime = Instant.now().toString();
-		given(doc2.getCreatedAt()).willReturn(Instant.parse(mockCursorTime));
-
-		UUID conv3Id = UUID.randomUUID();
-		ConversationDocument doc3 = mock(ConversationDocument.class);
-
-		List<ConversationDocument> esDocuments = List.of(doc1, doc2, doc3);
-
 		Conversation conv1 = mock(Conversation.class);
 		given(conv1.getId()).willReturn(conv1Id);
+
+		UUID conv2Id = UUID.randomUUID();
 		Conversation conv2 = mock(Conversation.class);
 		given(conv2.getId()).willReturn(conv2Id);
+		String mockCursorTime = Instant.now().toString();
+		given(conv2.getCreatedAt()).willReturn(Instant.parse(mockCursorTime));
 
-		// ES
-		given(conversationElasticSearchRepository.searchConversation(request, requestUserId, matchingRoomIds))
-			.willReturn(esDocuments);
-		given(conversationElasticSearchRepository.countConversation(request, requestUserId, matchingRoomIds))
+		UUID conv3Id = UUID.randomUUID();
+		Conversation conv3 = mock(Conversation.class);
+
+		List<Conversation> conversations = List.of(conv1, conv2, conv3);
+
+		// QDSL Repository 직접 호출 (ES 모킹 제거)
+		given(conversationRepository.searchConversation(request, requestUserId))
+			.willReturn(conversations);
+		given(conversationRepository.countConversation(request, requestUserId))
 			.willReturn(3L);
-
-		given(conversationRepository.findAllByIdIn(anyList())).willReturn(List.of(conv1, conv2));
 
 		// N+3 방어 로직
 		given(conversationParticipantRepository.findByConversationIdIn(anyList())).willReturn(List.of());
@@ -456,7 +449,6 @@ class ConversationServiceTest {
 		assertThat(result).isEqualTo(expectedResponse);
 		verify(conversationMapper).toCursorPageResponse(anyList(), anyString(), any(UUID.class), eq(true), eq(3L),
 			any(), any());
-		verify(conversationRepository).findAllByIdIn(List.of(conv1Id, conv2Id));
 	}
 
 	@Test
@@ -473,12 +465,10 @@ class ConversationServiceTest {
 			"createdAt"
 		);
 
-		given(
-			conversationElasticSearchRepository.searchConversation(request, requestUserId, matchingRoomIds)).willReturn(
-			List.of());
-		given(
-			conversationElasticSearchRepository.countConversation(request, requestUserId, matchingRoomIds)).willReturn(
-			0L);
+		given(conversationRepository.searchConversation(request, requestUserId))
+			.willReturn(List.of());
+		given(conversationRepository.countConversation(request, requestUserId))
+			.willReturn(0L);
 
 		// 빌더 패턴 적용
 		CursorResponseConversationDto expectedResponse = CursorResponseConversationDto.builder()
@@ -519,32 +509,22 @@ class ConversationServiceTest {
 		);
 
 		UUID id1 = UUID.randomUUID();
-		ConversationDocument doc1 = mock(ConversationDocument.class);
-		given(doc1.getId()).willReturn(id1);
-
-		UUID id2 = UUID.randomUUID();
-		ConversationDocument doc2 = mock(ConversationDocument.class);
-		given(doc2.getId()).willReturn(id2);
-
-		UUID id3 = UUID.randomUUID();
-		ConversationDocument doc3 = mock(ConversationDocument.class);
-		given(doc3.getId()).willReturn(id3);
-
-		given(conversationElasticSearchRepository.searchConversation(request, requestUserId, matchingRoomIds))
-			.willReturn(List.of(doc1, doc2, doc3));
-		given(conversationElasticSearchRepository.countConversation(request, requestUserId, matchingRoomIds))
-			.willReturn(3L);
-
-		// RDB에서는 순서가 무작위로 조회된다고 세팅
 		Conversation conv1 = mock(Conversation.class);
 		given(conv1.getId()).willReturn(id1);
+
+		UUID id2 = UUID.randomUUID();
 		Conversation conv2 = mock(Conversation.class);
 		given(conv2.getId()).willReturn(id2);
+
+		UUID id3 = UUID.randomUUID();
 		Conversation conv3 = mock(Conversation.class);
 		given(conv3.getId()).willReturn(id3);
 
-		given(conversationRepository.findAllByIdIn(anyList()))
-			.willReturn(List.of(conv3, conv1, conv2));
+		// 서비스 로직 수정으로 searchConversation에서 바로 정렬된 List<Conversation>을 반환함
+		given(conversationRepository.searchConversation(request, requestUserId))
+			.willReturn(List.of(conv1, conv2, conv3));
+		given(conversationRepository.countConversation(request, requestUserId))
+			.willReturn(3L);
 
 		given(conversationParticipantRepository.findByConversationIdIn(anyList())).willReturn(List.of());
 		given(directMessageRepository.findLastestMessagesByConversationIds(anyList())).willReturn(List.of());
@@ -579,6 +559,6 @@ class ConversationServiceTest {
 			.isInstanceOf(ConversationException.class)
 			.hasMessageContaining(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage());
 
-		verifyNoInteractions(conversationElasticSearchRepository);
+		verifyNoInteractions(conversationRepository);
 	}
 }
