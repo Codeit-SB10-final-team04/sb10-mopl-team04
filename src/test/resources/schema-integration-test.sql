@@ -17,19 +17,6 @@ CREATE TABLE IF NOT EXISTS users
     PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS auth_sessions
-(
-    session_id         UUID                     NOT NULL,
-    user_id            UUID                     NOT NULL UNIQUE,
-    refresh_token_hash TEXT                     NOT NULL,
-    access_expires_at  TIMESTAMP WITH TIME ZONE NOT NULL,
-    refresh_expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    last_refreshed_at  TIMESTAMP WITH TIME ZONE,
-    updated_at         TIMESTAMP WITH TIME ZONE NOT NULL,
-    PRIMARY KEY (session_id),
-    CONSTRAINT fk_auth_sessions_user FOREIGN KEY (user_id) REFERENCES users (id)
-);
-
 CREATE TABLE IF NOT EXISTS temporary_passwords
 (
     user_id       UUID                     NOT NULL,
@@ -155,16 +142,19 @@ CREATE TABLE IF NOT EXISTS follows
 
 CREATE TABLE IF NOT EXISTS notifications
 (
-    id          UUID                     NOT NULL,
-    receiver_id UUID                     NOT NULL,
-    title       VARCHAR(50)              NOT NULL,
-    content     TEXT                     NOT NULL,
-    type        VARCHAR(30)              NOT NULL,
-    level       VARCHAR(20)              NOT NULL,
-    read_at     TIMESTAMP WITH TIME ZONE,
-    created_at  TIMESTAMP WITH TIME ZONE NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT fk_notifications_receiver FOREIGN KEY (receiver_id) REFERENCES users (id)
+    id              UUID            NOT NULL,
+    receiver_id     UUID            NOT NULL,
+    source_event_id UUID,
+    title           VARCHAR(50)     NOT NULL,
+    content         TEXT            NOT NULL,
+    type            VARCHAR(30)     NOT NULL,
+    level           VARCHAR(20)     NOT NULL,
+    read_at         TIMESTAMPTZ     NULL,
+    created_at      TIMESTAMPTZ     NOT NULL,
+
+    CONSTRAINT pk_notifications PRIMARY KEY (id),
+    CONSTRAINT fk_notifications_receiver FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT up_notifications_source_event_receiver UNIQUE (source_event_id, receiver_id)
 );
 
 CREATE TABLE IF NOT EXISTS playlists

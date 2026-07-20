@@ -86,7 +86,7 @@ public class DirectMessageService {
 			newDirectMessage.getId(),
 			directMessageDto
 		));
-		
+
 		log.info("[DM_CREATE] DM 생성 완료: conversationId={}, senderId={}, dmId={}",
 			conversationId, senderId, newDirectMessage.getId());
 

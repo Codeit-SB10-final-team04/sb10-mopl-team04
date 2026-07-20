@@ -1,4 +1,9 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchClientAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration
   sql:
     init:
       mode: never
@@ -98,6 +103,12 @@ storage:
     # 키 미설정 시 기본 체인(환경변수 → 프로파일 → EC2/ECS IAM Role) 자동 탐색
     access-key: ${S3_ACCESS_KEY:}
     secret-key: ${S3_SECRET_KEY:}
+
+spring.redisson:
+  config: |
+    singleServerConfig:
+      address: "rediss://${SPRING_DATA_REDIS_HOST}:${SPRING_DATA_REDIS_PORT:6379}"
+      password: "${SPRING_DATA_REDIS_PASSWORD:}"
 
 notification:
   realtime:

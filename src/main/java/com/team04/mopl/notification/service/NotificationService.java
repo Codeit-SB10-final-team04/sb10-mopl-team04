@@ -39,18 +39,16 @@ public class NotificationService {
 	private final NotificationRepository notificationRepository;
 	private final NotificationMapper notificationMapper;
 
-	// TODO: 도메인 이벤트 Listener를 AFTER_COMMIT으로 확정한 뒤 @Transactional 삭제 및 private 메서드로 변경 검토
-	// TODO: private 메서드로 변경될 경우 로그 삭제
-	// @Transactional(propagation = Propagation.REQUIRES_NEW)
 	@Transactional
 	public List<NotificationDto> saveNotificationList(
 		Set<UUID> receiverIds,
+		UUID sourceEventId,
 		String title,
 		String content,
 		NotificationType type,
 		NotificationLevel level
 	) {
-		validateCreateNotificationListRequest(receiverIds, title, content, type, level);
+		validateCreateNotificationListRequest(receiverIds, sourceEventId, title, content, type, level);
 
 		// receiverIds Set이 비었으면 빈 리스트 반환
 		if (receiverIds.isEmpty()) {
@@ -60,19 +58,34 @@ public class NotificationService {
 		log.info("[NOTIFICATION_LIST_CREATE] 알림 생성 시작: receiverCount={}, type={}, level={}",
 			receiverIds.size(), type, level);
 
-		// 수신인 Map 조회 및 누락 검증
-		Map<UUID, User> receiverMap = getReceiverMapOrThrow(receiverIds);
+		// sourceEventId 기준으로 이미 알림이 생성된 receiverId 목록 조회
+		Set<UUID> existingReceiverIds =
+			notificationRepository.findExistingReceiverIdsBySourceEventId(receiverIds, sourceEventId);
 
-		List<Notification> notificationList = saveNotificationList(
-			receiverIds,
+		// 이미 알림이 생성된 수신자를 제외하고 신규 생성해야 하는 receiverId만 추출
+		Set<UUID> targetReceiverIds = receiverIds.stream()
+			.filter(receiverId -> !existingReceiverIds.contains(receiverId))
+			.collect(toSet());
+
+		// 모든 수신자에게 이미 알림이 생성된 중복 이벤트라면 저장 및 실시간 전송 생략
+		if (targetReceiverIds.isEmpty()) {
+			log.info("[NOTIFICATION_DUPLICATE_EVENT_SKIP] 중복 알림 이벤트로 저장 생략: sourceEventId={}", sourceEventId);
+			return List.of();
+		}
+
+		// 수신인 Map 조회 및 누락 검증
+		Map<UUID, User> receiverMap = getReceiverMapOrThrow(targetReceiverIds);
+
+		List<Notification> notificationList = createNotificationList(
+			targetReceiverIds,
 			receiverMap,
+			sourceEventId,
 			title,
 			content,
 			type,
 			level
 		);
 
-		// 알림 저장 및 dto로 변환
 		List<NotificationDto> notificationDtoList = notificationRepository.saveAll(notificationList)
 			.stream()
 			.map(notification -> notificationMapper.toDto(notification))
@@ -182,9 +195,10 @@ public class NotificationService {
 				.addDetail("currentUserId", currentUserId));
 	}
 
-	private List<Notification> saveNotificationList(
+	private List<Notification> createNotificationList(
 		Set<UUID> receiverIds,
 		Map<UUID, User> receiverMap,
+		UUID sourceEventId,
 		String title,
 		String content,
 		NotificationType type,
@@ -194,6 +208,7 @@ public class NotificationService {
 		return receiverIds.stream()
 			.map(receiverId -> createNotification(
 				receiverMap.get(receiverId),
+				sourceEventId,
 				title,
 				content,
 				type,
@@ -204,6 +219,7 @@ public class NotificationService {
 
 	private Notification createNotification(
 		User receiver,
+		UUID sourceEventId,
 		String title,
 		String content,
 		NotificationType type,
@@ -211,6 +227,7 @@ public class NotificationService {
 	) {
 		return Notification.builder()
 			.receiver(receiver)
+			.sourceEventId(sourceEventId)
 			.title(title)
 			.content(content)
 			.type(type)
@@ -222,6 +239,7 @@ public class NotificationService {
 	// 검증 통합
 	private void validateCreateNotificationListRequest(
 		Set<UUID> receiverIds,
+		UUID sourceEventId,
 		String title,
 		String content,
 		NotificationType type,
@@ -233,8 +251,11 @@ public class NotificationService {
 		// 길이 검증
 		validateTitleSize(title);
 
-		// 입력된 receiverId null or blank 검증
-		validateReceiverIdsNullOrBlank(receiverIds);
+		// 입력된 receiverId null 검증
+		validateReceiverIdsNull(receiverIds);
+
+		// 입력된 sourceEventId null 검증
+		validateSourceEventIdNull(sourceEventId);
 	}
 
 	// 입력된 알림 정보 null or blank 검증
@@ -268,11 +289,19 @@ public class NotificationService {
 		}
 	}
 
-	// 입력된 receiverId null or blank 검증
-	private void validateReceiverIdsNullOrBlank(Set<UUID> receiverIds) {
+	// 입력된 receiverId null 검증
+	private void validateReceiverIdsNull(Set<UUID> receiverIds) {
 		if (receiverIds == null) {
 			throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
 				.addDetail("isReceiverProvided", false);
+		}
+	}
+
+	// 입력된 sourceEventId null 검증
+	private void validateSourceEventIdNull(UUID sourceEventId) {
+		if (sourceEventId == null) {
+			throw new NotificationException(NotificationErrorCode.NOTIFICATION_INVALID_INPUT)
+				.addDetail("isSourceEventIdProvided", false);
 		}
 	}
 }

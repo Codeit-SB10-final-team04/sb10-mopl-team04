@@ -17,7 +17,7 @@ import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.jwt.JwtAuthenticationClaims;
 import com.team04.mopl.auth.security.jwt.JwtTokenProvider;
 import com.team04.mopl.auth.session.AuthSessionStore;
-import com.team04.mopl.watching.store.WebSocketSessionStore;
+import com.team04.mopl.watching.store.WatchingSessionStore;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +32,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
 	private final JwtTokenProvider jwtTokenProvider;
 	private final AuthSessionStore authSessionStore;
-	private final WebSocketSessionStore webSocketSessionStore;
+	private final WatchingSessionStore watchingSessionStore;
 
 	@Override
 	public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -54,7 +54,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 		// 세션 스토어에 등록
 		String sessionId = accessor.getSessionId();
 		if (sessionId != null) {
-			webSocketSessionStore.register(sessionId, claims.userId());
+			watchingSessionStore.registerSession(sessionId, claims.userId());
 		}
 
 		log.debug("WebSocket 연결 인증 성공: userId={}", claims.userId());
