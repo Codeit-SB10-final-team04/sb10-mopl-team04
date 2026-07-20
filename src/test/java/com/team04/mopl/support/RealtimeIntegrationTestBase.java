@@ -2,19 +2,17 @@ package com.team04.mopl.support;
 
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.utility.DockerImageName;
 
-// Testcontainers 기반 통합 테스트 베이스 클래스
-// PostgreSQL + Redis 컨테이너를 static으로 공유하여 테스트 클래스 간 재시작 방지
 @SpringBootTest
 @Testcontainers
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -28,9 +26,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 	"spring.cache.type=simple",
 	"mopl.redis.pubsub.enabled=false",
 	"notification.realtime.mode=local",
-	"spring.kafka.bootstrap-servers=",
+	"spring.kafka.consumer.group-id=mopl-notification-integration",
+	"spring.kafka.consumer.auto-offset-reset=earliest",
 	"spring.autoconfigure.exclude="
-		+ "org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration,"
 		+ "org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchClientAutoConfiguration,"
 		+ "org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration,"
 		+ "org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration,"
@@ -40,18 +38,25 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 		+ "org.redisson.spring.starter.RedissonAutoConfigurationV2"
 })
 @SuppressWarnings("rawtypes")
-public abstract class IntegrationTestBase extends ElasticsearchMockingSupport {
-
-	@MockitoBean
-	protected KafkaTemplate kafkaTemplate;
+public abstract class RealtimeIntegrationTestBase
+	extends ElasticsearchMockingSupport {
 
 	@Container
 	@ServiceConnection
-	static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+	static PostgreSQLContainer<?> postgres =
+		new PostgreSQLContainer<>("postgres:16-alpine");
 
 	@Container
-	static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
-		.withExposedPorts(6379);
+	@ServiceConnection
+	static KafkaContainer kafka =
+		new KafkaContainer(
+			DockerImageName.parse("apache/kafka-native:3.8.0")
+		);
+
+	@Container
+	static GenericContainer<?> redis =
+		new GenericContainer<>("redis:7-alpine")
+			.withExposedPorts(6379);
 
 	@DynamicPropertySource
 	static void redisProperties(DynamicPropertyRegistry registry) {

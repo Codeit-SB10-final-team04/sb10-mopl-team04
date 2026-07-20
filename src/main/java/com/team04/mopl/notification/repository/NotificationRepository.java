@@ -3,6 +3,7 @@ package com.team04.mopl.notification.repository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.domain.Pageable;
@@ -57,4 +58,15 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 		WHERE n.id IN :notificationIds
 		""")
 	void deleteAllByNotificationIds(@Param("notificationIds") List<UUID> notificationIds);
+
+	@Query("""
+		SELECT n.receiver.id
+		FROM Notification AS n
+		WHERE n.receiver.id IN :receiverIds
+			AND n.sourceEventId = :sourceEventId
+		""")
+	Set<UUID> findExistingReceiverIdsBySourceEventId(
+		@Param("receiverIds") Set<UUID> receiverIds,
+		@Param("sourceEventId") UUID sourceEventId
+	);
 }
