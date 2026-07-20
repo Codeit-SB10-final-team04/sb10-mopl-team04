@@ -29,27 +29,19 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 	"spring.kafka.bootstrap-servers=",
 	"spring.autoconfigure.exclude="
 		+ "org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration,"
-		+ "org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchClientAutoConfiguration,"
-		+ "org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration,"
-		+ "org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration,"
-		+ "org.opensearch.spring.boot.autoconfigure.OpenSearchRestClientAutoConfiguration,"
-		+ "org.opensearch.spring.boot.autoconfigure.OpenSearchRestHighLevelClientAutoConfiguration,"
-		+ "org.opensearch.data.client.config.OpenSearchDataAutoConfiguration,"
 		+ "org.redisson.spring.starter.RedissonAutoConfigurationV2"
 })
 @SuppressWarnings("rawtypes")
-public abstract class IntegrationTestBase extends ElasticsearchMockingSupport {
-
-	@MockitoBean
-	protected KafkaTemplate kafkaTemplate;
+public abstract class IntegrationTestBase {
 
 	@Container
 	@ServiceConnection
 	static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
-
 	@Container
 	static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
 		.withExposedPorts(6379);
+	@MockitoBean
+	protected KafkaTemplate kafkaTemplate;
 
 	@DynamicPropertySource
 	static void redisProperties(DynamicPropertyRegistry registry) {

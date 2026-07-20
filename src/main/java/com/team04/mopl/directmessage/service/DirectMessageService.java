@@ -21,7 +21,6 @@ import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.directmessage.event.DirectMessageReadEvent;
-import com.team04.mopl.directmessage.event.DirectMessageSentEvent;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
@@ -87,14 +86,7 @@ public class DirectMessageService {
 			newDirectMessage.getId(),
 			directMessageDto
 		));
-
-		// 8. ES 서버 동기화를 위한 이벤트 발행
-		eventPublisher.publishEvent(new DirectMessageSentEvent(
-			conversationId,
-			newDirectMessage.getId(),
-			newDirectMessage.getContent())
-		);
-
+		
 		log.info("[DM_CREATE] DM 생성 완료: conversationId={}, senderId={}, dmId={}",
 			conversationId, senderId, newDirectMessage.getId());
 

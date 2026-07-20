@@ -21,7 +21,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 
 import com.team04.mopl.review.repository.ReviewRepository;
-import com.team04.mopl.support.ElasticsearchMockingSupport;
 
 @SpringBootTest
 @TestPropertySource(properties = {
@@ -32,7 +31,7 @@ import com.team04.mopl.support.ElasticsearchMockingSupport;
 	"spring.batch.jdbc.initialize-schema=always",
 	"spring.batch.job.enabled=false"
 })
-public class ReviewHardDeleteBatchTest extends ElasticsearchMockingSupport {
+public class ReviewHardDeleteBatchTest {
 
 	@Autowired
 	private JobLauncher jobLauncher;

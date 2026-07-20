@@ -23,7 +23,6 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.common.enums.SortDirection;
-import com.team04.mopl.conversation.document.ConversationDocument;
 import com.team04.mopl.conversation.dto.request.ConversationCreateRequest;
 import com.team04.mopl.conversation.dto.request.ConversationPageRequest;
 import com.team04.mopl.conversation.dto.response.ConversationDto;
@@ -38,7 +37,6 @@ import com.team04.mopl.conversation.mapper.ConversationParticipantMapper;
 import com.team04.mopl.conversation.redis.ConversationRedisStore;
 import com.team04.mopl.conversation.repository.ConversationParticipantRepository;
 import com.team04.mopl.conversation.repository.ConversationRepository;
-import com.team04.mopl.conversation.repository.es.ConversationElasticSearchRepository;
 import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
@@ -59,9 +57,6 @@ class ConversationServiceTest {
 
 	@Mock
 	private ConversationParticipantRepository conversationParticipantRepository;
-
-	@Mock
-	private ConversationElasticSearchRepository conversationElasticSearchRepository;
 
 	@Mock
 	private DirectMessageRepository directMessageRepository;
@@ -425,9 +420,9 @@ class ConversationServiceTest {
 		given(conv2.getId()).willReturn(conv2Id);
 
 		// ES
-		given(conversationElasticSearchRepository.searchConversation(request, requestUserId))
+		given(conversationElasticSearchRepository.searchConversation(request, requestUserId, matchingRoomIds))
 			.willReturn(esDocuments);
-		given(conversationElasticSearchRepository.countConversation(request, requestUserId))
+		given(conversationElasticSearchRepository.countConversation(request, requestUserId, matchingRoomIds))
 			.willReturn(3L);
 
 		given(conversationRepository.findAllByIdIn(anyList())).willReturn(List.of(conv1, conv2));
@@ -478,8 +473,12 @@ class ConversationServiceTest {
 			"createdAt"
 		);
 
-		given(conversationElasticSearchRepository.searchConversation(request, requestUserId)).willReturn(List.of());
-		given(conversationElasticSearchRepository.countConversation(request, requestUserId)).willReturn(0L);
+		given(
+			conversationElasticSearchRepository.searchConversation(request, requestUserId, matchingRoomIds)).willReturn(
+			List.of());
+		given(
+			conversationElasticSearchRepository.countConversation(request, requestUserId, matchingRoomIds)).willReturn(
+			0L);
 
 		// 빌더 패턴 적용
 		CursorResponseConversationDto expectedResponse = CursorResponseConversationDto.builder()
@@ -531,9 +530,9 @@ class ConversationServiceTest {
 		ConversationDocument doc3 = mock(ConversationDocument.class);
 		given(doc3.getId()).willReturn(id3);
 
-		given(conversationElasticSearchRepository.searchConversation(request, requestUserId))
+		given(conversationElasticSearchRepository.searchConversation(request, requestUserId, matchingRoomIds))
 			.willReturn(List.of(doc1, doc2, doc3));
-		given(conversationElasticSearchRepository.countConversation(request, requestUserId))
+		given(conversationElasticSearchRepository.countConversation(request, requestUserId, matchingRoomIds))
 			.willReturn(3L);
 
 		// RDB에서는 순서가 무작위로 조회된다고 세팅
