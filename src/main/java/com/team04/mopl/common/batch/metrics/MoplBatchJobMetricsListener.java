@@ -41,7 +41,7 @@ public class MoplBatchJobMetricsListener implements JobExecutionListener {
 	private String toResult(BatchStatus batchStatus) {
 		return switch (batchStatus) {
 			case COMPLETED -> "success";
-			case STARTED -> "stopped";
+			case STOPPED -> "stopped";
 			default -> "failed";
 		};
 	}
