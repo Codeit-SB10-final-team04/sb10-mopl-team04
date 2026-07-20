@@ -196,6 +196,17 @@ services:
     networks:
       - backend
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mopl-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - backend
+
 networks: # 서비스 간 통신을 위한 네트워크 정의
   backend:
 
@@ -205,3 +216,5 @@ volumes: # 데이터 영속성을 위한 볼륨 정의
   redis-data:
   # OpenSearch 데이터 저장용 볼륨
   opensearch-data:
+  # Prometheus 데이터 저장용 볼륨
+  prometheus-data:
