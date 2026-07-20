@@ -408,8 +408,7 @@ class ConversationServiceTest {
 		given(conv2.getId()).willReturn(conv2Id);
 		String mockCursorTime = Instant.now().toString();
 		given(conv2.getCreatedAt()).willReturn(Instant.parse(mockCursorTime));
-
-		UUID conv3Id = UUID.randomUUID();
+		
 		Conversation conv3 = mock(Conversation.class);
 
 		List<Conversation> conversations = List.of(conv1, conv2, conv3);
