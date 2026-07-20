@@ -16,9 +16,14 @@ public interface ConversationElasticSearchRepositoryCustom {
 	// 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 인덱스 목록 조회
 	List<ConversationDocument> searchConversation(
 		ConversationPageRequest request,
-		UUID requestUserId
+		UUID requestUserId,
+		List<UUID> matchingRoomIds
 	);
 
 	// 필터링이 조건이 적용된 대화 인덱스 목록의 전체 개수 조회
-	long countConversation(ConversationPageRequest request, UUID requestUserId);
+	long countConversation(
+		ConversationPageRequest request,
+		UUID requestUserId,
+		List<UUID> matchingRoomIds
+	);
 }

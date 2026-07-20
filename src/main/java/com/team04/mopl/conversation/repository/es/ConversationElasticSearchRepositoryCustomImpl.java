@@ -30,9 +30,13 @@ public class ConversationElasticSearchRepositoryCustomImpl implements Conversati
 	private final ElasticsearchOperations elasticsearchOperations;
 
 	@Override
-	public List<ConversationDocument> searchConversation(ConversationPageRequest request, UUID requestUserId) {
+	public List<ConversationDocument> searchConversation(
+		ConversationPageRequest request,
+		UUID requestUserId,
+		List<UUID> matchingRoomIds
+	) {
 		try {
-			CriteriaQuery query = buildSearchQuery(request, requestUserId);
+			CriteriaQuery query = buildSearchQuery(request, requestUserId, matchingRoomIds);
 
 			SearchHits<ConversationDocument> searchHits = elasticsearchOperations.search(
 				query,
@@ -54,9 +58,13 @@ public class ConversationElasticSearchRepositoryCustomImpl implements Conversati
 	}
 
 	@Override
-	public long countConversation(ConversationPageRequest request, UUID requestUserId) {
+	public long countConversation(
+		ConversationPageRequest request,
+		UUID requestUserId,
+		List<UUID> matchingRoomIds
+	) {
 		try {
-			CriteriaQuery query = new CriteriaQuery(createCriteria(request, requestUserId));
+			CriteriaQuery query = new CriteriaQuery(createCriteria(request, requestUserId, matchingRoomIds));
 
 			return elasticsearchOperations.count(query, ConversationDocument.class);
 
@@ -67,8 +75,12 @@ public class ConversationElasticSearchRepositoryCustomImpl implements Conversati
 		}
 	}
 
-	private CriteriaQuery buildSearchQuery(ConversationPageRequest request, UUID requestUserId) {
-		Criteria criteria = createCriteria(request, requestUserId);
+	private CriteriaQuery buildSearchQuery(
+		ConversationPageRequest request,
+		UUID requestUserId,
+		List<UUID> matchingRoomIds
+	) {
+		Criteria criteria = createCriteria(request, requestUserId, matchingRoomIds);
 
 		CriteriaQuery query = new CriteriaQuery(criteria);
 		query.addSort(createSort(request));
@@ -82,15 +94,25 @@ public class ConversationElasticSearchRepositoryCustomImpl implements Conversati
 		return query;
 	}
 
-	private Criteria createCriteria(ConversationPageRequest request, UUID requestUserId) {
-		// 1. 완전 일치: 요청자의 대화 참여 여부
-		Criteria criteria = Criteria.where("participantIds").is(requestUserId.toString());
+	private Criteria createCriteria(ConversationPageRequest request, UUID requestUserId, List<UUID> matchingRoomIds) {
+		// 1. 필수 조건: 내가 참여한 대화방
+		Criteria criteria = new Criteria("participantIds").is(requestUserId.toString());
 
-		// 2. 부분 일치: 사용자 닉네임 or 다이렉트 메시지 키워드 검색
+		// 2. 검색 조건: 메시지 내용 OR 사용자 닉네임
 		if (StringUtils.hasText(request.keywordLike())) {
-			Criteria keywordCriteria = new Criteria("participantNames").matches(request.keywordLike())
-				.or("messageContents").matches(request.keywordLike());
-			criteria = criteria.and(keywordCriteria);
+			String keyword = request.keywordLike();
+
+			// 메시지 내용은 무조건 검색
+			Criteria searchCriteria = new Criteria("messageContents").contains(keyword);
+
+			// RDB에서 이름으로 찾은 방이 있다면 OR 조건으로 합치기
+			if (matchingRoomIds != null && !matchingRoomIds.isEmpty()) {
+				List<String> stringIds = matchingRoomIds.stream().map(UUID::toString).toList();
+
+				searchCriteria = searchCriteria.or(new Criteria("id").in(stringIds));
+			}
+
+			criteria.subCriteria(searchCriteria);
 		}
 
 		return criteria;

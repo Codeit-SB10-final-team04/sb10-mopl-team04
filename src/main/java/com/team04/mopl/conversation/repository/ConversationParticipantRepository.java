@@ -26,4 +26,15 @@ public interface ConversationParticipantRepository extends JpaRepository<Convers
 		+ "JOIN ConversationParticipant p2 ON p1.conversation.id = p2.conversation.id "
 		+ "WHERE p1.user.id = :userId1 AND p2.user.id = :userId2")
 	Optional<UUID> findExistingConversationId(@Param("userId1") UUID userId1, @Param("userId2") UUID userId2);
+
+	// 내 대화방 중, 상대방 이름에 특정 키워드가 포함된 대화방 ID 목록 조회
+	@Query("SELECT cp_other.conversation.id FROM ConversationParticipant cp_me " +
+		"JOIN ConversationParticipant cp_other ON cp_me.conversation.id = cp_other.conversation.id " +
+		"WHERE cp_me.user.id = :userId " +
+		"AND cp_other.user.id != :userId " +
+		"AND cp_other.user.name LIKE %:keyword%")
+	List<UUID> findConversationIdsByOtherNameKeyword(
+		@Param("userId") UUID userId,
+		@Param("keyword") String keyword
+	);
 }

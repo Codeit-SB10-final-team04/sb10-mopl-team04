@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.RefreshPolicy;
 import org.springframework.data.elasticsearch.core.document.Document;
 import org.springframework.data.elasticsearch.core.query.ScriptType;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
@@ -59,6 +60,7 @@ public class ConversationEsSyncProcessor {
 			UpdateQuery updateQuery = UpdateQuery.builder(event.conversationId().toString())
 				.withDocument(updateDoc)  // 문서가 있으면 updateDoc 내용만 병합
 				.withUpsert(upsertDoc)    // 문서가 없으면 upsertDoc 생성
+				.withRefreshPolicy(RefreshPolicy.IMMEDIATE)
 				.build();
 
 			// 4. 업데이트
@@ -112,9 +114,9 @@ public class ConversationEsSyncProcessor {
 				""";
 
 			// 대상 문서가 없을 경우, 빈 껍데기 문서 생성
-			Document defaultDoc = Document.create();
-			defaultDoc.put("id", event.conversationId().toString());
-			defaultDoc.put("messageContents", new ArrayList<>());
+			// Document defaultDoc = Document.create();
+			// defaultDoc.put("id", event.conversationId().toString());
+			// defaultDoc.put("messageContents", new ArrayList<>());
 
 			// 2. 쿼리 작성
 			UpdateQuery updateQuery = UpdateQuery.builder(event.conversationId().toString())
@@ -125,8 +127,7 @@ public class ConversationEsSyncProcessor {
 					"newMessage", event.content(),
 					"maxSize", MAX_MESSAGE_HISTORY_SIZE
 				))
-				.withUpsert(defaultDoc)
-				.withScriptedUpsert(true)
+				.withRefreshPolicy(RefreshPolicy.IMMEDIATE)
 				.build();
 
 			// 3. 쿼리 전송

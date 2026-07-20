@@ -13,6 +13,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import com.team04.mopl.common.dto.UserSummary;
 import com.team04.mopl.conversation.document.ConversationDocument;
@@ -238,14 +239,33 @@ public class ConversationService {
 		// 1. 유효성 검증: 정렬 기준
 		validateSortField(conversationPageRequest.sortBy());
 
-		// 2. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
+		List<UUID> matchingRoomIds = null;
+
+		if (StringUtils.hasText(conversationPageRequest.keywordLike())) {
+			matchingRoomIds = conversationParticipantRepository.findConversationIdsByOtherNameKeyword(
+				requestUserId, conversationPageRequest.keywordLike()
+			);
+		}
+
+		// ✨ 2. ES 조회할 때 방 ID 목록을 같이 던져줍니다. (메서드 파라미터 추가 필요)
 		List<ConversationDocument> documents = conversationElasticSearchRepository.searchConversation(
 			conversationPageRequest,
-			requestUserId
+			requestUserId,
+			matchingRoomIds
 		);
 
+		// 2. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
+		// List<ConversationDocument> documents = conversationElasticSearchRepository.searchConversation(
+		// 	conversationPageRequest,
+		// 	requestUserId,
+		// 	matchingRoomIds);
+
 		// 3. 대화 전체 개수 조회
-		Long totalCount = conversationElasticSearchRepository.countConversation(conversationPageRequest, requestUserId);
+		Long totalCount = conversationElasticSearchRepository.countConversation(
+			conversationPageRequest,
+			requestUserId,
+			matchingRoomIds
+		);
 
 		// 조회 결과가 없을 경우, 불필요한 DB 조회 방지를 위해 빈 응답 객체 반환
 		if (documents.isEmpty()) {
