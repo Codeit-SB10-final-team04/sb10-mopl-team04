@@ -21,6 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 
 import com.team04.mopl.content.repository.ContentRepository;
+import com.team04.mopl.support.IntegrationTestBase;
 
 @SpringBootTest
 @TestPropertySource(properties = {
@@ -31,7 +32,7 @@ import com.team04.mopl.content.repository.ContentRepository;
 	"spring.batch.jdbc.initialize-schema=always",
 	"spring.batch.job.enabled=false"
 })
-public class ContentHardDeleteBatchTest {
+public class ContentHardDeleteBatchTest extends IntegrationTestBase {
 
 	@Autowired
 	private JobLauncher jobLauncher;
