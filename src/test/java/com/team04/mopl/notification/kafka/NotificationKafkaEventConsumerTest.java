@@ -477,7 +477,7 @@ class NotificationKafkaEventConsumerTest {
 		notificationKafkaEventConsumer.consumePlaylistContentAddedEvent(kafkaEvent);
 
 		// then
-		verify(notificationMetrics).recordCreated(NotificationType.CONTENT_ADD, 2L);
+		verify(notificationMetrics).recordSaved(NotificationType.CONTENT_ADD, 2L);
 		verify(notificationMetrics).recordDuplicateSkipped(NotificationType.CONTENT_ADD, 1L);
 	}
 
@@ -517,7 +517,7 @@ class NotificationKafkaEventConsumerTest {
 		assertEquals(storeFailure, actualException);
 
 		verify(notificationMetrics).recordStoreFailure(NotificationType.SUBSCRIBE);
-		verify(notificationMetrics, never()).recordCreated(any(NotificationType.class), anyLong());
+		verify(notificationMetrics, never()).recordSaved(any(NotificationType.class), anyLong());
 		verify(notificationRealtimePublisher, never()).publish(any(NotificationDto.class));
 	}
 

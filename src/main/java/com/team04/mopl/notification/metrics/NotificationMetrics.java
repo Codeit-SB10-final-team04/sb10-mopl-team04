@@ -16,7 +16,7 @@ public class NotificationMetrics {
 	private static final String NOTIFICATION_KAFKA_DESERIALIZATION_FAILURE = "mopl.notification.kafka.deserialization.failure";
 
 	// 저장된 알림 건수 Counter에 사용하는 메트릭 이름
-	private static final String NOTIFICATION_CREATED = "mopl.notification.created";
+	private static final String NOTIFICATION_SAVED = "mopl.notification.saved";
 
 	// 중복 알림으로 저장에서 제외된 알림 수신자 수 Counter에 사용하는 메트릭 이름
 	private static final String NOTIFICATION_DUPLICATE_SKIPPED = "mopl.notification.duplicate.skipped";
@@ -42,13 +42,13 @@ public class NotificationMetrics {
 	}
 
 	// 저장된 알림 건수를 알림 타입별로 기록
-	public void recordCreated(NotificationType type, long notificationCount) {
+	public void recordSaved(NotificationType type, long notificationCount) {
 		if (notificationCount <= 0) {
 			return;
 		}
 
 		meterRegistry.counter(
-			NOTIFICATION_CREATED,
+			NOTIFICATION_SAVED,
 			"type", toTypeTag(type)
 		).increment(notificationCount);
 	}

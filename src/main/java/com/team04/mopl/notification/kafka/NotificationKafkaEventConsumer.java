@@ -295,7 +295,7 @@ public class NotificationKafkaEventConsumer {
 		long notificationCount = notificationDtoList.size();
 
 		// 저장된 알림 건수 메트릭에 기록
-		notificationMetrics.recordCreated(type, notificationCount);
+		notificationMetrics.recordSaved(type, notificationCount);
 
 		// 저장에서 제외된 수신자 수
 		long skippedReceiverCount = receiverIds.size() - notificationCount;

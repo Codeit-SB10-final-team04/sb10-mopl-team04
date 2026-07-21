@@ -44,17 +44,17 @@ class NotificationMetricsTest {
 
 	@Test
 	@DisplayName("저장된 알림 건수가 양수면 알림 생성 Counter를 해당 건수만큼 증가시킨다.")
-	void recordCreated_incrementCounterByNotificationCount_whenCountIsPositive() {
+	void recordSaved_incrementCounterByNotificationCount_whenCountIsPositive() {
 		// given
 		NotificationType type = NotificationType.SUBSCRIBE;
 		long notificationCount = 2L;
 
 		// when
-		notificationMetrics.recordCreated(type, notificationCount);
+		notificationMetrics.recordSaved(type, notificationCount);
 
 		// then
 		double count = meterRegistry
-			.get("mopl.notification.created")
+			.get("mopl.notification.saved")
 			.tag("type", "subscribe")
 			.counter()
 			.count();
@@ -64,16 +64,16 @@ class NotificationMetricsTest {
 
 	@Test
 	@DisplayName("저장된 알림 건수가 0 이하면 알림 생성 Counter를 등록하지 않는다.")
-	void recordCreated_doesNotRegisterCounter_whenCountIsNotPositive() {
+	void recordSaved_doesNotRegisterCounter_whenCountIsNotPositive() {
 		// given
 		NotificationType type = NotificationType.SUBSCRIBE;
 
 		// when
-		notificationMetrics.recordCreated(type, 0);
+		notificationMetrics.recordSaved(type, 0);
 
 		// then
 		Counter counter = meterRegistry
-			.find("mopl.notification.created")
+			.find("mopl.notification.saved")
 			.tag("type", "subscribe")
 			.counter();
 
