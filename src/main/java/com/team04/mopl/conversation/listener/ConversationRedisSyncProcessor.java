@@ -15,6 +15,7 @@ import com.team04.mopl.conversation.event.ConversationCreatedEvent;
 import com.team04.mopl.conversation.redis.ConversationRedisStore;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -36,6 +37,9 @@ public class ConversationRedisSyncProcessor {
 		backoff = @Backoff(delay = 1000, multiplier = 2)
 	)
 	public void syncRedisOnConversationCreated(ConversationCreatedEvent conversationCreatedEvent) {
+		// 커스텀 메트릭: 처리 시간 측정 시작
+		Timer.Sample sample = Timer.start(meterRegistry);
+
 		try {
 			// 대화 참여자 목록 ID 추출
 			List<UUID> participantIds = conversationCreatedEvent.participantIds();
@@ -55,7 +59,12 @@ public class ConversationRedisSyncProcessor {
 			log.info("[REDIS_SYNC] 대화방 생성 Redis 동기화 완료: conversationId={}",
 				conversationCreatedEvent.conversationId());
 
-			// 커스텀 메트릭 추가: 대화방 동기화 성공
+			// 커스텀 메트릭 추가: 대화방 생성 동기화 성공 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.conversation.redis.sync.duration",
+				"operation", "create", "result", "success"
+			));
+			// 커스텀 메트릭 추가: 대화방 생성 동기화 성공
 			meterRegistry.counter(
 				"mopl.conversation.redis.sync",
 				"operation", "create", "result", "success"
@@ -64,11 +73,17 @@ public class ConversationRedisSyncProcessor {
 			log.error("[REDIS_SYNC] 대화방 생성 Redis 동기화 실패: conversationId={}",
 				conversationCreatedEvent.conversationId(), e);
 
-			// 커스텀 메트릭 추가: 대화방 동기화 실패 및 재시도
+			// 커스텀 메트릭 추가: 대화방 생성 동기화 실패 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.conversation.redis.sync.duration",
+				"operation", "create", "result", "failure"
+			));
+			// 커스텀 메트릭 추가: 대화방 생성 동기화 실패
 			meterRegistry.counter(
 				"mopl.conversation.redis.sync",
 				"operation", "create", "result", "failure"
 			).increment();
+			// 커스텀 메트릭 추가: 대화방 생성 동기화 재시도
 			meterRegistry.counter(
 				"mopl.conversation.redis.sync.retry",
 				"operation", "create"

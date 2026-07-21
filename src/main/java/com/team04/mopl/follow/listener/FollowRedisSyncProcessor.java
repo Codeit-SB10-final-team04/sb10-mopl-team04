@@ -13,6 +13,7 @@ import com.team04.mopl.follow.event.FollowDeletedEvent;
 import com.team04.mopl.follow.redis.FollowRedisStore;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -35,6 +36,9 @@ public class FollowRedisSyncProcessor {
 		backoff = @Backoff(delay = 1000, multiplier = 2)
 	)
 	public void syncRedisOnFollowCreated(FollowCreatedEvent followCreatedEvent) {
+		// 커스텀 메트릭: 처리 시간 측정 시작
+		Timer.Sample sample = Timer.start(meterRegistry);
+
 		try {
 			// 팔로우 저장 (Redis)
 			followRedisStore.addFollow(followCreatedEvent.followerId(), followCreatedEvent.followeeId());
@@ -42,7 +46,12 @@ public class FollowRedisSyncProcessor {
 			log.info("[REDIS_SYNC] 팔로우 생성 Redis 동기화 완료: followerId={}, followeeId={}",
 				followCreatedEvent.followerId(), followCreatedEvent.followeeId());
 
-			// 커스텀 메트릭 추가: 팔로우 동기화 성공
+			// 커스텀 메트릭 추가: 팔로우 생성 동기화 성공 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.follow.redis.sync.duration",
+				"operation", "create", "result", "success"
+			));
+			// 커스텀 메트릭 추가: 팔로우 생성 동기화 성공
 			meterRegistry.counter(
 				"mopl.follow.redis.sync",
 				"operation", "create", "result", "success"
@@ -51,11 +60,17 @@ public class FollowRedisSyncProcessor {
 			log.error("[REDIS_SYNC] 팔로우 생성 Redis 동기화 실패: followerId={}, followeeId={}",
 				followCreatedEvent.followerId(), followCreatedEvent.followeeId(), e);
 
-			// 커스텀 메트릭 추가: 팔로우 동기화 실패 및 재시도
+			// 커스텀 메트릭 추가: 팔로우 생성 동기화 실패 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.follow.redis.sync.duration",
+				"operation", "create", "result", "failure"
+			));
+			// 커스텀 메트릭 추가: 팔로우 생성 동기화 실패
 			meterRegistry.counter(
 				"mopl.follow.redis.sync",
 				"operation", "create", "result", "failure"
 			).increment();
+			// 커스텀 메트릭 추가: 팔로우 생성 동기화 재시도
 			meterRegistry.counter(
 				"mopl.follow.redis.sync.retry",
 				"operation", "create"
@@ -107,6 +122,9 @@ public class FollowRedisSyncProcessor {
 		backoff = @Backoff(delay = 1000, multiplier = 2)
 	)
 	public void syncRedisOnFollowDeleted(FollowDeletedEvent followDeletedEvent) {
+		// 커스텀 메트릭: 처리 시간 측정 시작
+		Timer.Sample sample = Timer.start(meterRegistry);
+
 		try {
 			// 팔로우 삭제 (Redis)
 			followRedisStore.removeFollow(followDeletedEvent.followeeId(), followDeletedEvent.followerId());
@@ -114,6 +132,11 @@ public class FollowRedisSyncProcessor {
 			log.info("[REDIS_SYNC] 팔로우 취소 Redis 동기화 완료: followerId={}, followeeId={}",
 				followDeletedEvent.followerId(), followDeletedEvent.followeeId());
 
+			// 커스텀 메트릭 추가: 팔로우 취소 동기화 성공 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.follow.redis.sync.duration",
+				"operation", "delete", "result", "success"
+			));
 			// 커스텀 메트릭 추가: 팔로우 취소 동기화 성공
 			meterRegistry.counter(
 				"mopl.follow.redis.sync",
@@ -123,11 +146,17 @@ public class FollowRedisSyncProcessor {
 			log.error("[REDIS_SYNC] 팔로우 취소 Redis 동기화 실패: followerId={}, followeeId={}",
 				followDeletedEvent.followerId(), followDeletedEvent.followeeId(), e);
 
-			// 커스텀 메트릭 추가: 팔로우 취소 동기화 실패 및 재시도
+			// 커스텀 메트릭 추가: 팔로우 취소 동기화 실패 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.follow.redis.sync.duration",
+				"operation", "delete", "result", "failure"
+			));
+			// 커스텀 메트릭 추가: 팔로우 취소 동기화 실패
 			meterRegistry.counter(
 				"mopl.follow.redis.sync",
 				"operation", "delete", "result", "failure"
 			).increment();
+			// 커스텀 메트릭 추가: 팔로우 취소 동기화 재시도
 			meterRegistry.counter(
 				"mopl.follow.redis.sync.retry",
 				"operation", "delete"

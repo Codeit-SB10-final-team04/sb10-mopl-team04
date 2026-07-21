@@ -13,6 +13,7 @@ import com.team04.mopl.directmessage.event.DirectMessageReadEvent;
 import com.team04.mopl.directmessage.redis.DirectMessageRedisStore;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -35,6 +36,9 @@ public class DirectMessageRedisSyncProcessor {
 		backoff = @Backoff(delay = 1000, multiplier = 2)
 	)
 	public void syncRedisOnDirectMessageCreated(DirectMessageCreatedEvent directMessageCreatedEvent) {
+		// 커스텀 메트릭: 처리 시간 측정 시작
+		Timer.Sample sample = Timer.start(meterRegistry);
+
 		try {
 			// DM 저장 (Redis)
 			directMessageRedisStore.addDirectMessage(
@@ -46,7 +50,12 @@ public class DirectMessageRedisSyncProcessor {
 			log.info("[REDIS_SYNC] DM 생성 Redis 동기화 완료: directMessageId={}",
 				directMessageCreatedEvent.directMessageId());
 
-			// 커스텀 메트릭 추가: DM 동기화 성공
+			// 커스텀 메트릭 추가: DM 생성 동기화 성공 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.dm.redis.sync.duration",
+				"operation", "create", "result", "success"
+			));
+			// 커스텀 메트릭 추가: DM 생성 동기화 성공
 			meterRegistry.counter(
 				"mopl.dm.redis.sync",
 				"operation", "create", "result", "success"
@@ -55,11 +64,17 @@ public class DirectMessageRedisSyncProcessor {
 			log.error("[REDIS_SYNC] DM 생성 Redis 동기화 실패: directMessageId={}",
 				directMessageCreatedEvent.directMessageId(), e);
 
-			// 커스텀 메트릭 추가: DM 동기화 실패 및 재시도
+			// 커스텀 메트릭 추가: DM 생성 동기화 실패 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.dm.redis.sync.duration",
+				"operation", "create", "result", "failure"
+			));
+			// 커스텀 메트릭 추가: DM 생성 동기화 실패
 			meterRegistry.counter(
 				"mopl.dm.redis.sync",
 				"operation", "create", "result", "failure"
 			).increment();
+			// 커스텀 메트릭 추가: DM 생성 동기화 재시도
 			meterRegistry.counter(
 				"mopl.dm.redis.sync.retry",
 				"operation", "create"
@@ -111,6 +126,9 @@ public class DirectMessageRedisSyncProcessor {
 		backoff = @Backoff(delay = 1000, multiplier = 2)
 	)
 	public void syncRedisOnDirectMessageRead(DirectMessageReadEvent directMessageReadEvent) {
+		// 커스텀 메트릭: 처리 시간 측정 시작
+		Timer.Sample sample = Timer.start(meterRegistry);
+
 		try {
 			// DM 읽음 개수 감소 (Redis)
 			directMessageRedisStore.decrementUnreadCount(
@@ -121,7 +139,12 @@ public class DirectMessageRedisSyncProcessor {
 			log.info("[REDIS_SYNC] DM 읽음 처리 Redis 동기화 완료: directMessageId={}, receiverId={}",
 				directMessageReadEvent.directMessageId(), directMessageReadEvent.receiverId());
 
-			// 커스텀 메트릭 추가: DM 읽음 상태 동기화 성공
+			// 커스텀 메트릭 추가: DM 읽음 상태 생성 동기화 성공 및 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.dm.redis.sync.duration",
+				"operation", "read", "result", "success"
+			));
+			// 커스텀 메트릭 추가: DM 읽음 상태 생성 동기화 성공
 			meterRegistry.counter(
 				"mopl.dm.redis.sync",
 				"operation", "read", "result", "success"
@@ -130,11 +153,17 @@ public class DirectMessageRedisSyncProcessor {
 			log.error("[REDIS_SYNC] DM 읽음 처리 Redis 동기화 실패: directMessageId={}, receiverId={}",
 				directMessageReadEvent.directMessageId(), directMessageReadEvent.receiverId(), e);
 
-			// 커스텀 메트릭 추가: DM 읽음 상태 동기화 실패 및 재시도
+			// 커스텀 메트릭 추가: DM 읽음 상태 생성 동기화 실패 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.dm.redis.sync.duration",
+				"operation", "read", "result", "failure"
+			));
+			// 커스텀 메트릭 추가: DM 읽음 상태 생성 동기화 실패
 			meterRegistry.counter(
 				"mopl.dm.redis.sync",
 				"operation", "read", "result", "failure"
 			).increment();
+			// 커스텀 메트릭 추가: DM 읽음 상태 생성 동기화 재시도
 			meterRegistry.counter(
 				"mopl.dm.redis.sync.retry",
 				"operation", "read"
