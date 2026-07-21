@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,8 @@ import com.team04.mopl.conversation.redis.ConversationRedisStore;
 import com.team04.mopl.conversation.service.ConversationService;
 import com.team04.mopl.support.IntegrationTestBase;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 @Transactional
@@ -103,6 +107,31 @@ class ConversationServiceIntegrationTest extends IntegrationTestBase {
 		// then
 		assertThat(response).isNotNull();
 		assertThat(response.with().userId()).isEqualTo(withUser.getId());
+	}
+
+	@Test
+	@DisplayName("대화 단건 조회 실패: 생성되지 않은 공통 대화방을 조회할 경우 예외가 발생한다.")
+	void findConversationByUserId_Fail_NotFound() {
+		// given
+		// requestUser와 withUser 사이에 대화방을 생성하지 않은 상태
+		when(conversationRedisStore.getConversationId(any(), any())).thenReturn(null);
+
+		// when & then
+		assertThatThrownBy(() -> conversationService.findConversationByUserId(withUser.getId(), requestUser.getId()))
+			.isInstanceOf(ConversationException.class)
+			.hasMessageContaining(ConversationErrorCode.CONVERSATION_NOT_FOUND.getMessage());
+	}
+
+	@Test
+	@DisplayName("대화 단건 조회 실패: 존재하지 않는 상대방과의 대화를 조회할 경우 예외가 발생한다.")
+	void findConversationByUserId_Fail_UserNotFound() {
+		// given
+		UUID nonExistentUserId = UUID.randomUUID();
+
+		// when & then
+		assertThatThrownBy(() -> conversationService.findConversationByUserId(nonExistentUserId, requestUser.getId()))
+			.isInstanceOf(UserException.class)
+			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
 	}
 
 	@Test
