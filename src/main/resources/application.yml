@@ -17,8 +17,6 @@ spring:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
-opensearch:
-  uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
 
 server:
   port: 8080
