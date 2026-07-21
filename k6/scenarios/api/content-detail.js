@@ -26,11 +26,12 @@ export const options = {
 export function setup() {}
 
 export default function () {
+  // VU별 고유 유저 배정
   const user = users[(__VU - 1) % users.length];
   const accessToken = login(user.email, user.password);
   const headers = authHeaders(accessToken);
 
-  // Fetch content list to get IDs
+  // 콘텐츠 목록 조회 (상세 조회할 ID 확보용)
   const listRes = http.get(
     `${BASE_URL}/api/contents?sortBy=watcherCount&sortDirection=DESCENDING&limit=20`,
     { headers, tags: { endpoint: 'content_list_for_detail' } },
@@ -51,7 +52,7 @@ export default function () {
     return;
   }
 
-  // Pick a random content from first page
+  // 첫 페이지에서 랜덤 콘텐츠 선택 후 상세 조회
   const randomContent = contents[Math.floor(Math.random() * contents.length)];
   const contentId = randomContent.id || randomContent.contentId;
 

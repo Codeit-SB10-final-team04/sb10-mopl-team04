@@ -36,10 +36,12 @@ export const options = {
 export function setup() {}
 
 export default function () {
+  // VU별 고유 유저 배정
   const user = users[(__VU - 1) % users.length];
   const accessToken = login(user.email, user.password);
   const headers = authHeaders(accessToken);
 
+  // 랜덤 키워드로 콘텐츠 검색
   const keyword = keywords[Math.floor(Math.random() * keywords.length)];
 
   const res = http.get(

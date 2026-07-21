@@ -26,6 +26,7 @@ export const options = {
 export function setup() {}
 
 export default function () {
+  // VU별 고유 유저 배정
   const user = users[(__VU - 1) % users.length];
   const accessToken = login(user.email, user.password);
   const headers = {
@@ -33,7 +34,7 @@ export default function () {
     'Content-Type': 'application/json',
   };
 
-  // Fetch first page of playlists to get IDs
+  // 플레이리스트 목록 조회 (상세 조회할 ID 확보용)
   const listRes = http.get(
     `${BASE_URL}/api/playlists?sortBy=subscribeCount&sortDirection=DESCENDING&limit=20`,
     {
@@ -57,7 +58,7 @@ export default function () {
     return;
   }
 
-  // Pick random playlist from first page
+  // 첫 페이지에서 랜덤 플레이리스트 선택 후 상세 조회
   const playlist = playlists[Math.floor(Math.random() * playlists.length)];
   const playlistId = playlist.id || playlist.playlistId;
 

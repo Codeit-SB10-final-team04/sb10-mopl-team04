@@ -26,6 +26,7 @@ export const options = {
 export function setup() {}
 
 export default function () {
+  // VU별 고유 유저 배정
   const user = users[(__VU - 1) % users.length];
   const accessToken = login(user.email, user.password);
   const headers = {
@@ -33,7 +34,7 @@ export default function () {
     'Content-Type': 'application/json',
   };
 
-  // Fetch playlist list
+  // 구독할 플레이리스트 선택을 위해 목록 조회
   const listRes = http.get(
     `${BASE_URL}/api/playlists?sortBy=subscribeCount&sortDirection=DESCENDING&limit=20`,
     {
@@ -53,7 +54,7 @@ export default function () {
 
   const playlists = listRes.json().content || listRes.json().data || [];
 
-  // Filter out own playlists
+  // 본인 플레이리스트 제외 (자기 구독 방지)
   const otherPlaylists = playlists.filter(
     (p) => p.ownerEmail !== user.email && p.creatorEmail !== user.email
   );
@@ -66,7 +67,7 @@ export default function () {
   const playlist = otherPlaylists[Math.floor(Math.random() * otherPlaylists.length)];
   const playlistId = playlist.id || playlist.playlistId;
 
-  // Subscribe
+  // 플레이리스트 구독
   const subRes = http.post(
     `${BASE_URL}/api/playlists/${playlistId}/subscription`,
     null,
@@ -80,7 +81,7 @@ export default function () {
     '구독 성공': (r) => r.status === 204,
   });
 
-  // Cleanup: Unsubscribe
+  // 데이터 정리: 구독 취소
   const unsubRes = http.del(
     `${BASE_URL}/api/playlists/${playlistId}/subscription`,
     null,

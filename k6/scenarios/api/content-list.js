@@ -26,10 +26,12 @@ export const options = {
 export function setup() {}
 
 export default function () {
+  // VU별 고유 유저 배정
   const user = users[(__VU - 1) % users.length];
   const accessToken = login(user.email, user.password);
   const headers = authHeaders(accessToken);
 
+  // 콘텐츠 목록 커서 기반 페이지네이션 (최대 3페이지)
   let cursor = null;
 
   for (let page = 0; page < 3; page++) {
@@ -49,6 +51,7 @@ export default function () {
 
     if (res.status !== 200) break;
 
+    // 다음 페이지 커서 추출
     const body = res.json();
     const hasNext = body.hasNext;
     cursor = body.cursor || null;

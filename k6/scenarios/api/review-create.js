@@ -26,6 +26,7 @@ export const options = {
 export function setup() {}
 
 export default function () {
+  // VU별 고유 유저 배정
   const user = users[(__VU - 1) % users.length];
   const accessToken = login(user.email, user.password);
   const headers = {
@@ -33,7 +34,7 @@ export default function () {
     'Content-Type': 'application/json',
   };
 
-  // Fetch content list to pick a random content
+  // 리뷰 작성할 콘텐츠 선택을 위해 목록 조회
   const listRes = http.get(
     `${BASE_URL}/api/contents?sortBy=watcherCount&sortDirection=DESCENDING&limit=20`,
     { headers, tags: { endpoint: 'content_list_for_review_create' } },
@@ -58,7 +59,7 @@ export default function () {
   const contentId = randomContent.id || randomContent.contentId;
   const randomRating = Math.floor(Math.random() * 5) + 1;
 
-  // Create review
+  // 리뷰 생성
   const createRes = http.post(
     `${BASE_URL}/api/reviews`,
     JSON.stringify({
@@ -73,7 +74,7 @@ export default function () {
     '리뷰 생성 성공': (r) => r.status === 200 || r.status === 201,
   });
 
-  // Cleanup: delete the review if created successfully
+  // 데이터 정리: 생성된 리뷰 삭제
   if (createSuccess) {
     const reviewId =
       createRes.json().id || createRes.json().reviewId;

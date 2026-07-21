@@ -27,6 +27,7 @@ export const options = {
   },
 };
 
+// STOMP 프레임 생성 헬퍼
 function stompFrame(command, headers, body) {
   let frame = command + '\n';
   for (const [key, value] of Object.entries(headers || {})) {
@@ -41,6 +42,7 @@ function stompFrame(command, headers, body) {
 export function setup() {}
 
 export default function () {
+  // VU별 고유 유저 배정
   const user = users[(__VU - 1) % users.length];
   const accessToken = login(user.email, user.password);
   const headers = {
@@ -48,7 +50,7 @@ export default function () {
     'Content-Type': 'application/json',
   };
 
-  // Fetch content list to get a content ID
+  // 시청 세션 테스트할 콘텐츠 ID 확보를 위해 목록 조회
   const listRes = http.get(
     `${BASE_URL}/api/contents?sortBy=watcherCount&sortDirection=DESCENDING&limit=20`,
     {
@@ -72,17 +74,17 @@ export default function () {
     return;
   }
 
-  // Pick random content from first page
+  // 첫 페이지에서 랜덤 콘텐츠 선택
   const content = contents[Math.floor(Math.random() * contents.length)];
   const contentId = content.id || content.contentId;
   const subscriptionId = `sub-${__VU}-${__ITER}`;
 
-  // Connect WebSocket with auth
+  // 인증 토큰으로 WebSocket 연결
   const wsUrl = `${WS_URL}?token=${accessToken}`;
 
   const res = ws.connect(wsUrl, {}, function (socket) {
     socket.on('open', function () {
-      // STOMP CONNECT
+      // STOMP 프로토콜 연결
       socket.send(
         stompFrame('CONNECT', {
           'accept-version': '1.2',
@@ -92,7 +94,7 @@ export default function () {
     });
 
     socket.on('message', function (msg) {
-      // After receiving CONNECTED frame, subscribe to watch channel
+      // CONNECTED 프레임 수신 후 시청 채널 구독
       if (msg.startsWith('CONNECTED')) {
         socket.send(
           stompFrame('SUBSCRIBE', {
@@ -101,7 +103,7 @@ export default function () {
           })
         );
 
-        // Stay connected for 10 seconds, then unsubscribe and disconnect
+        // 10초 시청 후 구독 해제 및 연결 종료
         socket.setTimeout(function () {
           socket.send(
             stompFrame('UNSUBSCRIBE', {
@@ -113,7 +115,7 @@ export default function () {
         }, 10000);
       }
 
-      // Close socket on RECEIPT (disconnect acknowledgement)
+      // RECEIPT 프레임 수신 시 소켓 종료 (연결 해제 확인)
       if (msg.startsWith('RECEIPT')) {
         socket.close();
       }
@@ -123,7 +125,7 @@ export default function () {
       console.error(`WS error (VU ${__VU}): ${e.error()}`);
     });
 
-    // Timeout safety: close after 15s if still open
+    // 안전 타임아웃: 15초 후에도 열려있으면 강제 종료
     socket.setTimeout(function () {
       socket.close();
     }, 15000);
