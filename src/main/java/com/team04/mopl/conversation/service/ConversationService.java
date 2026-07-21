@@ -231,25 +231,22 @@ public class ConversationService {
 	) {
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 시작: keyword={}", conversationPageRequest.keywordLike());
 
-		// 1. 유효성 검증: 정렬 기준
-		validateSortField(conversationPageRequest.sortBy());
-
-		// 2. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
+		// 1. 필터링 + 정렬 + 커서 기반 페이지네이션이 적용된 대화 리스트
 		List<Conversation> conversations = conversationRepository.searchConversation(
 			conversationPageRequest,
 			requestUserId
 		);
 
-		// 3. 대화 전체 개수 조회
+		// 2. 대화 전체 개수 조회
 		Long totalCount = conversationRepository.countConversation(conversationPageRequest, requestUserId);
 
-		// 4. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기
+		// 3. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기
 		boolean hasNext = conversations.size() > conversationPageRequest.limit();
 		List<Conversation> pagedConversations = hasNext
 			? conversations.subList(0, conversationPageRequest.limit())
 			: conversations;
 
-		// 5. 다음 커서 값 계산 (메인 커서, 보조 커서)
+		// 4. 다음 커서 값 계산 (메인 커서, 보조 커서)
 		String nextCursor = null;
 		UUID nextIdAfter = null;
 
@@ -262,7 +259,7 @@ public class ConversationService {
 			nextIdAfter = lastConversation.getId();
 		}
 
-		// 6. Conversation -> ConversationDto
+		// 5. Conversation -> ConversationDto
 		List<ConversationDto> data = mapToConversationDtoList(pagedConversations, requestUserId);
 
 		log.debug("[CONVERSATION_FIND_SEARCH] 대화 목록 조회 완료: keyword={}", conversationPageRequest.keywordLike());
@@ -309,14 +306,6 @@ public class ConversationService {
 			throw new ConversationException(ConversationErrorCode.CONVERSATION_SELF_SELECT_MOT_ALLOWED)
 				.addDetail("requestUserId", requestUserId)
 				.addDetail("withUserId", withUserId);
-		}
-	}
-
-	// 유효성 검증: 정렬 기준
-	private void validateSortField(String sortBy) {
-		if (!"createdAt".equals(sortBy)) {
-			throw new ConversationException(ConversationErrorCode.CONVERSATION_INVALID_FORMAT)
-				.addDetail("sortBy", sortBy);
 		}
 	}
 

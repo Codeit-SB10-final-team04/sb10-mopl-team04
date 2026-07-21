@@ -88,7 +88,7 @@ class ConversationServiceTest {
 	=========================
 	 */
 	@Test
-	@DisplayName("성공: 유효한 요청일 경우 대화방을 생성하고 ES 동기화 이벤트를 발행한 뒤 DTO를 반환한다.")
+	@DisplayName("성공: 유효한 요청일 경우 대화방을 생성하고 동기화 이벤트를 발행한 뒤 DTO를 반환한다.")
 	void createConversation_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -408,7 +408,7 @@ class ConversationServiceTest {
 		given(conv2.getId()).willReturn(conv2Id);
 		String mockCursorTime = Instant.now().toString();
 		given(conv2.getCreatedAt()).willReturn(Instant.parse(mockCursorTime));
-		
+
 		Conversation conv3 = mock(Conversation.class);
 
 		List<Conversation> conversations = List.of(conv1, conv2, conv3);
@@ -494,7 +494,7 @@ class ConversationServiceTest {
 	}
 
 	@Test
-	@DisplayName("성공: RDB에서 조회된 데이터 순서가 뒤죽박죽이어도 ES 문서 순서에 맞게 재정렬된다.")
+	@DisplayName("성공: Repository에서 조회된 대화 목록의 정렬 순서가 DTO 매핑 과정에서도 그대로 보존된다.")
 	void findAll_OrderMaintained_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -537,27 +537,5 @@ class ConversationServiceTest {
 		inOrder.verify(conversationMapper).toDto(eq(conv1), any(), any(), anyBoolean());
 		inOrder.verify(conversationMapper).toDto(eq(conv2), any(), any(), anyBoolean());
 		inOrder.verify(conversationMapper).toDto(eq(conv3), any(), any(), anyBoolean());
-	}
-
-	@Test
-	@DisplayName("실패: sortBy가 createdAt이 아니면 예외가 발생하고 ES 쿼리는 실행되지 않는다.")
-	void findAll_InvalidSortBy_Fail() {
-		// given
-		UUID requestUserId = UUID.randomUUID();
-		ConversationPageRequest request = new ConversationPageRequest(
-			null,
-			null,
-			null,
-			10,
-			SortDirection.DESCENDING,
-			"invalidSort"
-		);
-
-		// when & then
-		assertThatThrownBy(() -> conversationService.findAll(request, requestUserId))
-			.isInstanceOf(ConversationException.class)
-			.hasMessageContaining(ConversationErrorCode.CONVERSATION_INVALID_FORMAT.getMessage());
-
-		verifyNoInteractions(conversationRepository);
 	}
 }
