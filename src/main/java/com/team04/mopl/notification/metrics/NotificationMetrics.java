@@ -1,5 +1,7 @@
 package com.team04.mopl.notification.metrics;
 
+import java.util.Locale;
+
 import org.springframework.stereotype.Component;
 
 import com.team04.mopl.notification.enums.NotificationType;
@@ -13,7 +15,7 @@ public class NotificationMetrics {
 	// 알림 Kafka 이벤트 역직렬화 실패 횟수 Counter에 사용하는 메트릭 이름
 	private static final String NOTIFICATION_KAFKA_DESERIALIZATION_FAILURE = "mopl.notification.kafka.deserialization.failure";
 
-	// 알림 저장 건수 Counter에 사용하는 메트릭 이름
+	// 저장된 알림 건수 Counter에 사용하는 메트릭 이름
 	private static final String NOTIFICATION_CREATED = "mopl.notification.created";
 
 	private final MeterRegistry meterRegistry;
@@ -30,9 +32,16 @@ public class NotificationMetrics {
 		).increment();
 	}
 
-	// 알림 저장 건수를 알림 타입별로 기록
+	// 저장된 알림 건수를 알림 타입별로 기록
 	public void recordCreated(NotificationType type, long count) {
+		if (count <= 0) {
+			return;
+		}
 
+		meterRegistry.counter(
+			NOTIFICATION_CREATED,
+			"type", type.toString().toLowerCase(Locale.ROOT)
+		).increment(count);
 	}
 
 	// 중복 제외된 수신자 건수

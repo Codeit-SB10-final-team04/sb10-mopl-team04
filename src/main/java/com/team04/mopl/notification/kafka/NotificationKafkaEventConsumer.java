@@ -223,6 +223,8 @@ public class NotificationKafkaEventConsumer {
 			return objectMapper.readValue(kafkaEvent, eventClass);
 		} catch (JsonProcessingException e) {
 			String eventName = eventClass.getSimpleName();
+
+			// 알림 Kafka 역직렬화 실패 횟수 메트릭에 기록
 			notificationMetrics.recordDeserializationFailure(eventName);
 
 			log.error("[EVENT_DESERIALIZATION_FAILED] 이벤트 역직렬화 실패", e);
@@ -257,6 +259,12 @@ public class NotificationKafkaEventConsumer {
 			level
 		);
 
+		// notificationDto count
+		long notificationCount = notificationDtoList.size();
+
+		// 저장된 알림 건수 메트릭에 기록
+		notificationMetrics.recordCreated(type, notificationCount);
+
 		// 실패 count
 		int failureCount = 0;
 
@@ -273,7 +281,7 @@ public class NotificationKafkaEventConsumer {
 
 		log.info(
 			"[NOTIFICATION_REALTIME_PUBLISH_COMPLETE] 알림 저장 및 실시간 전송 완료: receiverCount={}, notificationCount={}, failureCount={}, type={}",
-			receiverIds.size(), notificationDtoList.size(), failureCount, type);
+			receiverIds.size(), notificationCount, failureCount, type);
 	}
 
 	private String roleToDisplayName(UserRole role) {
