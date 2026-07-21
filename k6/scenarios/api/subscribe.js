@@ -12,10 +12,11 @@ const users = new SharedArray('users', function () {
 
 export const options = {
   stages: [
-    { duration: '30s', target: 5 },
-    { duration: '1m', target: 20 },
-    { duration: '2m', target: 50 },
-    { duration: '1m', target: 0 },
+    { duration: '30s', target: 25 },    // Warm-up
+    { duration: '1m',  target: 50 },    // Normal
+    { duration: '2m',  target: 70 },    // Peak
+    { duration: '1m',  target: 70 },    // Sustain: 최대 부하 유지
+    { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {
     http_req_duration: ['p(95)<500'],
@@ -55,8 +56,12 @@ export default function () {
   const playlists = listRes.json().content || listRes.json().data || [];
 
   // 본인 플레이리스트 제외 (자기 구독 방지)
+  // API 응답의 owner는 중첩 객체이므로 owner.email 또는 owner.userId로 비교
   const otherPlaylists = playlists.filter(
-    (p) => p.ownerEmail !== user.email && p.creatorEmail !== user.email
+    (p) => {
+      const ownerEmail = (p.owner && p.owner.email) || p.ownerEmail;
+      return ownerEmail !== user.email;
+    }
   );
 
   if (otherPlaylists.length === 0) {
