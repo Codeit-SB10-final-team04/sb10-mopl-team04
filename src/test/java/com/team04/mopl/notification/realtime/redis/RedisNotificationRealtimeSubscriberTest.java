@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,8 +22,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.realtime.dto.NotificationRealtimeMessage;
+import com.team04.mopl.notification.realtime.redis.metrics.RedisPubSubMetrics;
 import com.team04.mopl.sse.event.SseEventNames;
 import com.team04.mopl.sse.service.SseService;
+
+import io.micrometer.core.instrument.Timer;
 
 @ExtendWith(MockitoExtension.class)
 class RedisNotificationRealtimeSubscriberTest {
@@ -33,8 +37,19 @@ class RedisNotificationRealtimeSubscriberTest {
 	@Mock
 	private ObjectMapper objectMapper;
 
+	@Mock
+	private RedisPubSubMetrics redisPubSubMetrics;
+
+	@Mock
+	private Timer.Sample sample;
+
 	@InjectMocks
 	private RedisNotificationRealtimeSubscriber subscriber;
+
+	@BeforeEach
+	void setUp() {
+		when(redisPubSubMetrics.startTimer()).thenReturn(sample);
+	}
 
 	@Test
 	@DisplayName("알림 실시간 전송 요청을 수신하면 SSE 메시지를 전송한다.")
@@ -64,6 +79,9 @@ class RedisNotificationRealtimeSubscriberTest {
 			realtimeMessage.eventName(),
 			realtimeMessage.data()
 		);
+		verify(redisPubSubMetrics).recordReceive();
+		verify(redisPubSubMetrics).recordProcess(sample, "success");
+		verify(redisPubSubMetrics, never()).recordDeserializationFailure();
 	}
 
 	@Test
@@ -93,6 +111,9 @@ class RedisNotificationRealtimeSubscriberTest {
 			anyString(),
 			any()
 		);
+		verify(redisPubSubMetrics).recordReceive();
+		verify(redisPubSubMetrics).recordDeserializationFailure();
+		verify(redisPubSubMetrics).recordProcess(sample, "failure");
 	}
 
 	@Test
@@ -123,7 +144,7 @@ class RedisNotificationRealtimeSubscriberTest {
 			);
 
 		// when
-		subscriber.onMessage(message, null);
+		assertDoesNotThrow(() -> subscriber.onMessage(message, null));
 
 		// then
 		verify(objectMapper).readValue(body, NotificationRealtimeMessage.class);
@@ -133,6 +154,9 @@ class RedisNotificationRealtimeSubscriberTest {
 			realtimeMessage.eventName(),
 			realtimeMessage.data()
 		);
+		verify(redisPubSubMetrics).recordReceive();
+		verify(redisPubSubMetrics, never()).recordDeserializationFailure();
+		verify(redisPubSubMetrics).recordProcess(sample, "failure");
 	}
 
 	private NotificationDto createNotificationDto(UUID receiverId) {
