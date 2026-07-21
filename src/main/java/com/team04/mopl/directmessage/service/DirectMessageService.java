@@ -28,6 +28,8 @@ import com.team04.mopl.directmessage.redis.DirectMessageRedisStore;
 import com.team04.mopl.directmessage.repository.DirectMessageRepository;
 import com.team04.mopl.user.entity.User;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -47,6 +49,8 @@ public class DirectMessageService {
 
 	private final ApplicationEventPublisher eventPublisher;
 
+	private final MeterRegistry meterRegistry;
+
 	// DM 생성
 	@Transactional
 	public DirectMessageDto create(
@@ -54,44 +58,75 @@ public class DirectMessageService {
 		DirectMessageSendRequest directMessageSendRequest,
 		UUID senderId
 	) {
-		log.info("[DM_CREATE] DM 생성 시작: conversationId={}, senderId={}", conversationId, senderId);
+		// 커스텀 메트릭 추가: 처리 시간 측정 시작
+		Timer.Sample sample = Timer.start(meterRegistry);
 
-		// 1. 유효성 검증: 대화 존재 여부
-		Conversation conversation = getConversationEntityOrThrow(conversationId);
+		log.info("[DM_CREATE] DM 생성 시작: conversationId={}, senderId={}",
+			conversationId, senderId);
 
-		// 2. 대화 참여자 목록 조회
-		List<ConversationParticipant> participants = getParticipants(conversationId);
+		try {
+			// 1. 유효성 검증: 대화 존재 여부
+			Conversation conversation = getConversationEntityOrThrow(conversationId);
 
-		// 3. 송신자 조회
-		User sender = extractSenderOrThrow(participants, senderId);
+			// 2. 대화 참여자 목록 조회
+			List<ConversationParticipant> participants = getParticipants(conversationId);
 
-		// 4. 수신자 조회
-		User receiver = extractReceiverOrThrow(participants, senderId);
+			// 3. 송신자 조회
+			User sender = extractSenderOrThrow(participants, senderId);
 
-		// 5. DM 엔티티 생성 및 저장
-		DirectMessage newDirectMessage = directMessageMapper.toEntity(
-			conversation,
-			sender,
-			receiver,
-			directMessageSendRequest
-		);
-		directMessageRepository.save(newDirectMessage);
+			// 4. 수신자 조회
+			User receiver = extractReceiverOrThrow(participants, senderId);
 
-		// 6. DTO 전환
-		DirectMessageDto directMessageDto = directMessageMapper.toDto(newDirectMessage);
+			// 5. DM 엔티티 생성 및 저장
+			DirectMessage newDirectMessage = directMessageMapper.toEntity(
+				conversation,
+				sender,
+				receiver,
+				directMessageSendRequest
+			);
+			directMessageRepository.save(newDirectMessage);
 
-		// 7. SSE 및 Redis 동기화를 위한 이벤트 발행
-		eventPublisher.publishEvent(DirectMessageCreatedEvent.of(
-				receiver.getId(),
-				directMessageDto.id(),
-				directMessageDto
-			)
-		);
+			// 6. DTO 전환
+			DirectMessageDto directMessageDto = directMessageMapper.toDto(newDirectMessage);
 
-		log.info("[DM_CREATE] DM 생성 완료: conversationId={}, senderId={}, dmId={}",
-			conversationId, senderId, newDirectMessage.getId());
+			// 7. SSE 및 Redis 동기화를 위한 이벤트 발행
+			eventPublisher.publishEvent(DirectMessageCreatedEvent.of(
+					receiver.getId(),
+					directMessageDto.id(),
+					directMessageDto
+				)
+			);
 
-		return directMessageDto;
+			log.info("[DM_CREATE] DM 생성 완료: conversationId={}, senderId={}, dmId={}",
+				conversationId, senderId, newDirectMessage.getId());
+
+			// 커스텀 메트릭 추가: DM 생성 성공 측정 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.dm.create.duration",
+				"result", "success")
+			);
+			// 커스텀 메트릭 추가: DM 생성 성공
+			meterRegistry.counter(
+				"mopl.dm.create",
+				"result", "success"
+			).increment();
+
+			return directMessageDto;
+
+		} catch (Exception e) {
+			// 커스텀 메트릭 추가: DM 생성 실패 측정 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.dm.create.duration",
+				"result", "failure")
+			);
+			// 커스텀 메트릭 추가: DM 생성 실패
+			meterRegistry.counter(
+				"mopl.dm.create",
+				"result", "failure"
+			).increment();
+
+			throw e;
+		}
 	}
 
 	// 송신자 추출 및 검증
@@ -120,40 +155,66 @@ public class DirectMessageService {
 		UUID directMessageId,
 		UUID requestUserId
 	) {
-		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 시작: conversationId={}, directMessageId={}", conversationId,
-			directMessageId);
+		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 시작: conversationId={}, directMessageId={}",
+			conversationId, directMessageId);
 
-		// 1. 유효성 검증: 대화 존재 유무
-		Conversation conversation = getConversationEntityOrThrow(conversationId);
+		try {
+			// 1. 유효성 검증: 대화 존재 유무
+			Conversation conversation = getConversationEntityOrThrow(conversationId);
 
-		// 2. 유효성 검증: 특정 대화방 참가자 여부
-		validateParticipant(conversation.getId(), requestUserId);
+			// 2. 유효성 검증: 특정 대화방 참가자 여부
+			validateParticipant(conversation.getId(), requestUserId);
 
-		// 3. 유효성 검증: DM 존재 유무
-		DirectMessage directMessage = getDirectMessageEntityOrThrow(directMessageId);
+			// 3. 유효성 검증: DM 존재 유무
+			DirectMessage directMessage = getDirectMessageEntityOrThrow(directMessageId);
 
-		// 4. 유효성 검증: 해당 대화 내 DM 존재 유무
-		validateMessageInConversation(directMessage, conversation.getId());
+			// 4. 유효성 검증: 해당 대화 내 DM 존재 유무
+			validateMessageInConversation(directMessage, conversation.getId());
 
-		// 5. DM 읽음 처리 및 저장
-		int updatedCount = directMessageRepository.markAllAsRead(
-			conversationId,
-			requestUserId,
-			directMessage.getCreatedAt(),
-			Instant.now()
-		);
-
-		// 6. 읽음 처리 Redis 동기화를 위한 이벤트 발행
-		if (updatedCount > 0) {
-			eventPublisher.publishEvent(new DirectMessageReadEvent(
-				requestUserId,
+			// 5. DM 읽음 처리 및 저장
+			int updatedCount = directMessageRepository.markAllAsRead(
 				conversationId,
-				directMessageId
-			));
-		}
+				requestUserId,
+				directMessage.getCreatedAt(),
+				Instant.now()
+			);
 
-		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}, updatedCount={}",
-			conversationId, directMessageId, updatedCount);
+			// 6. 읽음 처리 Redis 동기화를 위한 이벤트 발행
+			if (updatedCount > 0) {
+				eventPublisher.publishEvent(new DirectMessageReadEvent(
+					requestUserId,
+					conversationId,
+					directMessageId
+				));
+				// 커스텀 메트릭 추가: DM 읽음 처리 생성 (메시지 개수)
+				meterRegistry.counter(
+					"mopl.dm.read.messages"
+				).increment(updatedCount);
+			} else {
+				// 커스텀 메트릭 추가: DM 읽음 처리 변화 없음
+				meterRegistry.counter(
+					"mopl.dm.read.no.change"
+				).increment();
+			}
+
+			log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}, updatedCount={}",
+				conversationId, directMessageId, updatedCount);
+
+			// 커스텀 메트릭 추가: DM 읽음 처리 생성 (읽음 처리 개수)
+			meterRegistry.counter(
+				"mopl.dm.read",
+				"result", "success"
+			).increment();
+
+		} catch (Exception e) {
+			// 커스텀 메트릭 추가: DM 읽음 처리 생성 실패
+			meterRegistry.counter(
+				"mopl.dm.read",
+				"result", "failure"
+			).increment();
+
+			throw e;
+		}
 	}
 
 	// DM 목록 조회 (정렬 + 커서 페이지네이션)
