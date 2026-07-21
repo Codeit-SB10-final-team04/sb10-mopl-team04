@@ -22,10 +22,11 @@ const keywords = [
 
 export const options = {
   stages: [
-    { duration: '30s', target: 5 },
-    { duration: '1m', target: 20 },
-    { duration: '2m', target: 50 },
-    { duration: '1m', target: 0 },
+    { duration: '30s', target: 30 },    // Warm-up
+    { duration: '1m',  target: 60 },    // Normal
+    { duration: '2m',  target: 100 },   // Peak
+    { duration: '1m',  target: 100 },   // Sustain: 최대 부하 유지
+    { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {
     http_req_duration: ['p(95)<1000'],
@@ -41,17 +42,36 @@ export default function () {
   const accessToken = login(user.email, user.password);
   const headers = authHeaders(accessToken);
 
-  // 랜덤 키워드로 콘텐츠 검색
+  // 랜덤 키워드로 콘텐츠 검색 커서 기반 페이지네이션 (최대 3페이지)
   const keyword = keywords[Math.floor(Math.random() * keywords.length)];
+  let cursor = null;
+  let idAfter = null;
 
-  const res = http.get(
-    `${BASE_URL}/api/contents?keywordLike=${encodeURIComponent(keyword)}&limit=20`,
-    { headers, tags: { endpoint: 'content_search' } },
-  );
+  for (let page = 0; page < 3; page++) {
+    let url = `${BASE_URL}/api/contents?keywordLike=${encodeURIComponent(keyword)}&limit=20`;
+    if (cursor && idAfter) {
+      url += `&cursor=${cursor}&idAfter=${idAfter}`;
+    }
 
-  check(res, {
-    '콘텐츠 검색 성공': (r) => r.status === 200,
-  });
+    const res = http.get(url, {
+      headers,
+      tags: { endpoint: 'content_search' },
+    });
+
+    check(res, {
+      '콘텐츠 검색 성공': (r) => r.status === 200,
+    });
+
+    if (res.status !== 200) break;
+
+    // 다음 페이지 커서 추출
+    const body = res.json();
+    const hasNext = body.hasNext;
+    cursor = body.nextCursor || null;
+    idAfter = body.nextIdAfter || null;
+
+    if (!hasNext) break;
+  }
 
   sleep(1);
 }

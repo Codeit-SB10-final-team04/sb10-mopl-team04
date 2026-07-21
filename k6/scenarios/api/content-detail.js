@@ -12,10 +12,11 @@ const users = new SharedArray('users', function () {
 
 export const options = {
   stages: [
-    { duration: '30s', target: 5 },
-    { duration: '1m', target: 20 },
-    { duration: '2m', target: 50 },
-    { duration: '1m', target: 0 },
+    { duration: '30s', target: 30 },    // Warm-up
+    { duration: '1m',  target: 60 },    // Normal
+    { duration: '2m',  target: 100 },   // Peak
+    { duration: '1m',  target: 100 },   // Sustain: 최대 부하 유지
+    { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {
     http_req_duration: ['p(95)<300'],
@@ -31,29 +32,47 @@ export default function () {
   const accessToken = login(user.email, user.password);
   const headers = authHeaders(accessToken);
 
-  // 콘텐츠 목록 조회 (상세 조회할 ID 확보용)
-  const listRes = http.get(
-    `${BASE_URL}/api/contents?sortBy=watcherCount&sortDirection=DESCENDING&limit=20`,
-    { headers, tags: { endpoint: 'content_list_for_detail' } },
-  );
+  // 콘텐츠 목록 커서 기반 페이지네이션 (최대 3페이지, 상세 조회할 ID 확보용)
+  let cursor = null;
+  let idAfter = null;
+  let allContents = [];
 
-  check(listRes, {
-    '콘텐츠 목록 조회 성공': (r) => r.status === 200,
-  });
+  for (let page = 0; page < 3; page++) {
+    let url = `${BASE_URL}/api/contents?sortBy=watcherCount&sortDirection=DESCENDING&limit=20`;
+    if (cursor && idAfter) {
+      url += `&cursor=${cursor}&idAfter=${idAfter}`;
+    }
 
-  if (listRes.status !== 200) {
+    const listRes = http.get(url, {
+      headers,
+      tags: { endpoint: 'content_list_for_detail' },
+    });
+
+    check(listRes, {
+      '콘텐츠 목록 조회 성공': (r) => r.status === 200,
+    });
+
+    if (listRes.status !== 200) break;
+
+    // 다음 페이지 커서 추출
+    const body = listRes.json();
+    const items = body.data || [];
+    allContents = allContents.concat(items);
+
+    const hasNext = body.hasNext;
+    cursor = body.nextCursor || null;
+    idAfter = body.nextIdAfter || null;
+
+    if (!hasNext) break;
+  }
+
+  if (allContents.length === 0) {
     sleep(1);
     return;
   }
 
-  const contents = listRes.json().contents || listRes.json().content || [];
-  if (contents.length === 0) {
-    sleep(1);
-    return;
-  }
-
-  // 첫 페이지에서 랜덤 콘텐츠 선택 후 상세 조회
-  const randomContent = contents[Math.floor(Math.random() * contents.length)];
+  // 수집한 콘텐츠에서 랜덤 선택 후 상세 조회
+  const randomContent = allContents[Math.floor(Math.random() * allContents.length)];
   const contentId = randomContent.id || randomContent.contentId;
 
   const detailRes = http.get(`${BASE_URL}/api/contents/${contentId}`, {

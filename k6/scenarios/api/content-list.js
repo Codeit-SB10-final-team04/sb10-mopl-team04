@@ -12,10 +12,11 @@ const users = new SharedArray('users', function () {
 
 export const options = {
   stages: [
-    { duration: '30s', target: 5 },
-    { duration: '1m', target: 20 },
-    { duration: '2m', target: 50 },
-    { duration: '1m', target: 0 },
+    { duration: '30s', target: 30 },    // Warm-up
+    { duration: '1m',  target: 60 },    // Normal
+    { duration: '2m',  target: 100 },   // Peak
+    { duration: '1m',  target: 100 },   // Sustain: 최대 부하 유지
+    { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {
     http_req_duration: ['p(95)<500'],
@@ -33,11 +34,12 @@ export default function () {
 
   // 콘텐츠 목록 커서 기반 페이지네이션 (최대 3페이지)
   let cursor = null;
+  let idAfter = null;
 
   for (let page = 0; page < 3; page++) {
     let url = `${BASE_URL}/api/contents?sortBy=watcherCount&sortDirection=DESCENDING&limit=20`;
-    if (cursor) {
-      url += `&cursor=${cursor}`;
+    if (cursor && idAfter) {
+      url += `&cursor=${cursor}&idAfter=${idAfter}`;
     }
 
     const res = http.get(url, {
@@ -54,7 +56,8 @@ export default function () {
     // 다음 페이지 커서 추출
     const body = res.json();
     const hasNext = body.hasNext;
-    cursor = body.cursor || null;
+    cursor = body.nextCursor || null;
+    idAfter = body.nextIdAfter || null;
 
     if (!hasNext) break;
   }
