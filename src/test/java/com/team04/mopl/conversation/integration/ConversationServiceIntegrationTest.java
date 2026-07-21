@@ -8,7 +8,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
@@ -43,9 +42,6 @@ class ConversationServiceIntegrationTest extends IntegrationTestBase {
 
 	@MockitoBean
 	private ConversationRedisStore conversationRedisStore;
-
-	@MockitoBean
-	private ApplicationEventPublisher eventPublisher;
 
 	private User requestUser;
 	private User withUser;
