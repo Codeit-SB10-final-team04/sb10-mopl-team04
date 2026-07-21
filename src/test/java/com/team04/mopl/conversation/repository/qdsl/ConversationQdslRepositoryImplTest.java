@@ -78,6 +78,44 @@ class ConversationQdslRepositoryImplTest {
 	}
 
 	@Test
+	@DisplayName("성공: 요청자가 참여하지 않은 대화방은 조회 결과에서 안전하게 제외된다.")
+	void searchConversation_ExcludeNonParticipatingRooms_Success() {
+		// given
+		User requestUser = createUser("requestUser");
+		User otherUser1 = createUser("otherUser1");
+		User otherUser2 = createUser("otherUser2");
+
+		// 요청자가 참여한 대화방
+		Conversation convParticipated = em.persist(Conversation.create());
+		em.persist(ConversationParticipant.builder().conversation(convParticipated).user(requestUser).build());
+		em.persist(ConversationParticipant.builder().conversation(convParticipated).user(otherUser1).build());
+
+		// 요청자가 참여하지 않은 대화방
+		Conversation convNotParticipated = em.persist(Conversation.create());
+		em.persist(ConversationParticipant.builder().conversation(convNotParticipated).user(otherUser1).build());
+		em.persist(ConversationParticipant.builder().conversation(convNotParticipated).user(otherUser2).build());
+
+		em.flush();
+		em.clear();
+
+		ConversationPageRequest request = new ConversationPageRequest(
+			null,
+			null,
+			null,
+			10,
+			SortDirection.DESCENDING,
+			"createdAt"
+		);
+
+		// when
+		List<Conversation> result = conversationRepository.searchConversation(request, requestUser.getId());
+
+		// then
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getId()).isEqualTo(convParticipated.getId());
+	}
+
+	@Test
 	@DisplayName("성공: 내림차순(DESC) 커서 페이지네이션 적용 시 커서 시간 및 ID보다 작은 데이터를 조회한다.")
 	void searchConversation_CursorPaginationDesc_Success() {
 		// given
@@ -162,6 +200,62 @@ class ConversationQdslRepositoryImplTest {
 	}
 
 	@Test
+	@DisplayName("성공: 생성 시간이 동일할 경우 2차 정렬 기준인 ID를 통해 중복/누락 없이 커서 페이징된다.")
+	void searchConversation_SameCreatedAt_TieBreakerById_Success() {
+		// given
+		User requestUser = createUser("requestUser");
+		Instant sameTime = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+
+		Conversation conv1 = em.persist(Conversation.create());
+		em.persist(ConversationParticipant.builder().conversation(conv1).user(requestUser).build());
+
+		Conversation conv2 = em.persist(Conversation.create());
+		em.persist(ConversationParticipant.builder().conversation(conv2).user(requestUser).build());
+
+		Conversation conv3 = em.persist(Conversation.create());
+		em.persist(ConversationParticipant.builder().conversation(conv3).user(requestUser).build());
+
+		em.flush();
+
+		updateConversationTime(conv1, sameTime);
+		updateConversationTime(conv2, sameTime);
+		updateConversationTime(conv3, sameTime);
+
+		em.clear();
+
+		ConversationPageRequest firstRequest = new ConversationPageRequest(
+			null,
+			null,
+			null,
+			10,
+			SortDirection.DESCENDING,
+			"createdAt"
+		);
+		List<Conversation> initialResult = conversationRepository.searchConversation(firstRequest, requestUser.getId());
+		assertThat(initialResult).hasSize(3);
+
+		// 정렬된 결과 중 두 번째 항목을 커서로 지정
+		Conversation cursorConversation = initialResult.get(1);
+		Conversation expectedNextConversation = initialResult.get(2);
+
+		ConversationPageRequest cursorRequest = new ConversationPageRequest(
+			null,
+			cursorConversation.getCreatedAt().toString(),
+			cursorConversation.getId(),
+			10,
+			SortDirection.DESCENDING,
+			"createdAt"
+		);
+
+		// when
+		List<Conversation> cursorResult = conversationRepository.searchConversation(cursorRequest, requestUser.getId());
+
+		// then
+		assertThat(cursorResult).hasSize(1);
+		assertThat(cursorResult.get(0).getId()).isEqualTo(expectedNextConversation.getId());
+	}
+
+	@Test
 	@DisplayName("실패: 커서 값만 전달되고 idAfter가 null이면 DTO 생성 시 예외가 발생한다.")
 	void searchConversation_OnlyCursorProvided_Fail() {
 		// given
@@ -204,7 +298,7 @@ class ConversationQdslRepositoryImplTest {
 	void searchConversation_SearchByOpponentName_Success() {
 		// given
 		User requestUser = createUser("requestUser");
-		User opponentUser = createUser("opponentNickname"); // 검색 대상
+		User opponentUser = createUser("opponentNickname");
 
 		Conversation conversation = em.persist(Conversation.create());
 
