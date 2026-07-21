@@ -22,10 +22,10 @@ const keywords = [
 
 export const options = {
   stages: [
-    { duration: '30s', target: 30 },    // Warm-up
-    { duration: '1m',  target: 60 },    // Normal
-    { duration: '2m',  target: 100 },   // Peak
-    { duration: '1m',  target: 100 },   // Sustain: 최대 부하 유지
+    { duration: '30s', target: 25 },    // Warm-up
+    { duration: '1m',  target: 50 },    // Normal
+    { duration: '2m',  target: 70 },    // Peak
+    { duration: '1m',  target: 70 },    // Sustain: 최대 부하 유지
     { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {

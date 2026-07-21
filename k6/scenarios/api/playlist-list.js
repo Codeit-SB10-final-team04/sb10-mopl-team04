@@ -12,10 +12,11 @@ const users = new SharedArray('users', function () {
 
 export const options = {
   stages: [
-    { duration: '30s', target: 5 },
-    { duration: '1m', target: 20 },
-    { duration: '2m', target: 50 },
-    { duration: '1m', target: 0 },
+    { duration: '30s', target: 25 },    // Warm-up
+    { duration: '1m',  target: 50 },    // Normal
+    { duration: '2m',  target: 70 },    // Peak
+    { duration: '1m',  target: 70 },    // Sustain: 최대 부하 유지
+    { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {
     http_req_duration: ['p(95)<500'],
