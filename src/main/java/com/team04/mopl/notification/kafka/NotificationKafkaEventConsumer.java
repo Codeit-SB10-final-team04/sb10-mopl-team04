@@ -259,13 +259,19 @@ public class NotificationKafkaEventConsumer {
 			level
 		);
 
-		// notificationDto count
+		// 저장된 알림 수
 		long notificationCount = notificationDtoList.size();
 
 		// 저장된 알림 건수 메트릭에 기록
 		notificationMetrics.recordCreated(type, notificationCount);
 
-		// 실패 count
+		// 저장에서 제외된 수신자 수
+		long skippedReceiverCount = receiverIds.size() - notificationCount;
+
+		// 중복 알림으로 저장에서 제외된 수신자 수 메트릭에 기록
+		notificationMetrics.recordDuplicateSkipped(type, skippedReceiverCount);
+
+		// 실패 횟수
 		int failureCount = 0;
 
 		// 실시간 알림 전송
