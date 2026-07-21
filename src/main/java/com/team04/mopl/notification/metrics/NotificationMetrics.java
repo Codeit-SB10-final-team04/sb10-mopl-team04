@@ -21,10 +21,10 @@ public class NotificationMetrics {
 	// 중복 알림으로 저장에서 제외된 알림 수신자 수 Counter에 사용하는 메트릭 이름
 	private static final String NOTIFICATION_DUPLICATE_SKIPPED = "mopl.notification.duplicate.skipped";
 
-	// 알림 저장 실패 건수 Counter에 사용하는 메트릭 이름
+	// 알림 저장 실패 횟수 Counter에 사용하는 메트릭 이름
 	private static final String NOTIFICATION_STORE_FAILURE = "mopl.notification.store.failure";
 
-	// 알림 한 건 Publish 결과 Counter에 사용하는 메트릭 이름
+	// 알림 한 건의 실시간 Publish 성공/실패 Counter에 사용하는 메트릭 이름
 	private static final String NOTIFICATION_REALTIME_PUBLISH = "mopl.notification.realtime.publish";
 
 	private final MeterRegistry meterRegistry;
@@ -65,7 +65,7 @@ public class NotificationMetrics {
 		).increment(skippedReceiverCount);
 	}
 
-	// 알림 저장 실패 건수를 알림 타입별로 기록
+	// 알림 저장 실패 횟수를 알림 타입별로 기록
 	public void recordStoreFailure(NotificationType notificationType) {
 		meterRegistry.counter(
 			NOTIFICATION_STORE_FAILURE,
@@ -73,7 +73,7 @@ public class NotificationMetrics {
 		).increment();
 	}
 
-	// 알림 한 건의 Publish 결과를 알림 타입별로 기록
+	// 알림 한 건의 실시간 Publish 성공/실패를 알림 타입별로 기록
 	public void recordRealtimePublish(NotificationType type, String result) {
 		meterRegistry.counter(
 			NOTIFICATION_REALTIME_PUBLISH,
