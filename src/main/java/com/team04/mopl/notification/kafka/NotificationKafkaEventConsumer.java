@@ -80,7 +80,7 @@ public class NotificationKafkaEventConsumer {
 
 	// 구독 중인 플레이리스트에 콘텐츠가 추가되면 해당 플레이리스트 구독자에게 알림을 보내는 listener
 	@KafkaListener(
-		id = "notification-playlistContent_added",
+		id = "notification-playlist-content-added",
 		idIsGroup = false,
 		topics = NotificationKafkaTopics.PLAYLIST_CONTENT_ADDED
 	)
@@ -181,7 +181,7 @@ public class NotificationKafkaEventConsumer {
 
 	// 사용자 권한 변경 시 해당 사용자에게 알림을 보내는 listener
 	@KafkaListener(
-		id = "notification-userRole-changed",
+		id = "notification-user-role-changed",
 		idIsGroup = false,
 		topics = NotificationKafkaTopics.USER_ROLE_CHANGED
 	)
@@ -213,7 +213,7 @@ public class NotificationKafkaEventConsumer {
 
 	// DM 생성 시 해당 사용자에게 알림을 보내는 listener
 	@KafkaListener(
-		id = "notification-directMessage-created",
+		id = "notification-direct-message-created",
 		idIsGroup = false,
 		topics = NotificationKafkaTopics.DIRECT_MESSAGE_CREATED
 	)
@@ -285,7 +285,7 @@ public class NotificationKafkaEventConsumer {
 				type,
 				level
 			);
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			// 알림 저장 실패 횟수를 메트릭에 기록
 			notificationMetrics.recordStoreFailure(type);
 			throw e;
