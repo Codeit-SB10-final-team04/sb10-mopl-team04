@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,8 @@ import com.team04.mopl.follow.redis.FollowRedisStore;
 import com.team04.mopl.follow.service.FollowService;
 import com.team04.mopl.support.IntegrationTestBase;
 import com.team04.mopl.user.entity.User;
+import com.team04.mopl.user.exception.UserErrorCode;
+import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
 @Transactional
@@ -85,6 +89,19 @@ class FollowServiceIntegrationTest extends IntegrationTestBase {
 		assertThatThrownBy(() -> followService.createFollow(request, follower.getId()))
 			.isInstanceOf(FollowException.class)
 			.hasMessageContaining(FollowErrorCode.FOLLOW_ALREADY.getMessage());
+	}
+
+	@Test
+	@DisplayName("팔로우 생성 실패: 존재하지 않는 사용자를 팔로우하려 하면 예외가 발생한다.")
+	void createFollow_Fail_UserNotFound() {
+		// given
+		UUID nonExistentUserId = UUID.randomUUID();
+		FollowRequest request = new FollowRequest(nonExistentUserId);
+
+		// when & then
+		assertThatThrownBy(() -> followService.createFollow(request, follower.getId()))
+			.isInstanceOf(UserException.class)
+			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
 	}
 
 	@Test
