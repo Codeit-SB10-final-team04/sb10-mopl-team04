@@ -8,7 +8,7 @@ import com.team04.mopl.notification.enums.NotificationType;
 
 import io.micrometer.core.instrument.MeterRegistry;
 
-// 알림 관련 실행 결과, 처리 건수 등을 Micrometer로 기록하는 컴포넌트
+// Kafka 알림 이벤트의 역직렬화/저장/실시간 Publish 결과와 처리 건수를 Micrometer로 기록하는 컴포넌트
 @Component
 public class NotificationMetrics {
 
