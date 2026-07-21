@@ -286,7 +286,13 @@ public class NotificationKafkaEventConsumer {
 		for (NotificationDto notificationDto : notificationDtoList) {
 			try {
 				notificationRealtimePublisher.publish(notificationDto);
+
+				// 알림 한 건 Publish 성공으로 메트릭에 기록
+				notificationMetrics.recordRealtimePublish(type, "success");
 			} catch (Exception e) {
+				// 알림 한 건 Publish 실패로 메트릭에 기록
+				notificationMetrics.recordRealtimePublish(type, "failure");
+
 				failureCount++;
 				log.warn("[NOTIFICATION_REALTIME_PUBLISH_FAILED] 실시간 전송 실패: receiverId={}, notificationId={}",
 					notificationDto.receiverId(), notificationDto.id(), e);
