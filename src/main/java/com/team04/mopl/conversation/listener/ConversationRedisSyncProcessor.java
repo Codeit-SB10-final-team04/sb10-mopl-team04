@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import com.team04.mopl.conversation.event.ConversationCreatedEvent;
 import com.team04.mopl.conversation.redis.ConversationRedisStore;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,7 +25,9 @@ public class ConversationRedisSyncProcessor {
 	private static final String DLQ_TOPIC = "conversation-sync-dlq";
 
 	private final ConversationRedisStore conversationRedisStore;
+
 	private final KafkaTemplate<String, Object> kafkaTemplate;
+	private final MeterRegistry meterRegistry;
 
 	@Retryable(
 		value = Exception.class,
@@ -32,46 +35,81 @@ public class ConversationRedisSyncProcessor {
 		maxAttempts = 3,
 		backoff = @Backoff(delay = 1000, multiplier = 2)
 	)
-	public void syncRedisOnConversationCreated(ConversationCreatedEvent event) {
+	public void syncRedisOnConversationCreated(ConversationCreatedEvent conversationCreatedEvent) {
 		try {
 			// 대화 참여자 목록 ID 추출
-			List<UUID> participantIds = event.participantIds();
+			List<UUID> participantIds = conversationCreatedEvent.participantIds();
 
-			if (event.participantIds().size() >= 2) {
+			if (conversationCreatedEvent.participantIds().size() >= 2) {
 				UUID user1 = participantIds.get(0);
 				UUID user2 = participantIds.get(1);
 
 				// 대화 저장 (Redis)
-				conversationRedisStore.addConversation(user1, user2, event.conversationId());
+				conversationRedisStore.addConversation(user1, user2, conversationCreatedEvent.conversationId());
 			}
 
 			// 대화 참여자 목록 저장 (Redis)
-			conversationRedisStore.addParticipants(event.conversationId(), new HashSet<>(participantIds));
+			conversationRedisStore.addParticipants(conversationCreatedEvent.conversationId(),
+				new HashSet<>(participantIds));
 
 			log.info("[REDIS_SYNC] 대화방 생성 Redis 동기화 완료: conversationId={}",
-				event.conversationId());
+				conversationCreatedEvent.conversationId());
+
+			// 커스텀 메트릭 추가: 대화방 동기화 성공
+			meterRegistry.counter(
+				"mopl.conversation.redis.sync",
+				"operation", "create", "result", "success"
+			).increment();
 		} catch (Exception e) {
 			log.error("[REDIS_SYNC] 대화방 생성 Redis 동기화 실패: conversationId={}",
-				event.conversationId(), e);
+				conversationCreatedEvent.conversationId(), e);
+
+			// 커스텀 메트릭 추가: 대화방 동기화 실패 및 재시도
+			meterRegistry.counter(
+				"mopl.conversation.redis.sync",
+				"operation", "create", "result", "failure"
+			).increment();
+			meterRegistry.counter(
+				"mopl.conversation.redis.sync.retry",
+				"operation", "create"
+			).increment();
 
 			throw e;
 		}
 	}
 
 	@Recover
-	public void recoverCreateFailure(Exception e, ConversationCreatedEvent event) {
+	public void recoverCreateFailure(
+		Exception e,
+		ConversationCreatedEvent conversationCreatedEvent
+	) {
 		try {
 			log.error("[REDIS_SYNC] 대화방 생성 Redis 동기화 최종 실패 및 DLQ 발행: conversationId={}, 원인={}",
-				event.conversationId(), e.getMessage());
+				conversationCreatedEvent.conversationId(), e.getMessage());
 
 			// 작업 저장: 5초 타임아웃
-			kafkaTemplate.send(DLQ_TOPIC, event.conversationId().toString(), event)
-				.get(5, TimeUnit.SECONDS);
+			kafkaTemplate.send(
+				DLQ_TOPIC,
+				conversationCreatedEvent.conversationId().toString(),
+				conversationCreatedEvent
+			).get(5, TimeUnit.SECONDS);
 
 			log.info("[REDIS_SYNC] 대화방 생성 Kafka DLQ 발행 완료: topic={}",
 				DLQ_TOPIC);
+
+			// 커스텀 메트릭 추가: DLQ 발행 성공
+			meterRegistry.counter(
+				"mopl.conversation.redis.sync.dlq.publish",
+				"result", "success"
+			).increment();
 		} catch (Exception kafkaException) {
 			log.error("[REDIS_SYNC] 대화방 생성 Kafka DLQ 발행 실패", kafkaException);
+
+			// 커스텀 메트릭 추가: DLQ 발행 실패
+			meterRegistry.counter(
+				"mopl.conversation.redis.sync.dlq.publish",
+				"result", "failure"
+			).increment();
 		}
 	}
 }
