@@ -125,7 +125,7 @@ class DirectMessageRestoreServiceIntegrationTest extends IntegrationTestBase {
 			sender.getId()
 		);
 
-		// Native Query를 사용하여 created_at을 11분 전으로 조작 (경계값 초과)
+		em.flush();
 		em.createNativeQuery("UPDATE direct_messages SET created_at = :time WHERE id = :id")
 			.setParameter("time", Instant.now().minus(11, ChronoUnit.MINUTES))
 			.setParameter("id", dm.id())
@@ -144,13 +144,17 @@ class DirectMessageRestoreServiceIntegrationTest extends IntegrationTestBase {
 	@DisplayName("미읽음 쪽지 복구 조회 성공: 본인의 것이 아닌 타인의 lastEventId 전달 시 null로 처리되어 Fallback(최근 미읽음 조회)으로 작동한다.")
 	void findUnreadMessagesAfter_InvalidEventId_FallbackSuccess() {
 		// given
-		User anotherUser = userRepository.save(User.builder().name("Another").email("another@example.com").build());
+		User anotherUser = userRepository.save(User.builder().
+			name("Another")
+			.email("another@example.com")
+			.build()
+		);
 		ConversationDto anotherConv = conversationService.createConversation(
 			new ConversationCreateRequest(anotherUser.getId()),
 			sender.getId()
 		);
 
-		// 다른 수신자의 메시지 (타인의 lastEventId 용도)
+		// 다른 수신자의 메시지
 		DirectMessageDto anotherMessage = directMessageService.create(
 			anotherConv.id(),
 			new DirectMessageSendRequest("Another message"),
@@ -164,11 +168,11 @@ class DirectMessageRestoreServiceIntegrationTest extends IntegrationTestBase {
 			sender.getId()
 		);
 
-		// when: 타인의 메시지 ID를 lastEventId로 전달
+		// when
 		List<DirectMessageDto> restored = directMessageRestoreService.findUnreadMessagesAfter(receiver.getId(),
 			anotherMessage.id());
 
-		// then: 예외 없이 Fallback이 작동하여 내 미읽음 메시지가 조회됨
+		// then
 		assertThat(restored).hasSize(1);
 		assertThat(restored.get(0).id()).isEqualTo(myMessage.id());
 	}
@@ -197,6 +201,6 @@ class DirectMessageRestoreServiceIntegrationTest extends IntegrationTestBase {
 
 		// then
 		assertThat(restored).hasSize(1);
-		assertThat(restored.get(0).id()).isEqualTo(dm2.id()); // 읽지 않은 두 번째 메시지만 포함
+		assertThat(restored.get(0).id()).isEqualTo(dm2.id());
 	}
 }
