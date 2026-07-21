@@ -19,8 +19,6 @@ services:
       SPRING_KAFKA_CONSUMER_GROUP_ID: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
       SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}
 
-      SPRING_ELASTICSEARCH_URIS: http://opensearch:9200
-
       MOPL_JWT_ISSUER: ${MOPL_JWT_ISSUER}
       MOPL_JWT_SECRET: ${MOPL_JWT_SECRET}
       MOPL_ACCESS_TOKEN_EXPIRATION_SECONDS: ${MOPL_ACCESS_TOKEN_EXPIRATION_SECONDS}
@@ -64,8 +62,6 @@ services:
         condition: service_healthy
       broker:
         condition: service_healthy
-      opensearch:
-        condition: service_healthy
     networks:
       # backend 네트워크에 app 서비스 연결
       - backend
@@ -90,8 +86,6 @@ services:
       redis:
         condition: service_healthy
       broker:
-        condition: service_healthy
-      opensearch:
         condition: service_healthy
     networks:
       - backend
@@ -170,32 +164,6 @@ services:
     networks:
       - backend
 
-  opensearch:
-    image: opensearchproject/opensearch:2.19.0
-    container_name: opensearch
-    environment:
-      - discovery.type=single-node
-      - DISABLE_SECURITY_PLUGIN=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
-    ports:
-      - "9200:9200"
-    volumes:
-      - opensearch-data:/usr/share/opensearch/data
-    command: >
-      bash -c '
-        if [ ! -d "plugins/analysis-nori" ]; then
-          bin/opensearch-plugin install --batch analysis-nori;
-        fi;
-        /usr/share/opensearch/opensearch-docker-entrypoint.sh
-      '
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1" ]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-    networks:
-      - backend
-
   prometheus:
     image: prom/prometheus:latest
     container_name: mopl-prometheus
@@ -214,7 +182,5 @@ volumes: # 데이터 영속성을 위한 볼륨 정의
   # PostgreSQL 데이터 저장용 볼륨
   postgres-data:
   redis-data:
-  # OpenSearch 데이터 저장용 볼륨
-  opensearch-data:
   # Prometheus 데이터 저장용 볼륨
   prometheus-data:

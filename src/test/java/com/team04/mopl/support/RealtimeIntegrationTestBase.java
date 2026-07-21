@@ -1,11 +1,13 @@
 package com.team04.mopl.support;
 
+import org.redisson.api.RedissonClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -29,17 +31,10 @@ import org.testcontainers.utility.DockerImageName;
 	"spring.kafka.consumer.group-id=mopl-notification-integration",
 	"spring.kafka.consumer.auto-offset-reset=earliest",
 	"spring.autoconfigure.exclude="
-		+ "org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchClientAutoConfiguration,"
-		+ "org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration,"
-		+ "org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration,"
-		+ "org.opensearch.spring.boot.autoconfigure.OpenSearchRestClientAutoConfiguration,"
-		+ "org.opensearch.spring.boot.autoconfigure.OpenSearchRestHighLevelClientAutoConfiguration,"
-		+ "org.opensearch.data.client.config.OpenSearchDataAutoConfiguration,"
 		+ "org.redisson.spring.starter.RedissonAutoConfigurationV2"
 })
 @SuppressWarnings("rawtypes")
-public abstract class RealtimeIntegrationTestBase
-	extends ElasticsearchMockingSupport {
+public abstract class RealtimeIntegrationTestBase {
 
 	@Container
 	@ServiceConnection
@@ -57,6 +52,9 @@ public abstract class RealtimeIntegrationTestBase
 	static GenericContainer<?> redis =
 		new GenericContainer<>("redis:7-alpine")
 			.withExposedPorts(6379);
+
+	@MockitoBean
+	protected RedissonClient redissonClient;
 
 	@DynamicPropertySource
 	static void redisProperties(DynamicPropertyRegistry registry) {

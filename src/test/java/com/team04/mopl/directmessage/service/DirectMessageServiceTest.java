@@ -96,6 +96,7 @@ class DirectMessageServiceTest {
 		given(directMessage.getId()).willReturn(directMessageId);
 
 		DirectMessageDto expectedDto = mock(DirectMessageDto.class);
+		given(expectedDto.id()).willReturn(directMessageId);
 
 		given(conversationRepository.findById(conversationId)).willReturn(Optional.of(conversation));
 		given(conversationParticipantRepository.findByConversationId(conversationId))

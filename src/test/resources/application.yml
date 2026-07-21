@@ -1,20 +1,6 @@
 spring:
-  # ===================================================================
-  # [ES 설정 비활성화 안내]
-  # 로컬 테스트 및 CI/CD 환경에서 매번 Docker(Elasticsearch)를 띄우는
-  # 오버헤드를 방지하기 위해 테스트 환경에서는 ES 자동 설정을 제외합니다.
-  #
-  # 실제 ES 쿼리 검증이 필요한 통합 테스트는 향후 Testcontainers를
-  # 도입하여 별도의 프로파일(예: test-integration)에서 진행할 예정입니다.
-  # ===================================================================
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchClientAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration
-      - org.opensearch.spring.boot.autoconfigure.OpenSearchRestClientAutoConfiguration
-      - org.opensearch.spring.boot.autoconfigure.OpenSearchRestHighLevelClientAutoConfiguration
-      - org.opensearch.data.client.config.OpenSearchDataAutoConfiguration
       - org.redisson.spring.starter.RedissonAutoConfigurationV2
   batch:
     job:
