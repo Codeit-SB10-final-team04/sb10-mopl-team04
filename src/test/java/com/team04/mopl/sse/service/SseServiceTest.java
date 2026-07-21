@@ -22,6 +22,7 @@ import com.team04.mopl.directmessage.service.DirectMessageRestoreService;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.service.NotificationRestoreService;
 import com.team04.mopl.sse.event.SseEventNames;
+import com.team04.mopl.sse.metrics.SseMetrics;
 import com.team04.mopl.sse.repository.SseEmitterRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +36,9 @@ class SseServiceTest {
 
 	@Mock
 	private DirectMessageRestoreService directMessageRestoreService;
+
+	@Mock
+	private SseMetrics sseMetrics;
 
 	@InjectMocks
 	private SseService sseService;
