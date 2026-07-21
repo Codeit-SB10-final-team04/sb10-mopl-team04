@@ -80,10 +80,13 @@ export default function () {
   let chatReceived = 0;
 
   // 2. WebSocket + STOMP 시청 세션 + 채팅
-  const wsRes = ws.connect(WS_URL, { headers: { Authorization: `Bearer ${accessToken}` } }, function (socket) {
+  // SockJS 환경에서 raw WebSocket 연결 시 /ws/websocket 경로 사용
+  const wsRes = ws.connect(`${WS_URL}/websocket`, {}, function (socket) {
+    // STOMP CONNECT 프레임에 Authorization 헤더로 JWT 전달
     socket.send(stompFrame('CONNECT', {
       'accept-version': '1.2',
       'heart-beat': '0,0',
+      Authorization: `Bearer ${accessToken}`,
     }));
 
     socket.on('message', function (msg) {

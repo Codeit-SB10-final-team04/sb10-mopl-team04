@@ -15,10 +15,11 @@ const users = new SharedArray('users', function () {
 
 export const options = {
   stages: [
-    { duration: '30s', target: 5 },
-    { duration: '1m', target: 20 },
-    { duration: '2m', target: 50 },
-    { duration: '1m', target: 0 },
+    { duration: '30s', target: 25 },    // Warm-up
+    { duration: '1m',  target: 50 },    // Normal
+    { duration: '2m',  target: 70 },    // Peak
+    { duration: '1m',  target: 70 },    // Sustain: 최대 부하 유지
+    { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {
     ws_connecting: ['p(95)<2000'],
@@ -79,16 +80,18 @@ export default function () {
   const contentId = content.id || content.contentId;
   const subscriptionId = `sub-${__VU}-${__ITER}`;
 
-  // 인증 토큰으로 WebSocket 연결
-  const wsUrl = `${WS_URL}?token=${accessToken}`;
+  // SockJS 환경에서 raw WebSocket 연결 시 /ws/websocket 경로 사용
+  const wsUrl = `${WS_URL}/websocket`;
 
   const res = ws.connect(wsUrl, {}, function (socket) {
     socket.on('open', function () {
-      // STOMP 프로토콜 연결
+      // STOMP CONNECT 프레임에 Authorization 헤더로 JWT 전달
+      // (서버의 StompAuthChannelInterceptor가 네이티브 헤더에서 Bearer 토큰 추출)
       socket.send(
         stompFrame('CONNECT', {
           'accept-version': '1.2',
           host: 'localhost',
+          Authorization: `Bearer ${accessToken}`,
         })
       );
     });
