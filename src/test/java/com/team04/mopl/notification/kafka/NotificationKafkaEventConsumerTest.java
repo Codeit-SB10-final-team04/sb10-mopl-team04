@@ -26,6 +26,7 @@ import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationType;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
+import com.team04.mopl.notification.metrics.NotificationMetrics;
 import com.team04.mopl.notification.realtime.NotificationRealtimePublisher;
 import com.team04.mopl.notification.service.NotificationService;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
@@ -49,6 +50,9 @@ class NotificationKafkaEventConsumerTest {
 
 	@Mock
 	private NotificationRealtimePublisher notificationRealtimePublisher;
+
+	@Mock
+	private NotificationMetrics notificationMetrics;
 
 	@Mock
 	private ObjectMapper objectMapper;

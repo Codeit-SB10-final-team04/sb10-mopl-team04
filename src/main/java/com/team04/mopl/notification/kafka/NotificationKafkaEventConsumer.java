@@ -17,6 +17,7 @@ import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationType;
 import com.team04.mopl.notification.kafka.exception.KafkaEventErrorCode;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
+import com.team04.mopl.notification.metrics.NotificationMetrics;
 import com.team04.mopl.notification.realtime.NotificationRealtimePublisher;
 import com.team04.mopl.notification.service.NotificationService;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
@@ -40,6 +41,8 @@ public class NotificationKafkaEventConsumer {
 
 	private final NotificationService notificationService;
 	private final NotificationRealtimePublisher notificationRealtimePublisher;
+
+	private final NotificationMetrics notificationMetrics;
 
 	private final ObjectMapper objectMapper;
 
@@ -219,9 +222,13 @@ public class NotificationKafkaEventConsumer {
 		try {
 			return objectMapper.readValue(kafkaEvent, eventClass);
 		} catch (JsonProcessingException e) {
+			String eventName = eventClass.getSimpleName();
+			notificationMetrics.recordDeserializationFailure(eventName);
+
 			log.error("[EVENT_DESERIALIZATION_FAILED] 이벤트 역직렬화 실패", e);
+
 			throw new KafkaEventException(KafkaEventErrorCode.KAFKA_EVENT_DESERIALIZATION_FAILED, e)
-				.addDetail("event", eventClass.getSimpleName());
+				.addDetail("event", eventName);
 		}
 	}
 
