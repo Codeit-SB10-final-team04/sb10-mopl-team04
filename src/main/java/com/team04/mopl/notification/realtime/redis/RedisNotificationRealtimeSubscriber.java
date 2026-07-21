@@ -11,8 +11,10 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.notification.realtime.dto.NotificationRealtimeMessage;
+import com.team04.mopl.notification.realtime.redis.metrics.RedisPubSubMetrics;
 import com.team04.mopl.sse.service.SseService;
 
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,9 +31,16 @@ public class RedisNotificationRealtimeSubscriber implements MessageListener {
 	private final SseService sseService;
 	private final ObjectMapper objectMapper;
 
+	private final RedisPubSubMetrics redisPubSubMetrics;
+
 	// Redis 채널에서 메시지가 발행될 때 Listener Container에 의해 호출됨
 	@Override
 	public void onMessage(Message message, @Nullable byte[] pattern) {
+		redisPubSubMetrics.recordReceive();
+
+		Timer.Sample sample = redisPubSubMetrics.startTimer();
+		String result = "failure";
+
 		try {
 			String body = new String(message.getBody(), StandardCharsets.UTF_8);
 			NotificationRealtimeMessage realtimeMessage =
@@ -43,10 +52,16 @@ public class RedisNotificationRealtimeSubscriber implements MessageListener {
 				realtimeMessage.eventName(),
 				realtimeMessage.data()
 			);
+
+			result = "success";
 		} catch (JsonProcessingException e) {
+			redisPubSubMetrics.recordDeserializationFailure();
+
 			log.warn("[NOTIFICATION_REALTIME_MESSAGE_DESERIALIZE_FAILED] Redis 알림 메시지 역직렬화 실패", e);
 		} catch (Exception e) {
 			log.warn("[NOTIFICATION_REALTIME_SUBSCRIBE_FAILED] Redis 알림 메시지 처리 실패", e);
+		} finally {
+			redisPubSubMetrics.recordProcess(sample, result);
 		}
 	}
 }
