@@ -8,6 +8,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.notification.kafka.exception.KafkaEventErrorCode;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
@@ -86,6 +87,19 @@ public class NotificationKafkaEventPublisher {
 
 		// UserRoleUpdatedEvent를 String으로 변환
 		sendEvent(NotificationKafkaTopics.USER_ROLE_CHANGED, event);
+	}
+
+	@Async("eventTaskExecutor")
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	public void publishDirectMessageCreatedEvent(DirectMessageCreatedEvent event) {
+		log.info("[NOTIFICATION_KAFKA_PUBLISH_START] kafka 이벤트 발행 시작: topic={}, eventType={}, eventId={}",
+			NotificationKafkaTopics.DIRECT_MESSAGE_CREATED,
+			DirectMessageCreatedEvent.class.getSimpleName(),
+			event.eventId()
+		);
+
+		// DirectMessageCreatedEvent를 String으로 변환
+		sendEvent(NotificationKafkaTopics.DIRECT_MESSAGE_CREATED, event);
 	}
 
 	private void sendEvent(String topic, Object event) {

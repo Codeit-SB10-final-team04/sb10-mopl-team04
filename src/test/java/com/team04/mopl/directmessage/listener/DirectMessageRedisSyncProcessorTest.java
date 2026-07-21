@@ -49,7 +49,7 @@ class DirectMessageRedisSyncProcessorTest {
 		UUID receiverId = UUID.randomUUID();
 		DirectMessageDto mockDto = mock(DirectMessageDto.class);
 
-		DirectMessageCreatedEvent event = new DirectMessageCreatedEvent(
+		DirectMessageCreatedEvent event = DirectMessageCreatedEvent.of(
 			UUID.randomUUID(),
 			receiverId,
 			mockDto
@@ -71,7 +71,7 @@ class DirectMessageRedisSyncProcessorTest {
 		DirectMessageDto mockDto = mock(DirectMessageDto.class);
 		given(mockDto.conversationId()).willReturn(conversationId);
 
-		DirectMessageCreatedEvent event = new DirectMessageCreatedEvent(
+		DirectMessageCreatedEvent event = DirectMessageCreatedEvent.of(
 			UUID.randomUUID(),
 			receiverId,
 			mockDto
@@ -93,7 +93,7 @@ class DirectMessageRedisSyncProcessorTest {
 		// given
 		UUID directMessageId = UUID.randomUUID();
 		DirectMessageDto mockDto = mock(DirectMessageDto.class);
-		DirectMessageCreatedEvent event = new DirectMessageCreatedEvent(
+		DirectMessageCreatedEvent event = DirectMessageCreatedEvent.of(
 			UUID.randomUUID(),
 			directMessageId,
 			mockDto
@@ -121,7 +121,7 @@ class DirectMessageRedisSyncProcessorTest {
 		// given
 		UUID directMessageId = UUID.randomUUID();
 		DirectMessageDto mockDto = mock(DirectMessageDto.class);
-		DirectMessageCreatedEvent event = new DirectMessageCreatedEvent(
+		DirectMessageCreatedEvent event = DirectMessageCreatedEvent.of(
 			UUID.randomUUID(),
 			directMessageId,
 			mockDto

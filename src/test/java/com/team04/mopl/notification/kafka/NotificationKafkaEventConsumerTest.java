@@ -17,6 +17,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team04.mopl.common.dto.UserSummary;
+import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
+import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.notification.dto.response.NotificationDto;
@@ -76,6 +79,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(event);
 		when(notificationService.saveNotificationList(
 			Set.of(playlistOwnerId),
+			event.eventId(),
 			"새 플레이리스트 구독 알림",
 			content,
 			NotificationType.SUBSCRIBE,
@@ -88,6 +92,7 @@ class NotificationKafkaEventConsumerTest {
 		// then
 		verify(notificationService).saveNotificationList(
 			Set.of(playlistOwnerId),
+			event.eventId(),
 			"새 플레이리스트 구독 알림",
 			content,
 			NotificationType.SUBSCRIBE,
@@ -124,6 +129,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(Set.of(subscriberId1, subscriberId2));
 		when(notificationService.saveNotificationList(
 			Set.of(subscriberId1, subscriberId2),
+			event.eventId(),
 			"새 콘텐츠 추가 알림",
 			content,
 			NotificationType.CONTENT_ADD,
@@ -136,6 +142,7 @@ class NotificationKafkaEventConsumerTest {
 		// then
 		verify(notificationService).saveNotificationList(
 			Set.of(subscriberId1, subscriberId2),
+			event.eventId(),
 			"새 콘텐츠 추가 알림",
 			content,
 			NotificationType.CONTENT_ADD,
@@ -167,6 +174,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(event);
 		when(notificationService.saveNotificationList(
 			Set.of(followeeId),
+			event.eventId(),
 			"새 팔로우 알림",
 			content,
 			NotificationType.FOLLOW,
@@ -179,6 +187,7 @@ class NotificationKafkaEventConsumerTest {
 		// then
 		verify(notificationService).saveNotificationList(
 			Set.of(followeeId),
+			event.eventId(),
 			"새 팔로우 알림",
 			content,
 			NotificationType.FOLLOW,
@@ -214,6 +223,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(Set.of(followerId1, followerId2));
 		when(notificationService.saveNotificationList(
 			Set.of(followerId1, followerId2),
+			event.eventId(),
 			"새 활동 알림",
 			content,
 			NotificationType.FOLLOWING_ACTIVITY,
@@ -226,6 +236,7 @@ class NotificationKafkaEventConsumerTest {
 		// then
 		verify(notificationService).saveNotificationList(
 			Set.of(followerId1, followerId2),
+			event.eventId(),
 			"새 활동 알림",
 			content,
 			NotificationType.FOLLOWING_ACTIVITY,
@@ -257,6 +268,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(event);
 		when(notificationService.saveNotificationList(
 			Set.of(userId),
+			event.eventId(),
 			"권한 변경 알림",
 			content,
 			NotificationType.ROLE_CHANGE,
@@ -269,9 +281,74 @@ class NotificationKafkaEventConsumerTest {
 		// then
 		verify(notificationService).saveNotificationList(
 			Set.of(userId),
+			event.eventId(),
 			"권한 변경 알림",
 			content,
 			NotificationType.ROLE_CHANGE,
+			NotificationLevel.INFO
+		);
+		verify(notificationRealtimePublisher).publish(notificationDto);
+	}
+
+	@Test
+	@DisplayName("DM 생성 이벤트를 소비하면 해당 사용자에게 알림을 저장하고 실시간 전송한다.")
+	void consumeDirectMessageCreatedEvent_saveNotificationAndPublishRealtimeNotification_whenValidRequest() throws
+		Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID senderId = UUID.randomUUID();
+		UUID receiverId = UUID.randomUUID();
+		UUID directMessageId = UUID.randomUUID();
+		UserSummary senderSummary = new UserSummary(
+			senderId,
+			"송신자",
+			"https://profile.sender"
+		);
+		UserSummary receiverSummary = new UserSummary(
+			receiverId,
+			"수신자",
+			"https://profile.receiver"
+		);
+		String content = "[송신자] 님이 DM을 보냈습니다.";
+
+		DirectMessageDto directMessageDto = new DirectMessageDto(
+			directMessageId,
+			UUID.randomUUID(),
+			Instant.now(),
+			senderSummary,
+			receiverSummary,
+			"안녕하세요."
+		);
+
+		DirectMessageCreatedEvent event = DirectMessageCreatedEvent.of(
+			receiverId,
+			directMessageId,
+			directMessageDto
+		);
+
+		NotificationDto notificationDto = createNotificationDto(receiverId);
+
+		when(objectMapper.readValue(kafkaEvent, DirectMessageCreatedEvent.class))
+			.thenReturn(event);
+		when(notificationService.saveNotificationList(
+			Set.of(receiverId),
+			event.eventId(),
+			"새 DM 알림",
+			content,
+			NotificationType.DM,
+			NotificationLevel.INFO
+		)).thenReturn(List.of(notificationDto));
+
+		// when
+		notificationKafkaEventConsumer.consumeDirectMessageCreatedEvent(kafkaEvent);
+
+		// then
+		verify(notificationService).saveNotificationList(
+			Set.of(receiverId),
+			event.eventId(),
+			"새 DM 알림",
+			content,
+			NotificationType.DM,
 			NotificationLevel.INFO
 		);
 		verify(notificationRealtimePublisher).publish(notificationDto);
@@ -305,6 +382,7 @@ class NotificationKafkaEventConsumerTest {
 			.thenReturn(Set.of(subscriberId1, subscriberId2));
 		when(notificationService.saveNotificationList(
 			Set.of(subscriberId1, subscriberId2),
+			event.eventId(),
 			"새 콘텐츠 추가 알림",
 			content,
 			NotificationType.CONTENT_ADD,
@@ -320,6 +398,7 @@ class NotificationKafkaEventConsumerTest {
 
 		verify(notificationService).saveNotificationList(
 			Set.of(subscriberId1, subscriberId2),
+			event.eventId(),
 			"새 콘텐츠 추가 알림",
 			content,
 			NotificationType.CONTENT_ADD,
@@ -346,6 +425,7 @@ class NotificationKafkaEventConsumerTest {
 
 		verify(notificationService, never()).saveNotificationList(
 			anySet(),
+			any(UUID.class),
 			anyString(),
 			anyString(),
 			any(NotificationType.class),

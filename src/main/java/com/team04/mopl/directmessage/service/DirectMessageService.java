@@ -1,5 +1,6 @@
 package com.team04.mopl.directmessage.service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,7 +21,6 @@ import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.entity.DirectMessage;
 import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.directmessage.event.DirectMessageReadEvent;
-import com.team04.mopl.directmessage.event.DirectMessageSentEvent;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.mapper.DirectMessageMapper;
@@ -81,17 +81,11 @@ public class DirectMessageService {
 		DirectMessageDto directMessageDto = directMessageMapper.toDto(newDirectMessage);
 
 		// 7. SSE 및 Redis 동기화를 위한 이벤트 발행
-		eventPublisher.publishEvent(new DirectMessageCreatedEvent(
-			receiver.getId(),
-			newDirectMessage.getId(),
-			directMessageDto
-		));
-
-		// 8. ES 서버 동기화를 위한 이벤트 발행
-		eventPublisher.publishEvent(new DirectMessageSentEvent(
-			conversationId,
-			newDirectMessage.getId(),
-			newDirectMessage.getContent())
+		eventPublisher.publishEvent(DirectMessageCreatedEvent.of(
+				receiver.getId(),
+				directMessageDto.id(),
+				directMessageDto
+			)
 		);
 
 		log.info("[DM_CREATE] DM 생성 완료: conversationId={}, senderId={}, dmId={}",
@@ -141,21 +135,25 @@ public class DirectMessageService {
 		// 4. 유효성 검증: 해당 대화 내 DM 존재 유무
 		validateMessageInConversation(directMessage, conversation.getId());
 
-		// 5. 유효성 검증: DM 수신인 여부
-		validateReceiver(directMessage, requestUserId);
-
-		// 6. DM 읽음 처리 및 저장
-		directMessage.markAsRead();
-
-		// 7. 읽음 처리 Redis 동기화를 위한 이벤트 발행
-		eventPublisher.publishEvent(new DirectMessageReadEvent(
-			requestUserId,
+		// 5. DM 읽음 처리 및 저장
+		int updatedCount = directMessageRepository.markAllAsRead(
 			conversationId,
-			directMessageId
-		));
+			requestUserId,
+			directMessage.getCreatedAt(),
+			Instant.now()
+		);
 
-		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}",
-			conversationId, directMessageId);
+		// 6. 읽음 처리 Redis 동기화를 위한 이벤트 발행
+		if (updatedCount > 0) {
+			eventPublisher.publishEvent(new DirectMessageReadEvent(
+				requestUserId,
+				conversationId,
+				directMessageId
+			));
+		}
+
+		log.info("[DM_CREATE_READ_STATUS] DM 읽음 상태 생성 완료: conversationId={}, directMessageId={}, updatedCount={}",
+			conversationId, directMessageId, updatedCount);
 	}
 
 	// DM 목록 조회 (정렬 + 커서 페이지네이션)
@@ -190,7 +188,7 @@ public class DirectMessageService {
 			directMessageRedisStore.initDirectMessages(conversation.getId(), allMessages);
 		}
 
-		// 5. 다음 페이지 유무 확인 및 limit (기본값: 10) 만큼 자르기
+		// 5. 다음 페이지 유무 확인 및 limit (기본값: 50) 만큼 자르기
 		boolean hasNext = directMessages.size() > directMessagePageRequest.limit();
 		List<DirectMessage> pagedDirectMessages = hasNext
 			? directMessages.subList(0, directMessagePageRequest.limit())
@@ -242,15 +240,6 @@ public class DirectMessageService {
 		if (!isParticipant) {
 			throw new ConversationException(ConversationErrorCode.CONVERSATION_ACCESS_DENIED)
 				.addDetail("conversationId", conversationId)
-				.addDetail("userId", userId);
-		}
-	}
-
-	// 유효성 검증: DM 수신인 여부
-	private void validateReceiver(DirectMessage directMessage, UUID userId) {
-		if (!directMessage.getReceiver().getId().equals(userId)) {
-			throw new DirectMessageException(DirectMessageErrorCode.DM_ACCESS_DENIED)
-				.addDetail("directMessageId", directMessage.getId())
 				.addDetail("userId", userId);
 		}
 	}

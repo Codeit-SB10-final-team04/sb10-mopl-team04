@@ -29,7 +29,7 @@ class DirectMessageRedisSyncListenerTest {
 	void onDirectMessageCreated_DelegatesToProcessor_Success() {
 		// given
 		DirectMessageDto mockDto = mock(DirectMessageDto.class);
-		DirectMessageCreatedEvent event = new DirectMessageCreatedEvent(
+		DirectMessageCreatedEvent event = DirectMessageCreatedEvent.of(
 			UUID.randomUUID(),
 			UUID.randomUUID(),
 			mockDto
