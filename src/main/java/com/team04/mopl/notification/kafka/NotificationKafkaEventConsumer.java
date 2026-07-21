@@ -250,14 +250,22 @@ public class NotificationKafkaEventConsumer {
 		log.info("[NOTIFICATION_REALTIME_PUBLISH_START] 알림 저장 및 실시간 전송 시작: receiverCount={}, type={}",
 			receiverIds.size(), type);
 
-		List<NotificationDto> notificationDtoList = notificationService.saveNotificationList(
-			receiverIds,
-			sourceEventId,
-			title,
-			content,
-			type,
-			level
-		);
+		List<NotificationDto> notificationDtoList;
+
+		try {
+			notificationDtoList = notificationService.saveNotificationList(
+				receiverIds,
+				sourceEventId,
+				title,
+				content,
+				type,
+				level
+			);
+		} catch (Exception e) {
+			// 알림 저장 실패 건수를 메트릭에 기록
+			notificationMetrics.recordStoreFailure(type);
+			throw e;
+		}
 
 		// 저장된 알림 수
 		long notificationCount = notificationDtoList.size();
