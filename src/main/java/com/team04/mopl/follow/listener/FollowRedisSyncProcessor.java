@@ -12,6 +12,7 @@ import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.follow.event.FollowDeletedEvent;
 import com.team04.mopl.follow.redis.FollowRedisStore;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,7 +24,9 @@ public class FollowRedisSyncProcessor {
 	private static final String DLQ_TOPIC = "follow-redis-sync-dlq";
 
 	private final FollowRedisStore followRedisStore;
+
 	private final KafkaTemplate<String, Object> kafkaTemplate;
+	private final MeterRegistry meterRegistry;
 
 	@Retryable(
 		value = Exception.class,
@@ -38,29 +41,62 @@ public class FollowRedisSyncProcessor {
 
 			log.info("[REDIS_SYNC] 팔로우 생성 Redis 동기화 완료: followerId={}, followeeId={}",
 				followCreatedEvent.followerId(), followCreatedEvent.followeeId());
+
+			// 커스텀 메트릭 추가: 팔로우 동기화 성공
+			meterRegistry.counter(
+				"mopl.follow.redis.sync",
+				"operation", "create", "result", "success"
+			).increment();
 		} catch (Exception e) {
 			log.error("[REDIS_SYNC] 팔로우 생성 Redis 동기화 실패: followerId={}, followeeId={}",
 				followCreatedEvent.followerId(), followCreatedEvent.followeeId(), e);
+
+			// 커스텀 메트릭 추가: 팔로우 동기화 실패 및 재시도
+			meterRegistry.counter(
+				"mopl.follow.redis.sync",
+				"operation", "create", "result", "failure"
+			).increment();
+			meterRegistry.counter(
+				"mopl.follow.redis.sync.retry",
+				"operation", "create"
+			).increment();
 
 			throw e;
 		}
 	}
 
 	@Recover
-	public void recoverCreateFailure(Exception e, FollowCreatedEvent followCreatedEvent) {
+	public void recoverCreateFailure(
+		Exception e,
+		FollowCreatedEvent followCreatedEvent
+	) {
 		try {
 			log.error("[REDIS_SYNC] 팔로우 생성 Redis 동기화 최종 실패: followerId={}, followeeId={}, 원인={}",
 				followCreatedEvent.followerId(), followCreatedEvent.followeeId(), e.getMessage());
 
-			// 작업 저장: 5초 타임아웃 (스레드 풀 방지)
-			kafkaTemplate.send(DLQ_TOPIC, followCreatedEvent.followerId().toString(), followCreatedEvent)
-				.get(5, TimeUnit.SECONDS);
+			// 작업 저장: 5초 타임아웃
+			kafkaTemplate.send(
+				DLQ_TOPIC,
+				followCreatedEvent.followerId().toString(),
+				followCreatedEvent
+			).get(5, TimeUnit.SECONDS);
 
 			log.info("[REDIS_SYNC] 팔로우 생성 Kafka DLQ 발행 완료: topic={}",
 				DLQ_TOPIC);
+
+			// 커스텀 메트릭 추가: DLQ 발행 성공
+			meterRegistry.counter(
+				"mopl.follow.redis.sync.dlq.publish",
+				"result", "success"
+			).increment();
 		} catch (Exception kafkaException) {
-			log.error("[REDIS_SYNC] 팔로우 생성 Kafka DLQ 발행 실패",
-				kafkaException);
+			log.error("[REDIS_SYNC] 팔로우 생성 Kafka DLQ 발행 실패", kafkaException);
+
+			// 커스텀 메트릭 추가: DLQ 발행 실패
+			meterRegistry.counter(
+				"mopl.follow.redis.sync.dlq.publish",
+				"result", "failure"
+			).increment();
 		}
 	}
 
@@ -77,29 +113,62 @@ public class FollowRedisSyncProcessor {
 
 			log.info("[REDIS_SYNC] 팔로우 취소 Redis 동기화 완료: followerId={}, followeeId={}",
 				followDeletedEvent.followerId(), followDeletedEvent.followeeId());
+
+			// 커스텀 메트릭 추가: 팔로우 취소 동기화 성공
+			meterRegistry.counter(
+				"mopl.follow.redis.sync",
+				"operation", "delete", "result", "success"
+			).increment();
 		} catch (Exception e) {
 			log.error("[REDIS_SYNC] 팔로우 취소 Redis 동기화 실패: followerId={}, followeeId={}",
 				followDeletedEvent.followerId(), followDeletedEvent.followeeId(), e);
+
+			// 커스텀 메트릭 추가: 팔로우 취소 동기화 실패 및 재시도
+			meterRegistry.counter(
+				"mopl.follow.redis.sync",
+				"operation", "delete", "result", "failure"
+			).increment();
+			meterRegistry.counter(
+				"mopl.follow.redis.sync.retry",
+				"operation", "delete"
+			).increment();
 
 			throw e;
 		}
 	}
 
 	@Recover
-	public void recoverDeleteFailure(Exception e, FollowDeletedEvent followDeletedEvent) {
+	public void recoverDeleteFailure(
+		Exception e,
+		FollowDeletedEvent followDeletedEvent
+	) {
 		try {
 			log.error("[REDIS_SYNC] 팔로우 취소 Redis 동기화 최종 실패: followerId={}, followeeId={}, 원인={}",
 				followDeletedEvent.followerId(), followDeletedEvent.followeeId(), e.getMessage());
 
 			// 작업 저장: 5초 타임아웃 (스레드 풀 방지)
-			kafkaTemplate.send(DLQ_TOPIC, followDeletedEvent.followerId().toString(), followDeletedEvent)
-				.get(5, TimeUnit.SECONDS);
+			kafkaTemplate.send(
+				DLQ_TOPIC,
+				followDeletedEvent.followerId().toString(),
+				followDeletedEvent
+			).get(5, TimeUnit.SECONDS);
 
 			log.info("[REDIS_SYNC] 팔로우 취소 Kafka DLQ 발행 완료: topic={}",
 				DLQ_TOPIC);
+
+			// 커스텀 메트릭 추가: DLQ 발행 성공
+			meterRegistry.counter(
+				"mopl.follow.redis.sync.dlq.publish",
+				"result", "success"
+			).increment();
 		} catch (Exception kafkaException) {
-			log.error("[REDIS_SYNC] 팔로우 취소 Kafka DLQ 발행 실패",
-				kafkaException);
+			log.error("[REDIS_SYNC] 팔로우 취소 Kafka DLQ 발행 실패", kafkaException);
+
+			// 커스텀 메트릭 추가: DLQ 발행 실패
+			meterRegistry.counter(
+				"mopl.follow.redis.sync.dlq.publish",
+				"result", "failure"
+			).increment();
 		}
 	}
 }
