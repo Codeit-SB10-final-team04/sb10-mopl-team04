@@ -2,6 +2,8 @@ package com.team04.mopl.directmessage.integration;
 
 import static org.assertj.core.api.Assertions.*;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,6 +26,8 @@ import com.team04.mopl.support.IntegrationTestBase;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.repository.UserRepository;
 
+import jakarta.persistence.EntityManager;
+
 @Transactional
 @RecordApplicationEvents
 class DirectMessageRestoreServiceIntegrationTest extends IntegrationTestBase {
@@ -42,6 +46,9 @@ class DirectMessageRestoreServiceIntegrationTest extends IntegrationTestBase {
 
 	@Autowired
 	private ApplicationEvents applicationEvents;
+
+	@Autowired
+	private EntityManager em;
 
 	private User sender;
 	private User receiver;
@@ -106,5 +113,90 @@ class DirectMessageRestoreServiceIntegrationTest extends IntegrationTestBase {
 
 		// then
 		assertThat(restored).isNotEmpty();
+	}
+
+	@Test
+	@DisplayName("미읽음 쪽지 복구 조회 실패: 생성된 지 RECOVERY_MINUTES(10분)가 초과된 미읽음 쪽지는 복구 대상에서 제외된다.")
+	void findUnreadMessagesAfter_Fail_TimeLimitExceeded() {
+		// given
+		DirectMessageDto dm = directMessageService.create(
+			conversationId,
+			new DirectMessageSendRequest("Old Message"),
+			sender.getId()
+		);
+
+		// Native Query를 사용하여 created_at을 11분 전으로 조작 (경계값 초과)
+		em.createNativeQuery("UPDATE direct_messages SET created_at = :time WHERE id = :id")
+			.setParameter("time", Instant.now().minus(11, ChronoUnit.MINUTES))
+			.setParameter("id", dm.id())
+			.executeUpdate();
+		em.clear();
+
+		// when
+		List<DirectMessageDto> restored = directMessageRestoreService.findUnreadMessagesAfter(receiver.getId(),
+			UUID.randomUUID());
+
+		// then
+		assertThat(restored).isEmpty();
+	}
+
+	@Test
+	@DisplayName("미읽음 쪽지 복구 조회 성공: 본인의 것이 아닌 타인의 lastEventId 전달 시 null로 처리되어 Fallback(최근 미읽음 조회)으로 작동한다.")
+	void findUnreadMessagesAfter_InvalidEventId_FallbackSuccess() {
+		// given
+		User anotherUser = userRepository.save(User.builder().name("Another").email("another@example.com").build());
+		ConversationDto anotherConv = conversationService.createConversation(
+			new ConversationCreateRequest(anotherUser.getId()),
+			sender.getId()
+		);
+
+		// 다른 수신자의 메시지 (타인의 lastEventId 용도)
+		DirectMessageDto anotherMessage = directMessageService.create(
+			anotherConv.id(),
+			new DirectMessageSendRequest("Another message"),
+			sender.getId()
+		);
+
+		// 내 메시지
+		DirectMessageDto myMessage = directMessageService.create(
+			conversationId,
+			new DirectMessageSendRequest("My message"),
+			sender.getId()
+		);
+
+		// when: 타인의 메시지 ID를 lastEventId로 전달
+		List<DirectMessageDto> restored = directMessageRestoreService.findUnreadMessagesAfter(receiver.getId(),
+			anotherMessage.id());
+
+		// then: 예외 없이 Fallback이 작동하여 내 미읽음 메시지가 조회됨
+		assertThat(restored).hasSize(1);
+		assertThat(restored.get(0).id()).isEqualTo(myMessage.id());
+	}
+
+	@Test
+	@DisplayName("미읽음 쪽지 복구 조회 성공: 이미 읽음 처리(markAsRead)된 메시지는 복구 결과에 포함되지 않는다.")
+	void findUnreadMessagesAfter_ExcludeReadMessages_Success() {
+		// given
+		DirectMessageDto dm1 = directMessageService.create(
+			conversationId,
+			new DirectMessageSendRequest("Read Message"),
+			sender.getId()
+		);
+		DirectMessageDto dm2 = directMessageService.create(
+			conversationId,
+			new DirectMessageSendRequest("Unread Message"),
+			sender.getId()
+		);
+
+		// 첫 번째 메시지를 읽음 처리
+		directMessageService.markAsRead(conversationId, dm1.id(), receiver.getId());
+
+		// when
+		List<DirectMessageDto> restored = directMessageRestoreService.findUnreadMessagesAfter(receiver.getId(),
+			UUID.randomUUID());
+
+		// then
+		assertThat(restored).hasSize(1);
+		assertThat(restored.get(0).id()).isEqualTo(dm2.id()); // 읽지 않은 두 번째 메시지만 포함
 	}
 }
