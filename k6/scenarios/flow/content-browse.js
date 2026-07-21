@@ -37,24 +37,56 @@ export default function () {
   const accessToken = login(user.email, user.password);
   const headers = { ...authHeaders(accessToken), 'Content-Type': 'application/json' };
 
-  // TODO(human): 콘텐츠 탐색 플로우 구현
-  // 유저가 콘텐츠를 탐색하는 실제 사용 패턴을 시뮬레이션하세요.
-  //
-  // 추천 플로우:
   //   1. 콘텐츠 목록 조회 (인기순)
+  const listRes = http.get(
+      `${BASE_URL}/api/contents?sortBy=watcherCount&sortDirection=DESCENDING&limit=20`,
+      { headers, tags: { name: 'content_list' } }
+  );
+
+  check(listRes, {'콘텐츠 목록 200' : (r) => r.status === 200 } )
+
+  const contents = JSON.parse(listRes.body).data || [];
+  if (contents.length === 0) {
+    return;
+  };
+
+  thinkTime(1, 3);
+
   //   2. 키워드 검색 (SEARCH_KEYWORDS에서 랜덤)
+  const keyword = randomItem(SEARCH_KEYWORDS);
+
+  const keywordRes = http.get(
+      `${BASE_URL}/api/contents?keywordLike=${keyword}&limit=20`,
+      { headers, tags: { name: 'content_search' } }
+  );
+
+  const details = JSON.parse(keywordRes.body).data;
+  if (details.length === 0) {
+    return;
+  }
+
+  check(keywordRes, { '콘텐츠 키워드 검색 200': (r) => r.status === 200} );
+
+  thinkTime(1, 3);
+
   //   3. 콘텐츠 상세 조회
+  const detail = randomItem(details.slice(0, 5));
+  const detailRes = http.get(
+      `${BASE_URL}/api/contents/${detail.id}`,
+      { headers, tags: { name: 'content_detail' } }
+  );
+
+  check(detailRes, { '콘텐츠 상세 200': (r) => r.status === 200});
+
+  thinkTime(1, 3);
+
   //   4. 해당 콘텐츠의 리뷰 목록 조회
-  //
-  // 사용 가능한 API:
-  //   GET /api/contents?sortBy=watcherCount&sortDirection=DESCENDING&limit=20
-  //   GET /api/contents?keywordLike={keyword}&limit=20
-  //   GET /api/contents/{id}
-  //   GET /api/reviews?contentId={id}&sortBy=createdAt&sortDirection=DESCENDING&limit=20
-  //
-  // 힌트:
-  //   - thinkTime(1, 3) 으로 단계 사이 대기
-  //   - check(res, { '이름': (r) => r.status === 200 }) 으로 응답 검증
-  //   - JSON.parse(res.body).data 로 목록 데이터 접근
-  //   - headers 변수에 인증 헤더가 이미 들어있음
+  const detailId = detail.id || detail.contentId;
+
+  const reviewRes = http.get(
+      `${BASE_URL}/api/reviews?contentId=${detailId}&sortBy=createdAt&sortDirection=DESCENDING&limit=20`,
+      { headers, tags: { name: 'review_list' } }
+  );
+
+  check(reviewRes, { '리뷰 목록 조회 200': (r) => r.status === 200} );
 }
