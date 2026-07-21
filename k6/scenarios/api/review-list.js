@@ -2,7 +2,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 
-import { login } from '../../shared/auth.js';
+import { loginAll, headersFromSetup } from '../../shared/auth.js';
 import { BASE_URL } from '../../shared/config.js';
 
 const users = new SharedArray('users', function () {
@@ -29,10 +29,13 @@ export const options = {
   },
 };
 
-export default function () {
-  const user = users[(__VU - 1) % users.length];
-  const accessToken = login(user.email, user.password);
-  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` };
+export function setup() {
+  return { tokens: loginAll(users) };
+}
+
+export default function (data) {
+  const token = data.tokens[(__VU - 1) % data.tokens.length];
+  const headers = { 'Content-Type': 'application/json', ...headersFromSetup(token) };
 
   // 콘텐츠 목록에서 랜덤 선택
   const listRes = http.get(

@@ -3,7 +3,7 @@ import { check } from 'k6';
 import { SharedArray } from 'k6/data';
 import { sleep } from 'k6';
 
-import { login, authHeaders } from '../../shared/auth.js';
+import { loginAll, headersFromSetup } from '../../shared/auth.js';
 import { BASE_URL } from '../../shared/config.js';
 
 const users = new SharedArray('users', function () {
@@ -34,13 +34,13 @@ export const options = {
   },
 };
 
-export function setup() {}
+export function setup() {
+  return { tokens: loginAll(users) };
+}
 
-export default function () {
-  // VU별 고유 유저 배정
-  const user = users[(__VU - 1) % users.length];
-  const accessToken = login(user.email, user.password);
-  const headers = authHeaders(accessToken);
+export default function (data) {
+  const token = data.tokens[(__VU - 1) % data.tokens.length];
+  const headers = headersFromSetup(token);
 
   // 랜덤 키워드로 콘텐츠 검색 커서 기반 페이지네이션 (최대 3페이지)
   const keyword = keywords[Math.floor(Math.random() * keywords.length)];

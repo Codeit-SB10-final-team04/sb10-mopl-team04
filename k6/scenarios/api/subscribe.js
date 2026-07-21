@@ -3,7 +3,7 @@ import { check } from 'k6';
 import { SharedArray } from 'k6/data';
 import { sleep } from 'k6';
 
-import { login, authHeaders } from '../../shared/auth.js';
+import { loginAll, headersFromSetup } from '../../shared/auth.js';
 import { BASE_URL } from '../../shared/config.js';
 
 const users = new SharedArray('users', function () {
@@ -24,14 +24,15 @@ export const options = {
   },
 };
 
-export function setup() {}
+export function setup() {
+  return { tokens: loginAll(users) };
+}
 
-export default function () {
-  // VU별 고유 유저 배정
+export default function (data) {
   const user = users[(__VU - 1) % users.length];
-  const accessToken = login(user.email, user.password);
+  const token = data.tokens[(__VU - 1) % data.tokens.length];
   const headers = {
-    ...authHeaders(accessToken),
+    ...headersFromSetup(token),
     'Content-Type': 'application/json',
   };
 
