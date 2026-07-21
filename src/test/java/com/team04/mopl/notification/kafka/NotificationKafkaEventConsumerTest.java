@@ -440,7 +440,7 @@ class NotificationKafkaEventConsumerTest {
 
 	@Test
 	@DisplayName("일부 수신자의 알림이 중복이면 저장 건수와 중복 제외 수신자 수를 기록한다.")
-	void consumeKafkaEvent_recordCreatedAndDuplicateSkipped_whenSomeNotificationAreDuplicate() throws Exception {
+	void consumeKafkaEvent_recordSavedAndDuplicateSkipped_whenSomeNotificationAreDuplicate() throws Exception {
 		// given
 		String kafkaEvent = "{}";
 		UUID playlistId = UUID.randomUUID();

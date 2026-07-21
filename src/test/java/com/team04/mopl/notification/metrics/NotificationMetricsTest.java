@@ -43,7 +43,7 @@ class NotificationMetricsTest {
 	}
 
 	@Test
-	@DisplayName("저장된 알림 건수가 양수면 알림 생성 Counter를 해당 건수만큼 증가시킨다.")
+	@DisplayName("저장된 알림 건수가 양수면 알림 저장 Counter를 해당 건수만큼 증가시킨다.")
 	void recordSaved_incrementCounterByNotificationCount_whenCountIsPositive() {
 		// given
 		NotificationType type = NotificationType.SUBSCRIBE;
@@ -63,7 +63,7 @@ class NotificationMetricsTest {
 	}
 
 	@Test
-	@DisplayName("저장된 알림 건수가 0 이하면 알림 생성 Counter를 등록하지 않는다.")
+	@DisplayName("저장된 알림 건수가 0 이하면 알림 저장 Counter를 등록하지 않는다.")
 	void recordSaved_doesNotRegisterCounter_whenCountIsNotPositive() {
 		// given
 		NotificationType type = NotificationType.SUBSCRIBE;
