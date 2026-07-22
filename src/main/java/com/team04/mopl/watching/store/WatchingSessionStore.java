@@ -63,6 +63,10 @@ public class WatchingSessionStore {
 		local joinedAt = redis.call('HGET', KEYS[1], 'joinedAt')
 		redis.call('DEL', KEYS[1])
 		redis.call('SREM', KEYS[3], ARGV[3])
+		-- 마지막 세션 제거 후 빈 집합이면 키를 완전히 삭제하여 과다 집계 방지
+		if redis.call('SCARD', KEYS[3]) == 0 then
+		   redis.call('DEL', KEYS[3])
+		end
 		local remaining = redis.call('SMEMBERS', KEYS[3])
 		for _, sid in ipairs(remaining) do
 		   local cid = redis.call('HGET', 'watching:session:' .. sid, 'contentId')
@@ -73,12 +77,10 @@ public class WatchingSessionStore {
 		redis.call('ZREM', KEYS[2], ARGV[1])
 		return joinedAt
 		""", String.class);
-	// Lua: CONNECT 시 session Hash + user-sessions 등록 (원자적 + expire)
+	// Lua: CONNECT 시 session Hash 등록 (user-sessions는 실제 join 시점에 SADD하도록 분리하여 정확한 시청자 집계 보장)
 	private static final DefaultRedisScript<String> REGISTER_SCRIPT = new DefaultRedisScript<>("""
 		redis.call('HSET', KEYS[1], 'userId', ARGV[1])
-		redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))
-		redis.call('SADD', KEYS[2], ARGV[2])
-		redis.call('EXPIRE', KEYS[2], tonumber(ARGV[3]))
+		redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
 		return '1'
 		""", String.class);
 	private final StringRedisTemplate redisTemplate;
@@ -88,12 +90,11 @@ public class WatchingSessionStore {
 	// CONNECT 시 최소 정보 저장 (userId만, contentId는 SUBSCRIBE 시 join에서 추가)
 	public void registerSession(String sessionId, UUID userId) {
 		List<String> keys = Arrays.asList(
-			String.format(SESSION_KEY, sessionId),
-			String.format(USER_SESSIONS_KEY, userId)
+			String.format(SESSION_KEY, sessionId)
 		);
 
 		redisTemplate.execute(REGISTER_SCRIPT, keys,
-			userId.toString(), sessionId, String.valueOf(TTL_SECONDS));
+			userId.toString(), String.valueOf(TTL_SECONDS));
 	}
 
 	// 시청 세션 입장 (Lua 원자적 처리)
