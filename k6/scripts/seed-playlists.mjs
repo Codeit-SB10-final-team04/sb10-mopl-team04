@@ -72,6 +72,15 @@ const validateConfiguration = () => {
   if (!isLocalTarget() && !allowRemoteSeed) {
     throw new Error('원격 서버 시딩이 차단됐습니다. ALLOW_REMOTE_SEED=true를 명시해야 합니다.');
   }
+  if (!Number.isInteger(playlistsPerUser) || playlistsPerUser < 1 || playlistsPerUser > 10) {
+    throw new Error('PLAYLISTS_PER_USER는 1 이상 10 이하여야 합니다.');
+  }
+  if (!Number.isInteger(contentsPerPlaylist) || contentsPerPlaylist < 1 || contentsPerPlaylist > 20) {
+    throw new Error('CONTENTS_PER_PLAYLIST는 1 이상 20 이하여야 합니다.');
+  }
+  if (!Number.isInteger(subscriptionsPerUser) || subscriptionsPerUser < 1 || subscriptionsPerUser > 20) {
+    throw new Error('SUBSCRIPTIONS_PER_USER는 1 이상 20 이하여야 합니다.');
+  }
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 20) {
     throw new Error('SEED_CONCURRENCY는 1 이상 20 이하여야 합니다.');
   }
