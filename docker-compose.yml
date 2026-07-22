@@ -175,6 +175,23 @@ services:
     networks:
       - backend
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mopl-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - backend
+
 networks: # 서비스 간 통신을 위한 네트워크 정의
   backend:
 
@@ -184,3 +201,5 @@ volumes: # 데이터 영속성을 위한 볼륨 정의
   redis-data:
   # Prometheus 데이터 저장용 볼륨
   prometheus-data:
+  # Grafana 데이터 저장용 볼륨
+  grafana-data:
