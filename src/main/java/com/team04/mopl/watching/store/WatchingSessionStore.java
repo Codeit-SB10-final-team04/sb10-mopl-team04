@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
@@ -17,6 +18,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -80,6 +82,8 @@ public class WatchingSessionStore {
 		return '1'
 		""", String.class);
 	private final StringRedisTemplate redisTemplate;
+
+	private final MeterRegistry meterRegistry;
 
 	// CONNECT 시 최소 정보 저장 (userId만, contentId는 SUBSCRIBE 시 join에서 추가)
 	public void registerSession(String sessionId, UUID userId) {
@@ -206,17 +210,23 @@ public class WatchingSessionStore {
 
 	// 현재 전체 활성 세션 수 조회
 	public double getTotalActiveSessionCount() {
-		return getCountByPattern("watching:session:*");
+		return getCountByPattern("watching:session:*", "watching:cache:count:sessions");
 	}
 
 	// 현재 시청 중인 전체 사용자 수 조회
 	public double getTotalActiveWatcherCount() {
-		return getCountByPattern("watching:user-sessions:*");
+		return getCountByPattern("watching:user-sessions:*", "watching:cache:count:users");
 	}
 
-	// 공통 메서드: 패턴 기반 Key 개수 반환
-	private long getCountByPattern(String pattern) {
-		// redisTemplate.execute를 통해 하위 수준의 RedisConnection을 직접 다룹니다.
+	// 공통 메서드: 패턴 기반 Key 개수 반환 (스캔 부하 완화를 위한 15초 짧은 캐시 적용)
+	private long getCountByPattern(String pattern, String cacheKey) {
+		// 1. 캐시 확인
+		String cachedCount = redisTemplate.opsForValue().get(cacheKey);
+		if (cachedCount != null) {
+			return Long.parseLong(cachedCount);
+		}
+
+		// 2. 캐시 미스 시 SCAN 수행
 		Long count = redisTemplate.execute((RedisCallback<Long>)connection -> {
 			long size = 0;
 
@@ -233,13 +243,27 @@ public class WatchingSessionStore {
 			} catch (Exception e) {
 				log.error("[WATCHING_SESSION_STORE] Redis Scan 중 오류 발생: pattern={}",
 					pattern, e);
+
+				// 커스텀 메트릭 추가: SCAN 실패 횟수 기록
+				meterRegistry.counter(
+					"mopl.watching.scan.error",
+					"pattern", pattern
+				).increment();
 			}
 
 			return size;
 		});
 
-		return count != null
-			? count
-			: 0;
+		long finalCount = count != null ? count : 0;
+
+		// 3. 중복 스캔 방지: 15초
+		redisTemplate.opsForValue().set(
+			cacheKey,
+			String.valueOf(finalCount),
+			15,
+			TimeUnit.SECONDS
+		);
+
+		return finalCount;
 	}
 }
