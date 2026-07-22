@@ -38,7 +38,7 @@ public class ConversationDlqConsumer {
 					"create"
 				)
 				.increment();
-			
+
 			log.error("[DLQ_CONSUMER] 대화방 생성 Redis 동기화 최종 실패: Payload={}",
 				conversationCreatedEvent);
 
