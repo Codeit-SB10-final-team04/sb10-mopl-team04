@@ -1,5 +1,7 @@
 package com.team04.mopl.common.stomp;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.context.event.EventListener;
@@ -19,6 +21,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class WebSocketEventListener {
 
+	private final Set<String> connectedSessionIds = ConcurrentHashMap.newKeySet();
+
 	private final MeterRegistry meterRegistry;
 
 	private AtomicInteger activeConnections;
@@ -32,32 +36,43 @@ public class WebSocketEventListener {
 		);
 	}
 
-	// 웹소켓 연결
+	// 웹소켓 연결 성공
 	@EventListener
 	public void handleWebSocketConnectListener(SessionConnectedEvent sessionConnectedEvent) {
-		activeConnections.incrementAndGet();
+		StompHeaderAccessor accessor = StompHeaderAccessor.wrap(sessionConnectedEvent.getMessage());
+		String sessionId = accessor.getSessionId();
 
-		meterRegistry.counter(
-			"mopl.websocket.connection",
-			"status", "connected"
-		).increment();
+		// 세션 ID가 추가된 경우에만, 카운트 증가
+		if (sessionId != null && connectedSessionIds.add(sessionId)) {
+			activeConnections.incrementAndGet();
 
-		log.debug("[WEBSOCKET_CONNECT] 웹소켓 연결 성공: 현재 활성화 된 웹소켓 개수={}",
-			activeConnections.get());
+			meterRegistry.counter(
+				"mopl.websocket.connection",
+				"status", "connected"
+			).increment();
+
+			log.debug("[WEBSOCKET_CONNECT] 웹소켓 연결 성공: 현재 활성화 된 웹소켓 개수={}",
+				activeConnections.get());
+		}
 	}
 
 	// 웹소켓 연결 해제
 	@EventListener
 	public void handleWebSocketDisconnectListener(SessionDisconnectEvent sessionDisconnectEvent) {
-		activeConnections.decrementAndGet();
+		String sessionId = sessionDisconnectEvent.getSessionId();
 
-		meterRegistry.counter(
-			"mopl.websocket.connection",
-			"status", "disconnected"
-		).increment();
+		// 세션 ID가 제거된 경우에만, 카운트 감소
+		if (sessionId != null && connectedSessionIds.remove(sessionId)) {
+			activeConnections.decrementAndGet();
 
-		log.debug("[WEBSOCKET_CONNECT] 웹소켓 연결 해제 성공: 현재 활성화 된 웹소켓 개수={}",
-			activeConnections.get());
+			meterRegistry.counter(
+				"mopl.websocket.connection",
+				"status", "disconnected"
+			).increment();
+
+			log.debug("[WEBSOCKET_CONNECT] 웹소켓 연결 해제 성공: 현재 활성화 된 웹소켓 개수={}",
+				activeConnections.get());
+		}
 	}
 
 	// 웹소켓 구독 성공
