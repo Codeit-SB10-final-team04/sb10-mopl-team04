@@ -9,6 +9,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageDeliveryException;
+import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
@@ -19,6 +20,7 @@ import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.watching.event.WatchingSessionEvent;
 import com.team04.mopl.watching.service.WatchingSessionService;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -36,9 +38,9 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 	// subscriptionId → contentId 매핑 (UNSUBSCRIBE 시 destination 복원용)
 	private final ConcurrentHashMap<String, String> watchSubscriptions = new ConcurrentHashMap<>();
 
-
 	private final WatchingSessionService watchingSessionService;
 	private final ApplicationEventPublisher eventPublisher;
+	private final MeterRegistry meterRegistry;
 
 	@Override
 	public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -48,16 +50,70 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 			return message;
 		}
 
-		switch (accessor.getCommand()) {
-			case SUBSCRIBE -> handleSubscribe(message, accessor);
-			case SEND -> handleSend(message, accessor);
-			case UNSUBSCRIBE -> handleUnsubscribe(accessor);
-			case DISCONNECT -> handleDisconnect(accessor);
-			default -> {
+		try {
+			switch (accessor.getCommand()) {
+				case SUBSCRIBE -> handleSubscribe(message, accessor);
+				case SEND -> handleSend(message, accessor);
+				case UNSUBSCRIBE -> handleUnsubscribe(accessor);
+				case DISCONNECT -> handleDisconnect(accessor);
+				default -> {
+				}
 			}
+		} catch (Exception e) {
+			// 커스텀 메트릭 추가
+			recordFailureMetrics(accessor, e);
+
+			throw e;
 		}
 
 		return message;
+	}
+
+	// 커스텀 메트릭 추가: 구독 실패
+	private void recordFailureMetrics(StompHeaderAccessor accessor, Exception e) {
+		String destination = accessor.getDestination();
+
+		if (destination == null) {
+			return;
+		}
+
+		if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+			String destinationType = determineDestinationType(destination);
+
+			// 커스텀 메트릭 추가: 구독 실패 횟수
+			meterRegistry.counter(
+				"mopl.stomp.subscription",
+				"destination_type", destinationType,
+				"result", "failure"
+			).increment();
+
+		} else if (StompCommand.SEND.equals(accessor.getCommand())) {
+			// 예외 메시지에 따라 reason 분류
+			String reason = (e.getMessage() != null && e.getMessage().contains("시청 세션에 먼저 참여"))
+				? "not_watching"
+				: "unauthorized";
+
+			// 커스텀 메트릭 추가: 메시지 전송 거부 횟수
+			meterRegistry.counter(
+				"mopl.stomp.rejected",
+				"operation", "send",
+				"reason", reason
+			).increment();
+		}
+	}
+
+	// 구독 유형 추출: 구독 URL 경로를 기반으로 구독 유형 추출
+	private String determineDestinationType(String destination) {
+		if (destination.contains("/direct-messages")) {
+			return "dm";
+		}
+		if (destination.contains("/chat")) {
+			return "content_chat";
+		}
+		if (destination.contains("/watch")) {
+			return "watching_session";
+		}
+		return "other";
 	}
 
 	private void handleSubscribe(Message<?> message, StompHeaderAccessor accessor) {
@@ -177,5 +233,4 @@ public class StompWatchingInterceptor implements ChannelInterceptor {
 
 		return userDetails.getUserId();
 	}
-
 }

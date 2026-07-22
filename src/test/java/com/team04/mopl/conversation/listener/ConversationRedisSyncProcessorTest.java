@@ -15,12 +15,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.conversation.event.ConversationCreatedEvent;
 import com.team04.mopl.conversation.redis.ConversationRedisStore;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class ConversationRedisSyncProcessorTest {
@@ -32,6 +37,12 @@ class ConversationRedisSyncProcessorTest {
 
 	@Mock
 	private KafkaTemplate<String, Object> kafkaTemplate;
+
+	@Mock
+	private ObjectMapper objectMapper;
+
+	@Spy
+	private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
 	@InjectMocks
 	private ConversationRedisSyncProcessor conversationRedisSyncProcessor;
@@ -114,7 +125,7 @@ class ConversationRedisSyncProcessorTest {
 	======================================
 	 */
 	@Test
-	@DisplayName("성공: 생성 동기화 최종 실패 시(@Recover), Kafka DLQ 토픽으로 이벤트를 정상적으로 발행한다.")
+	@DisplayName("성공: 생성 동기화 최종 실패 시(@Recover), 이벤트를 JSON으로 직렬화하여 Kafka DLQ 토픽으로 정상 발행한다.")
 	void recoverCreateFailure_Success() throws Exception {
 		// given
 		UUID conversationId = UUID.randomUUID();
@@ -125,10 +136,13 @@ class ConversationRedisSyncProcessorTest {
 		);
 
 		Exception syncException = new RuntimeException("최종 실패 예외");
+		String mockPayload = "{\"test\":\"json\"}";
+
+		given(objectMapper.writeValueAsString(event)).willReturn(mockPayload);
 
 		// Kafka 통신 CompletableFuture
 		CompletableFuture<SendResult<String, Object>> future = mock(CompletableFuture.class);
-		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(conversationId.toString()), eq(event)))
+		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(conversationId.toString()), eq(mockPayload)))
 			.willReturn(future);
 		given(future.get(5, TimeUnit.SECONDS)).willReturn(mock(SendResult.class));
 
@@ -136,13 +150,22 @@ class ConversationRedisSyncProcessorTest {
 		conversationRedisSyncProcessor.recoverCreateFailure(syncException, event);
 
 		// then
-		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, conversationId.toString(), event);
+		verify(objectMapper, times(1)).writeValueAsString(event);
+		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, conversationId.toString(), mockPayload);
 		verify(future, times(1)).get(5, TimeUnit.SECONDS);
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.conversation.redis.sync.dlq.publish")
+			.tag("operation", "create")
+			.tag("result", "success")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 
 	@Test
-	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되어 시스템이 중단되지 않는다.")
-	void recoverCreateFailure_KafkaFail_SafelyCaught() {
+	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외 발생 시, 예외를 다시 던져 오프셋 커밋을 방지한다.")
+	void recoverCreateFailure_KafkaFail_ThrowsException() throws Exception {
 		// given
 		UUID conversationId = UUID.randomUUID();
 		ConversationCreatedEvent event = new ConversationCreatedEvent(
@@ -150,14 +173,24 @@ class ConversationRedisSyncProcessorTest {
 			List.of(UUID.randomUUID(), UUID.randomUUID()),
 			Instant.now()
 		);
-
 		Exception syncException = new RuntimeException("최종 실패 예외");
+		String mockPayload = "{\"test\":\"json\"}";
 
+		given(objectMapper.writeValueAsString(event)).willReturn(mockPayload);
 		willThrow(new RuntimeException("Kafka Broker Down"))
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
 		// when & then
-		assertThatCode(() -> conversationRedisSyncProcessor.recoverCreateFailure(syncException, event))
-			.doesNotThrowAnyException();
+		assertThatThrownBy(() -> conversationRedisSyncProcessor.recoverCreateFailure(syncException, event))
+			.isInstanceOf(RuntimeException.class)
+			.hasMessageContaining("DLQ 발행 실패로 인한 이벤트 유실 방지");
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.conversation.redis.sync.dlq.publish")
+			.tag("operation", "create")
+			.tag("result", "failure")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 }

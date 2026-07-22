@@ -11,8 +11,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import jakarta.annotation.PreDestroy;
-
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.stereotype.Service;
@@ -37,6 +35,10 @@ import com.team04.mopl.watching.enums.ChangeType;
 import com.team04.mopl.watching.event.WatchingSessionEvent;
 import com.team04.mopl.watching.store.WatchingSessionStore;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -52,49 +54,110 @@ public class WatchingSessionService {
 	private final ContentRepository contentRepository;
 	private final SimpUserRegistry simpUserRegistry;
 	private final ApplicationEventPublisher eventPublisher;
+	private final MeterRegistry meterRegistry;
 	private final ScheduledExecutorService joinBroadcastScheduler = Executors.newScheduledThreadPool(2);
-
-	@PreDestroy
-	void shutdownScheduler() {
-		joinBroadcastScheduler.shutdown();
-	}
 
 	public WatchingSessionService(
 		WatchingSessionStore watchingSessionStore,
 		UserRepository userRepository,
 		ContentRepository contentRepository,
 		@org.springframework.context.annotation.Lazy SimpUserRegistry simpUserRegistry,
-		ApplicationEventPublisher eventPublisher
+		ApplicationEventPublisher eventPublisher,
+		MeterRegistry meterRegistry
 	) {
 		this.watchingSessionStore = watchingSessionStore;
 		this.userRepository = userRepository;
 		this.contentRepository = contentRepository;
 		this.simpUserRegistry = simpUserRegistry;
 		this.eventPublisher = eventPublisher;
+		this.meterRegistry = meterRegistry;
+	}
+
+	@PostConstruct
+	void initGauges() {
+		// 커스텀 메트릭: 현재 전체 활성 시청자 수
+		meterRegistry.gauge(
+			"mopl.watching.active.watchers",
+			watchingSessionStore,
+			WatchingSessionStore::getTotalActiveWatcherCount
+		);
+
+		// 커스텀 메트릭: 현재 활성 Watching Session 개수
+		meterRegistry.gauge(
+			"mopl.watching.active.sessions",
+			watchingSessionStore,
+			WatchingSessionStore::getTotalActiveSessionCount
+		);
+	}
+
+	@PreDestroy
+	void shutdownScheduler() {
+		joinBroadcastScheduler.shutdown();
 	}
 
 	// 시청 세션 입장
 	public Optional<WatchingSessionChange> join(UUID contentId, UUID userId, String sessionId) {
+		// 커스텀 메트릭: 시청 세션 입장 처리 시간 측정 시작
+		Timer.Sample sample = Timer.start(meterRegistry);
+
 		log.info("[WATCHING_SESSION_JOIN] 시청 세션 입장 시작: contentId={}, userId={}, sessionId={}",
 			contentId, userId, sessionId);
 
-		User user = getUserOrThrow(userId);
-		Content content = getContentOrThrow(contentId);
+		try {
+			User user = getUserOrThrow(userId);
+			Content content = getContentOrThrow(contentId);
 
-		Optional<Instant> joinedAt = watchingSessionStore.join(sessionId, userId, contentId);
+			Optional<Instant> joinedAt = watchingSessionStore.join(sessionId, userId, contentId);
 
-		if (joinedAt.isEmpty()) {
-			log.debug("[WATCHING_SESSION_JOIN] 추가 탭 입장 (브로드캐스트 없음): contentId={}, userId={}",
-				contentId, userId);
-			return Optional.empty();
+			if (joinedAt.isEmpty()) {
+				log.debug("[WATCHING_SESSION_JOIN] 추가 탭 입장 (브로드캐스트 없음): contentId={}, userId={}",
+					contentId, userId);
+
+				// 커스텀 메트릭: 입장 성공 처리 시간
+				sample.stop(meterRegistry.timer(
+					"mopl.watching.session.change.duration",
+					"operation", "join", "result", "success"
+				));
+				// 커스텀 메트릭: 입장 성공
+				meterRegistry.counter(
+					"mopl.watching.session.change",
+					"operation", "join", "result", "success"
+				).increment();
+				return Optional.empty();
+			}
+
+			WatchingSessionChange change = createChange(ChangeType.JOIN, user, content, userId, joinedAt.get());
+
+			log.info("[WATCHING_SESSION_JOIN] 첫 탭 입장 완료: contentId={}, userId={}, watcherCount={}",
+				contentId, userId, change.watcherCount());
+
+			// 커스텀 메트릭: 입장 성공 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.watching.session.change.duration",
+				"operation", "join", "result", "success"
+			));
+			// 커스텀 메트릭: 입장 성공
+			meterRegistry.counter(
+				"mopl.watching.session.change",
+				"operation", "join", "result", "success"
+			).increment();
+
+			return Optional.of(change);
+
+		} catch (Exception e) {
+			// 커스텀 메트릭: 입장 실패 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.watching.session.change.duration",
+				"operation", "join", "result", "failure"
+			));
+			// 커스텀 메트릭: 입장 실패
+			meterRegistry.counter(
+				"mopl.watching.session.change",
+				"operation", "join", "result", "failure"
+			).increment();
+
+			throw e;
 		}
-
-		WatchingSessionChange change = createChange(ChangeType.JOIN, user, content, userId, joinedAt.get());
-
-		log.info("[WATCHING_SESSION_JOIN] 첫 탭 입장 완료: contentId={}, userId={}, watcherCount={}",
-			contentId, userId, change.watcherCount());
-
-		return Optional.of(change);
 	}
 
 	// 구독 등록 확인 후 JOIN 이벤트 publish (preSend 시점에는 구독 미등록 상태이므로 지연 publish)
@@ -124,7 +187,8 @@ public class WatchingSessionService {
 				}
 
 				if (attempt + 1 >= JOIN_BROADCAST_MAX_RETRIES) {
-					log.warn("[WATCHING_SESSION_JOIN_BROADCAST] 구독 확인 실패, fallback publish: sessionId={}, destination={}",
+					log.warn(
+						"[WATCHING_SESSION_JOIN_BROADCAST] 구독 확인 실패, fallback publish: sessionId={}, destination={}",
 						sessionId, destination);
 					eventPublisher.publishEvent(new WatchingSessionEvent(contentId, change));
 					return;
@@ -147,25 +211,66 @@ public class WatchingSessionService {
 
 	// 시청 세션 퇴장
 	public Optional<WatchingSessionChange> leave(UUID contentId, UUID userId, String sessionId) {
+		// 커스텀 메트릭: 시청 세션 퇴장 처리 시간 측정 시작
+		Timer.Sample sample = Timer.start(meterRegistry);
+
 		log.info("[WATCHING_SESSION_LEAVE] 시청 세션 퇴장 시작: contentId={}, userId={}, sessionId={}",
 			contentId, userId, sessionId);
 
-		User user = getUserOrThrow(userId);
-		Content content = getContentOrThrow(contentId);
+		try {
+			User user = getUserOrThrow(userId);
+			Content content = getContentOrThrow(contentId);
 
-		Optional<Instant> joinedAt = watchingSessionStore.leave(sessionId, userId, contentId);
+			Optional<Instant> joinedAt = watchingSessionStore.leave(sessionId, userId, contentId);
 
-		if (joinedAt.isEmpty()) {
-			log.debug("[WATCHING_SESSION_LEAVE] 탭 닫힘 (아직 시청 중): contentId={}, userId={}", contentId, userId);
-			return Optional.empty();
+			if (joinedAt.isEmpty()) {
+				log.debug("[WATCHING_SESSION_LEAVE] 탭 닫힘 (아직 시청 중): contentId={}, userId={}", contentId, userId);
+
+				// 커스텀 메트릭: 퇴장 성공 측정 시간
+				sample.stop(meterRegistry.timer(
+					"mopl.watching.session.change.duration",
+					"operation", "leave", "result", "success"
+				));
+				// 커스텀 메트릭: 퇴장 성공
+				meterRegistry.counter(
+					"mopl.watching.session.change",
+					"operation", "leave", "result", "success"
+				).increment();
+				return Optional.empty();
+			}
+
+			WatchingSessionChange change = createChange(ChangeType.LEAVE, user, content, userId, joinedAt.get());
+
+			log.info("[WATCHING_SESSION_LEAVE] 마지막 탭 퇴장 완료: contentId={}, userId={}, watcherCount={}",
+				contentId, userId, change.watcherCount());
+
+			// 커스텀 메트릭: 퇴장 성공 측정 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.watching.session.change.duration",
+				"operation", "leave", "result", "success"
+			));
+			// 커스텀 메트릭: 퇴장 성공
+			meterRegistry.counter(
+				"mopl.watching.session.change",
+				"operation", "leave", "result", "success"
+			).increment();
+
+			return Optional.of(change);
+
+		} catch (Exception e) {
+			// 커스텀 메트릭: 퇴장 실패 측정 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.watching.session.change.duration",
+				"operation", "leave", "result", "failure"
+			));
+			// 커스텀 메트릭: 퇴장 실패 측정 시간
+			meterRegistry.counter(
+				"mopl.watching.session.change",
+				"operation", "leave", "result", "failure"
+			).increment();
+
+			throw e;
 		}
-
-		WatchingSessionChange change = createChange(ChangeType.LEAVE, user, content, userId, joinedAt.get());
-
-		log.info("[WATCHING_SESSION_LEAVE] 마지막 탭 퇴장 완료: contentId={}, userId={}, watcherCount={}",
-			contentId, userId, change.watcherCount());
-
-		return Optional.of(change);
 	}
 
 	// DISCONNECT용: sessionId만으로 퇴장 처리
@@ -351,7 +456,8 @@ public class WatchingSessionService {
 		}
 	}
 
-	private boolean isAfterCursor(WatchingSessionDto session, Instant cursorCreatedAt, UUID cursorId, boolean ascending) {
+	private boolean isAfterCursor(WatchingSessionDto session, Instant cursorCreatedAt, UUID cursorId,
+		boolean ascending) {
 		int createdAtCompare = session.createdAt().compareTo(cursorCreatedAt);
 
 		if (createdAtCompare == 0) {
