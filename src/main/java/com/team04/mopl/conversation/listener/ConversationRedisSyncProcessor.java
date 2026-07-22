@@ -115,7 +115,7 @@ public class ConversationRedisSyncProcessor {
 			// 커스텀 메트릭 추가: DLQ 발행 성공
 			meterRegistry.counter(
 				"mopl.conversation.redis.sync.dlq.publish",
-				"result", "success"
+				"operation", "create", "result", "success"
 			).increment();
 		} catch (Exception kafkaException) {
 			log.error("[REDIS_SYNC] 대화방 생성 Kafka DLQ 발행 실패", kafkaException);
@@ -123,7 +123,7 @@ public class ConversationRedisSyncProcessor {
 			// 커스텀 메트릭 추가: DLQ 발행 실패
 			meterRegistry.counter(
 				"mopl.conversation.redis.sync.dlq.publish",
-				"result", "failure"
+				"operation", "create", "result", "failure"
 			).increment();
 		}
 	}

@@ -102,7 +102,7 @@ public class FollowRedisSyncProcessor {
 			// 커스텀 메트릭 추가: DLQ 발행 성공
 			meterRegistry.counter(
 				"mopl.follow.redis.sync.dlq.publish",
-				"result", "success"
+				"operation", "create", "result", "success"
 			).increment();
 		} catch (Exception kafkaException) {
 			log.error("[REDIS_SYNC] 팔로우 생성 Kafka DLQ 발행 실패", kafkaException);
@@ -110,7 +110,7 @@ public class FollowRedisSyncProcessor {
 			// 커스텀 메트릭 추가: DLQ 발행 실패
 			meterRegistry.counter(
 				"mopl.follow.redis.sync.dlq.publish",
-				"result", "failure"
+				"operation", "create", "result", "failure"
 			).increment();
 		}
 	}
@@ -188,7 +188,7 @@ public class FollowRedisSyncProcessor {
 			// 커스텀 메트릭 추가: DLQ 발행 성공
 			meterRegistry.counter(
 				"mopl.follow.redis.sync.dlq.publish",
-				"result", "success"
+				"operation", "delete", "result", "success"
 			).increment();
 		} catch (Exception kafkaException) {
 			log.error("[REDIS_SYNC] 팔로우 취소 Kafka DLQ 발행 실패", kafkaException);
@@ -196,7 +196,7 @@ public class FollowRedisSyncProcessor {
 			// 커스텀 메트릭 추가: DLQ 발행 실패
 			meterRegistry.counter(
 				"mopl.follow.redis.sync.dlq.publish",
-				"result", "failure"
+				"operation", "delete", "result", "failure"
 			).increment();
 		}
 	}

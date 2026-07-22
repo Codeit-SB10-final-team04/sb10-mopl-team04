@@ -121,7 +121,7 @@ class ConversationRedisSyncProcessorTest {
 	======================================
 	 */
 	@Test
-	@DisplayName("성공: 생성 동기화 최종 실패 시(@Recover), Kafka DLQ 토픽으로 이벤트를 정상적으로 발행한다.")
+	@DisplayName("성공: 생성 동기화 최종 실패 시(@Recover), Kafka DLQ 토픽으로 이벤트를 정상적으로 발행하고 메트릭을 기록한다.")
 	void recoverCreateFailure_Success() throws Exception {
 		// given
 		UUID conversationId = UUID.randomUUID();
@@ -145,10 +145,18 @@ class ConversationRedisSyncProcessorTest {
 		// then
 		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, conversationId.toString(), event);
 		verify(future, times(1)).get(5, TimeUnit.SECONDS);
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.conversation.redis.sync.dlq.publish")
+			.tag("operation", "create")
+			.tag("result", "success")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 
 	@Test
-	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되어 시스템이 중단되지 않는다.")
+	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되고 실패 메트릭을 기록한다.")
 	void recoverCreateFailure_KafkaFail_SafelyCaught() {
 		// given
 		UUID conversationId = UUID.randomUUID();
@@ -166,5 +174,13 @@ class ConversationRedisSyncProcessorTest {
 		// when & then
 		assertThatCode(() -> conversationRedisSyncProcessor.recoverCreateFailure(syncException, event))
 			.doesNotThrowAnyException();
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.conversation.redis.sync.dlq.publish")
+			.tag("operation", "create")
+			.tag("result", "failure")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 }

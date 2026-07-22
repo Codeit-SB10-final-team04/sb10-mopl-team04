@@ -95,7 +95,7 @@ class DirectMessageRedisSyncProcessorTest {
 	}
 
 	@Test
-	@DisplayName("성공: 생성 동기화 최종 실패 시(@Recover), Kafka DLQ 토픽으로 이벤트를 정상적으로 발행한다.")
+	@DisplayName("성공: 생성 동기화 최종 실패 시(@Recover), Kafka DLQ 토픽으로 이벤트를 정상적으로 발행하고 메트릭을 기록한다.")
 	void recoverCreateFailure_Success() throws Exception {
 		// given
 		UUID directMessageId = UUID.randomUUID();
@@ -120,10 +120,18 @@ class DirectMessageRedisSyncProcessorTest {
 		// then
 		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, directMessageId.toString(), event);
 		verify(future, times(1)).get(5, TimeUnit.SECONDS);
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.dm.redis.sync.dlq.publish")
+			.tag("operation", "create")
+			.tag("result", "success")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 
 	@Test
-	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되어 시스템이 중단되지 않는다.")
+	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되고 실패 메트릭을 기록한다.")
 	void recoverCreateFailure_KafkaFail_SafelyCaught() {
 		// given
 		UUID directMessageId = UUID.randomUUID();
@@ -142,6 +150,14 @@ class DirectMessageRedisSyncProcessorTest {
 		// when & then
 		assertThatCode(() -> directMessageRedisSyncProcessor.recoverCreateFailure(syncException, event))
 			.doesNotThrowAnyException();
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.dm.redis.sync.dlq.publish")
+			.tag("operation", "create")
+			.tag("result", "failure")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 
 	/*
@@ -190,7 +206,7 @@ class DirectMessageRedisSyncProcessorTest {
 	}
 
 	@Test
-	@DisplayName("성공: 읽음 동기화 최종 실패 시(@Recover), 안전하게 에러 로그만 남기고 시스템을 중단시키지 않는다.")
+	@DisplayName("성공: 읽음 동기화 최종 실패 시(@Recover), DLQ 토픽으로 이벤트를 정상적으로 발행하고 메트릭을 기록한다.")
 	void recoverReadFailure_Success() throws Exception {
 		// given
 		DirectMessageReadEvent event = new DirectMessageReadEvent(
@@ -213,5 +229,13 @@ class DirectMessageRedisSyncProcessorTest {
 		// 읽음 실패 시 DLQ 토픽으로 이벤트를 정상적으로 발행함을 검증
 		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, event.directMessageId().toString(), event);
 		verify(future, times(1)).get(5, TimeUnit.SECONDS);
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.dm.redis.sync.dlq.publish")
+			.tag("operation", "read")
+			.tag("result", "success")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 }
