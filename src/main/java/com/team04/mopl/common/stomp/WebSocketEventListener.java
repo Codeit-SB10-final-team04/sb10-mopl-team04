@@ -86,7 +86,7 @@ public class WebSocketEventListener {
 		if (destination.contains("/chat")) {
 			return "content_chat";
 		}
-		if (destination.contains("/watching")) {
+		if (destination.contains("/watch")) {
 			return "watching_session";
 		}
 		return "other";
