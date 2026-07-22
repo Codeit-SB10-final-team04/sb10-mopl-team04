@@ -112,6 +112,9 @@ public class FollowRedisSyncProcessor {
 				"mopl.follow.redis.sync.dlq.publish",
 				"operation", "create", "result", "failure"
 			).increment();
+
+			throw new RuntimeException("DLQ 발행 실패로 인한 이벤트 유실 방지",
+				kafkaException);
 		}
 	}
 
@@ -198,6 +201,9 @@ public class FollowRedisSyncProcessor {
 				"mopl.follow.redis.sync.dlq.publish",
 				"operation", "delete", "result", "failure"
 			).increment();
+
+			throw new RuntimeException("DLQ 발행 실패로 인한 이벤트 유실 방지",
+				kafkaException);
 		}
 	}
 }

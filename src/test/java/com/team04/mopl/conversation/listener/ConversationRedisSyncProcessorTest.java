@@ -7,8 +7,6 @@ import static org.mockito.BDDMockito.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,7 +16,6 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
 
 import com.team04.mopl.conversation.event.ConversationCreatedEvent;
 import com.team04.mopl.conversation.redis.ConversationRedisStore;
@@ -121,8 +118,8 @@ class ConversationRedisSyncProcessorTest {
 	======================================
 	 */
 	@Test
-	@DisplayName("성공: 생성 동기화 최종 실패 시(@Recover), Kafka DLQ 토픽으로 이벤트를 정상적으로 발행하고 메트릭을 기록한다.")
-	void recoverCreateFailure_Success() throws Exception {
+	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외 발생 시, 예외를 다시 던져 오프셋 커밋을 방지한다.")
+	void recoverCreateFailure_KafkaFail_ThrowsException() {
 		// given
 		UUID conversationId = UUID.randomUUID();
 		ConversationCreatedEvent event = new ConversationCreatedEvent(
@@ -130,50 +127,15 @@ class ConversationRedisSyncProcessorTest {
 			List.of(UUID.randomUUID(), UUID.randomUUID()),
 			Instant.now()
 		);
-
-		Exception syncException = new RuntimeException("최종 실패 예외");
-
-		// Kafka 통신 CompletableFuture
-		CompletableFuture<SendResult<String, Object>> future = mock(CompletableFuture.class);
-		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(conversationId.toString()), eq(event)))
-			.willReturn(future);
-		given(future.get(5, TimeUnit.SECONDS)).willReturn(mock(SendResult.class));
-
-		// when
-		conversationRedisSyncProcessor.recoverCreateFailure(syncException, event);
-
-		// then
-		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, conversationId.toString(), event);
-		verify(future, times(1)).get(5, TimeUnit.SECONDS);
-
-		// 메트릭 검증
-		double count = meterRegistry.get("mopl.conversation.redis.sync.dlq.publish")
-			.tag("operation", "create")
-			.tag("result", "success")
-			.counter()
-			.count();
-		assertThat(count).isEqualTo(1.0);
-	}
-
-	@Test
-	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되고 실패 메트릭을 기록한다.")
-	void recoverCreateFailure_KafkaFail_SafelyCaught() {
-		// given
-		UUID conversationId = UUID.randomUUID();
-		ConversationCreatedEvent event = new ConversationCreatedEvent(
-			conversationId,
-			List.of(UUID.randomUUID(), UUID.randomUUID()),
-			Instant.now()
-		);
-
 		Exception syncException = new RuntimeException("최종 실패 예외");
 
 		willThrow(new RuntimeException("Kafka Broker Down"))
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
 		// when & then
-		assertThatCode(() -> conversationRedisSyncProcessor.recoverCreateFailure(syncException, event))
-			.doesNotThrowAnyException();
+		assertThatThrownBy(() -> conversationRedisSyncProcessor.recoverCreateFailure(syncException, event))
+			.isInstanceOf(RuntimeException.class)
+			.hasMessageContaining("DLQ 발행 실패로 인한 이벤트 유실 방지");
 
 		// 메트릭 검증
 		double count = meterRegistry.get("mopl.conversation.redis.sync.dlq.publish")

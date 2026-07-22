@@ -119,8 +119,8 @@ class FollowRedisSyncProcessorTest {
 	}
 
 	@Test
-	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되고 실패 메트릭을 기록한다.")
-	void recoverCreateFailure_KafkaFail_SafelyCaught() {
+	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외 발생 시, 예외를 다시 던져 오프셋 커밋을 방지한다.")
+	void recoverCreateFailure_KafkaFail_ThrowsException() {
 		// given
 		FollowCreatedEvent event = FollowCreatedEvent.of(
 			UUID.randomUUID(),
@@ -135,8 +135,9 @@ class FollowRedisSyncProcessorTest {
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
 		// when & then
-		assertThatCode(() -> followRedisSyncProcessor.recoverCreateFailure(syncException, event))
-			.doesNotThrowAnyException();
+		assertThatThrownBy(() -> followRedisSyncProcessor.recoverCreateFailure(syncException, event))
+			.isInstanceOf(RuntimeException.class)
+			.hasMessageContaining("DLQ 발행 실패로 인한 이벤트 유실 방지");
 
 		// 메트릭 검증
 		double count = meterRegistry.get("mopl.follow.redis.sync.dlq.publish")
@@ -218,8 +219,8 @@ class FollowRedisSyncProcessorTest {
 	}
 
 	@Test
-	@DisplayName("실패: 취소 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되고 실패 메트릭을 기록한다.")
-	void recoverDeleteFailure_KafkaFail_SafelyCaught() {
+	@DisplayName("실패: 취소 동기화 DLQ 발행 중 Kafka 통신 예외 발생 시, 예외를 다시 던져 오프셋 커밋을 방지한다.")
+	void recoverDeleteFailure_KafkaFail_ThrowsException() {
 		// given
 		FollowDeletedEvent event = new FollowDeletedEvent(
 			UUID.randomUUID(),
@@ -231,8 +232,9 @@ class FollowRedisSyncProcessorTest {
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
 		// when & then
-		assertThatCode(() -> followRedisSyncProcessor.recoverDeleteFailure(syncException, event))
-			.doesNotThrowAnyException();
+		assertThatThrownBy(() -> followRedisSyncProcessor.recoverDeleteFailure(syncException, event))
+			.isInstanceOf(RuntimeException.class)
+			.hasMessageContaining("DLQ 발행 실패로 인한 이벤트 유실 방지");
 
 		// 메트릭 검증
 		double count = meterRegistry.get("mopl.follow.redis.sync.dlq.publish")

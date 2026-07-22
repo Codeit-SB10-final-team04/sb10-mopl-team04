@@ -131,8 +131,8 @@ class DirectMessageRedisSyncProcessorTest {
 	}
 
 	@Test
-	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되고 실패 메트릭을 기록한다.")
-	void recoverCreateFailure_KafkaFail_SafelyCaught() {
+	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외 발생 시, 예외를 다시 던져 오프셋 커밋을 방지한다.")
+	void recoverCreateFailure_KafkaFail_ThrowsException() {
 		// given
 		UUID directMessageId = UUID.randomUUID();
 		DirectMessageDto mockDto = mock(DirectMessageDto.class);
@@ -148,8 +148,9 @@ class DirectMessageRedisSyncProcessorTest {
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
 		// when & then
-		assertThatCode(() -> directMessageRedisSyncProcessor.recoverCreateFailure(syncException, event))
-			.doesNotThrowAnyException();
+		assertThatThrownBy(() -> directMessageRedisSyncProcessor.recoverCreateFailure(syncException, event))
+			.isInstanceOf(RuntimeException.class)
+			.hasMessageContaining("DLQ 발행 실패로 인한 이벤트 유실 방지");
 
 		// 메트릭 검증
 		double count = meterRegistry.get("mopl.dm.redis.sync.dlq.publish")
@@ -234,6 +235,34 @@ class DirectMessageRedisSyncProcessorTest {
 		double count = meterRegistry.get("mopl.dm.redis.sync.dlq.publish")
 			.tag("operation", "read")
 			.tag("result", "success")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
+	}
+
+	@Test
+	@DisplayName("실패: 취소 동기화 DLQ 발행 중 Kafka 통신 예외 발생 시, 예외를 다시 던져 오프셋 커밋을 방지한다.")
+	void recoverReadFailure_KafkaFail_ThrowsException() {
+		// given
+		DirectMessageReadEvent event = new DirectMessageReadEvent(
+			UUID.randomUUID(),
+			UUID.randomUUID(),
+			UUID.randomUUID()
+		);
+		Exception syncException = new RuntimeException("최종 실패 예외");
+
+		willThrow(new RuntimeException("Kafka Broker Down"))
+			.given(kafkaTemplate).send(anyString(), anyString(), any());
+
+		// when & then
+		assertThatThrownBy(() -> directMessageRedisSyncProcessor.recoverReadFailure(syncException, event))
+			.isInstanceOf(RuntimeException.class)
+			.hasMessageContaining("DLQ 발행 실패로 인한 이벤트 유실 방지");
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.dm.redis.sync.dlq.publish")
+			.tag("operation", "read")
+			.tag("result", "failure")
 			.counter()
 			.count();
 		assertThat(count).isEqualTo(1.0);

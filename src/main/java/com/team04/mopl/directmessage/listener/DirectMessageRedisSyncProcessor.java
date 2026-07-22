@@ -109,13 +109,17 @@ public class DirectMessageRedisSyncProcessor {
 				"operation", "create", "result", "success"
 			).increment();
 		} catch (Exception kafkaException) {
-			log.error("[REDIS_SYNC] DM 생성 Kafka DLQ 발행 실패", kafkaException);
+			log.error("[REDIS_SYNC] DM 생성 Kafka DLQ 발행 실패",
+				kafkaException);
 
 			// 커스텀 메트릭 추가: DLQ 발행 실패
 			meterRegistry.counter(
 				"mopl.dm.redis.sync.dlq.publish",
 				"operation", "create", "result", "failure"
 			).increment();
+
+			throw new RuntimeException("DLQ 발행 실패로 인한 이벤트 유실 방지",
+				kafkaException);
 		}
 	}
 
@@ -198,13 +202,17 @@ public class DirectMessageRedisSyncProcessor {
 				"operation", "read", "result", "success"
 			).increment();
 		} catch (Exception kafkaException) {
-			log.error("[REDIS_SYNC] DM 읽음 상태 Kafka DLQ 발행 실패", kafkaException);
+			log.error("[REDIS_SYNC] DM 읽음 상태 Kafka DLQ 발행 실패",
+				kafkaException);
 
 			// 커스텀 메트릭 추가: DLQ 발행 실패
 			meterRegistry.counter(
 				"mopl.dm.redis.sync.dlq.publish",
 				"operation", "read", "result", "failure"
 			).increment();
+
+			throw new RuntimeException("DLQ 발행 실패로 인한 이벤트 유실 방지",
+				kafkaException);
 		}
 	}
 }
