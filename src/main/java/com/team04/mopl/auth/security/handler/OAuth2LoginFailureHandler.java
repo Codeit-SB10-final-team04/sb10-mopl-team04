@@ -3,6 +3,7 @@ package com.team04.mopl.auth.security.handler;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -26,6 +27,9 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @RequiredArgsConstructor
 public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
+
+	private static final int MAX_LOG_ERROR_CODE_LENGTH = 64;
+	private static final Pattern UNSAFE_LOG_ERROR_CODE_CHARACTERS = Pattern.compile("[^A-Za-z0-9._-]");
 
 	private final OAuth2Properties oauth2Properties;
 
@@ -52,7 +56,7 @@ public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
 			"[SOCIAL_LOGIN] 소셜 로그인 실패: requestUri={}, errorCode={}, errorMessage={}, "
 				+ "exceptionType={}, causeType={}",
 			request.getRequestURI(),
-			resolveProviderErrorCode(exception),
+			sanitizeProviderErrorCodeForLog(resolveProviderErrorCode(exception)),
 			errorMessage,
 			exception.getClass().getSimpleName(),
 			cause == null ? "none" : cause.getClass().getSimpleName()
@@ -86,6 +90,16 @@ public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
 		}
 
 		return "unknown";
+	}
+
+	// 실패 로그 오류 코드 정제
+	static String sanitizeProviderErrorCodeForLog(String errorCode) {
+		if (errorCode == null || errorCode.isBlank()) {
+			return "unknown";
+		}
+
+		String sanitized = UNSAFE_LOG_ERROR_CODE_CHARACTERS.matcher(errorCode).replaceAll("_");
+		return sanitized.substring(0, Math.min(sanitized.length(), MAX_LOG_ERROR_CODE_LENGTH));
 	}
 
 	// 실패 리다이렉트 URI에 오류 쿼리 파라미터 추가

@@ -123,4 +123,26 @@ class OAuth2LoginFailureHandlerTest {
 		assertThat(response.getRedirectedUrl())
 			.isEqualTo("http://localhost:8080/#/sign-in?from=oauth&error=oauth_failed&error_message=provider_error");
 	}
+
+	@Test
+	@DisplayName("로그용 OAuth2 오류 코드의 개행과 허용되지 않은 문자를 치환한다")
+	void sanitizeProviderErrorCodeForLog_replacesUnsafeCharacters() {
+		String errorCode = "invalid_client\r\nforged log";
+
+		String sanitized = OAuth2LoginFailureHandler.sanitizeProviderErrorCodeForLog(errorCode);
+
+		assertThat(sanitized).isEqualTo("invalid_client__forged_log");
+	}
+
+	@Test
+	@DisplayName("로그용 OAuth2 오류 코드는 최대 길이를 초과하지 않는다")
+	void sanitizeProviderErrorCodeForLog_limitsLength() {
+		String maxLengthErrorCode = "a".repeat(64);
+		String overLengthErrorCode = maxLengthErrorCode + "b";
+
+		assertThat(OAuth2LoginFailureHandler.sanitizeProviderErrorCodeForLog(maxLengthErrorCode))
+			.isEqualTo(maxLengthErrorCode);
+		assertThat(OAuth2LoginFailureHandler.sanitizeProviderErrorCodeForLog(overLengthErrorCode))
+			.isEqualTo(maxLengthErrorCode);
+	}
 }
