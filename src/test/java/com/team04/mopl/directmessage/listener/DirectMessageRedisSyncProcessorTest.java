@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
@@ -21,6 +22,9 @@ import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
 import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.directmessage.event.DirectMessageReadEvent;
 import com.team04.mopl.directmessage.redis.DirectMessageRedisStore;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class DirectMessageRedisSyncProcessorTest {
@@ -32,6 +36,9 @@ class DirectMessageRedisSyncProcessorTest {
 
 	@Mock
 	private KafkaTemplate<String, Object> kafkaTemplate;
+
+	@Spy
+	private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
 	@InjectMocks
 	private DirectMessageRedisSyncProcessor directMessageRedisSyncProcessor;
@@ -103,7 +110,7 @@ class DirectMessageRedisSyncProcessorTest {
 
 		// Kafka 통신 CompletableFuture 모킹
 		CompletableFuture<SendResult<String, Object>> future = mock(CompletableFuture.class);
-		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(directMessageId.toString())))
+		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(directMessageId.toString()), eq(event)))
 			.willReturn(future);
 		given(future.get(5, TimeUnit.SECONDS)).willReturn(mock(SendResult.class));
 
@@ -111,7 +118,7 @@ class DirectMessageRedisSyncProcessorTest {
 		directMessageRedisSyncProcessor.recoverCreateFailure(syncException, event);
 
 		// then
-		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, directMessageId.toString());
+		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, directMessageId.toString(), event);
 		verify(future, times(1)).get(5, TimeUnit.SECONDS);
 	}
 
@@ -130,7 +137,7 @@ class DirectMessageRedisSyncProcessorTest {
 		Exception syncException = new RuntimeException("최종 실패 예외");
 
 		willThrow(new RuntimeException("Kafka Broker Down"))
-			.given(kafkaTemplate).send(anyString(), anyString());
+			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
 		// when & then
 		assertThatCode(() -> directMessageRedisSyncProcessor.recoverCreateFailure(syncException, event))
@@ -184,7 +191,7 @@ class DirectMessageRedisSyncProcessorTest {
 
 	@Test
 	@DisplayName("성공: 읽음 동기화 최종 실패 시(@Recover), 안전하게 에러 로그만 남기고 시스템을 중단시키지 않는다.")
-	void recoverReadFailure_Success() {
+	void recoverReadFailure_Success() throws Exception {
 		// given
 		DirectMessageReadEvent event = new DirectMessageReadEvent(
 			UUID.randomUUID(),
@@ -193,11 +200,18 @@ class DirectMessageRedisSyncProcessorTest {
 		);
 		Exception syncException = new RuntimeException("최종 실패 예외");
 
+		// Kafka 통신 CompletableFuture 모킹
+		CompletableFuture<SendResult<String, Object>> future = mock(CompletableFuture.class);
+		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(event.directMessageId().toString()), eq(event)))
+			.willReturn(future);
+		given(future.get(5, TimeUnit.SECONDS)).willReturn(mock(SendResult.class));
+
 		// when & then
 		assertThatCode(() -> directMessageRedisSyncProcessor.recoverReadFailure(syncException, event))
 			.doesNotThrowAnyException();
 
-		// 읽음 실패는 DLQ 발행을 하지 않으므로 kafkaTemplate 호출이 없음을 검증
-		verify(kafkaTemplate, never()).send(anyString(), anyString(), any());
+		// 읽음 실패 시 DLQ 토픽으로 이벤트를 정상적으로 발행함을 검증
+		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, event.directMessageId().toString(), event);
+		verify(future, times(1)).get(5, TimeUnit.SECONDS);
 	}
 }

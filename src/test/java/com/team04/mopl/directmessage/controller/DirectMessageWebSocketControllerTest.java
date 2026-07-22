@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -26,6 +27,9 @@ import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.service.DirectMessageService;
 import com.team04.mopl.user.entity.UserRole;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 @ExtendWith(MockitoExtension.class)
 class DirectMessageWebSocketControllerTest {
 
@@ -34,6 +38,9 @@ class DirectMessageWebSocketControllerTest {
 
 	@Mock
 	private SimpMessagingTemplate simpMessagingTemplate;
+
+	@Spy
+	private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
 	@InjectMocks
 	private DirectMessageWebSocketController directMessageWebSocketController;
