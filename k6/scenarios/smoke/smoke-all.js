@@ -95,7 +95,10 @@ export default function () {
     check(playlistDetailRes, { '플레이리스트 상세 200': (r) => r.status === 200 });
 
     // 8. 구독 + 취소 (다른 유저 플레이리스트만)
-    const otherPlaylist = playlists.find((p) => p.owner.userId !== user.id);
+    const otherPlaylist = playlists.find((p) => {
+      const ownerEmail = (p.owner && p.owner.email) || p.ownerEmail;
+      return ownerEmail !== user.email;
+    });
     if (otherPlaylist) {
       const subRes = http.post(
         `${BASE_URL}/api/playlists/${otherPlaylist.id}/subscription`,
