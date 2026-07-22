@@ -54,6 +54,19 @@ CREATE TABLE contents (
                           CONSTRAINT uq_contents_external_id_source UNIQUE (external_id, source)
 );
 
+-- 콘텐츠 목록 조회 성능 인덱스 (정렬 기준별 Partial Index)
+CREATE INDEX idx_contents_active_watcher
+    ON contents (watcher_count DESC, id)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_contents_active_rating
+    ON contents (average_rating DESC, id)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_contents_active_created
+    ON contents (created_at DESC, id)
+    WHERE deleted_at IS NULL;
+
 CREATE TABLE conversations (
                                id          UUID        NOT NULL,
                                created_at  TIMESTAMPTZ NOT NULL,
@@ -167,6 +180,15 @@ CREATE TABLE content_reviews (
 
 CREATE UNIQUE INDEX uk_content_reviews_user_content_active
     ON content_reviews (user_id, content_id)
+    WHERE deleted_at IS NULL;
+
+-- 리뷰 목록 조회 성능 인덱스 (정렬 기준별 Partial Index)
+CREATE INDEX idx_reviews_content_created
+    ON content_reviews (content_id, created_at DESC, id DESC)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_reviews_content_rating
+    ON content_reviews (content_id, rating DESC, id DESC)
     WHERE deleted_at IS NULL;
 
 CREATE TABLE watching_sessions (
