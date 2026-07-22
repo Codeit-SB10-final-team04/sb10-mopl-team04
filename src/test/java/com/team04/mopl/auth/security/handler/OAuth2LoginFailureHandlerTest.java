@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -144,5 +147,14 @@ class OAuth2LoginFailureHandlerTest {
 			.isEqualTo(maxLengthErrorCode);
 		assertThat(OAuth2LoginFailureHandler.sanitizeProviderErrorCodeForLog(overLengthErrorCode))
 			.isEqualTo(maxLengthErrorCode);
+	}
+
+	@ParameterizedTest
+	@NullAndEmptySource
+	@ValueSource(strings = {" ", "\t", "\r\n"})
+	@DisplayName("로그용 OAuth2 오류 코드가 비어 있으면 unknown을 반환한다")
+	void sanitizeProviderErrorCodeForLog_returnsUnknown_whenNullOrBlank(String errorCode) {
+		assertThat(OAuth2LoginFailureHandler.sanitizeProviderErrorCodeForLog(errorCode))
+			.isEqualTo("unknown");
 	}
 }
