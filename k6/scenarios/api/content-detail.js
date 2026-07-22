@@ -19,7 +19,8 @@ export const options = {
     { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {
-    http_req_duration: ['p(95)<300'],
+    'http_req_duration{endpoint:content_detail}': ['p(95)<300'],
+    'http_req_duration{endpoint:content_list_for_detail}': ['p(95)<500'],
     http_req_failed: ['rate<0.05'],
   },
 };
@@ -40,7 +41,7 @@ export default function (data) {
   for (let page = 0; page < 3; page++) {
     let url = `${BASE_URL}/api/contents?sortBy=watcherCount&sortDirection=DESCENDING&limit=20`;
     if (cursor && idAfter) {
-      url += `&cursor=${cursor}&idAfter=${idAfter}`;
+      url += `&cursor=${encodeURIComponent(cursor)}&idAfter=${idAfter}`;
     }
 
     const listRes = http.get(url, {

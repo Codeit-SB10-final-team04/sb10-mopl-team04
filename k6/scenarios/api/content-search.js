@@ -50,7 +50,7 @@ export default function (data) {
   for (let page = 0; page < 3; page++) {
     let url = `${BASE_URL}/api/contents?keywordLike=${encodeURIComponent(keyword)}&limit=20`;
     if (cursor && idAfter) {
-      url += `&cursor=${cursor}&idAfter=${idAfter}`;
+      url += `&cursor=${encodeURIComponent(cursor)}&idAfter=${idAfter}`;
     }
 
     const res = http.get(url, {

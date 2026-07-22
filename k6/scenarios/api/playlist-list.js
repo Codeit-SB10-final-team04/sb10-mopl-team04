@@ -41,7 +41,7 @@ export default function (data) {
   for (let page = 0; page < 3; page++) {
     let url = `${BASE_URL}/api/playlists?sortBy=subscribeCount&sortDirection=DESCENDING&limit=20`;
     if (cursor) {
-      url += `&cursor=${cursor}`;
+      url += `&cursor=${encodeURIComponent(cursor)}`;
     }
 
     const res = http.get(url, {

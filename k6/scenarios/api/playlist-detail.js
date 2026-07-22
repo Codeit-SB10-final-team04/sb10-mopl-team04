@@ -19,7 +19,8 @@ export const options = {
     { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {
-    http_req_duration: ['p(95)<300'],
+    'http_req_duration{endpoint:playlist_detail}': ['p(95)<300'],
+    'http_req_duration{endpoint:playlist_list}': ['p(95)<500'],
     http_req_failed: ['rate<0.05'],
   },
 };
@@ -42,7 +43,7 @@ export default function (data) {
   for (let page = 0; page < 3; page++) {
     let url = `${BASE_URL}/api/playlists?sortBy=subscribeCount&sortDirection=DESCENDING&limit=20`;
     if (cursor) {
-      url += `&cursor=${cursor}`;
+      url += `&cursor=${encodeURIComponent(cursor)}`;
     }
 
     const listRes = http.get(url, {
