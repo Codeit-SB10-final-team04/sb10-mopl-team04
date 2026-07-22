@@ -55,3 +55,4 @@ k6/data/users.json
 k6/data/users.json.tmp
 # 부하 테스트 결과 파일은 용량이 크고 실행 환경마다 달라질 수 있음
 k6/results/
+summary.json

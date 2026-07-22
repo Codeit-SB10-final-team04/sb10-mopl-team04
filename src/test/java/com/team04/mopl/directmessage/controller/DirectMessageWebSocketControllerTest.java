@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -26,6 +27,9 @@ import com.team04.mopl.directmessage.exception.DirectMessageException;
 import com.team04.mopl.directmessage.service.DirectMessageService;
 import com.team04.mopl.user.entity.UserRole;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 @ExtendWith(MockitoExtension.class)
 class DirectMessageWebSocketControllerTest {
 
@@ -34,6 +38,9 @@ class DirectMessageWebSocketControllerTest {
 
 	@Mock
 	private SimpMessagingTemplate simpMessagingTemplate;
+
+	@Spy
+	private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
 	@InjectMocks
 	private DirectMessageWebSocketController directMessageWebSocketController;
@@ -62,10 +69,37 @@ class DirectMessageWebSocketControllerTest {
 			"/sub/conversations/" + conversationId + "/direct-messages",
 			expectedDto
 		);
+
+		double count = meterRegistry.get("mopl.dm.broadcast").tag("result", "success").counter().count();
+		assertThat(count).isEqualTo(1.0);
 	}
 
 	@Test
-	@DisplayName("실패: 인증 정보(Principal)가 유효하지 않으면 AuthException이 발생한다.")
+	@DisplayName("실패: 브로드캐스트(convertAndSend) 도중 예외 발생 시 failure 메트릭이 증가하고 예외를 밖으로 던진다.")
+	void sendDirectMessages_Fail_BroadcastException() {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		UUID senderId = UUID.randomUUID();
+		MoplUserDetails userDetails = MoplUserDetails.authenticated(senderId, "test@test.com", UserRole.USER);
+		Principal principal = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+		DirectMessageSendRequest request = new DirectMessageSendRequest("웹소켓 테스트 메시지");
+		DirectMessageDto expectedDto = mock(DirectMessageDto.class);
+
+		given(directMessageService.create(conversationId, request, senderId)).willReturn(expectedDto);
+		willThrow(new RuntimeException("Message Broker Offline")).given(simpMessagingTemplate)
+			.convertAndSend(anyString(), any(Object.class));
+
+		// when & then
+		assertThatThrownBy(() -> directMessageWebSocketController.sendDirectMessages(conversationId, request, principal))
+			.isInstanceOf(RuntimeException.class);
+
+		// 메트릭 검증: 브로드캐스트 실패 카운터가 증가했는지 확인
+		double count = meterRegistry.get("mopl.dm.broadcast").tag("result", "failure").counter().count();
+		assertThat(count).isEqualTo(1.0);
+	}
+
+	@Test
+	@DisplayName("실패: 인증 정보(Principal)가 유효하지 않으면 AuthException이 발생하고 브로드캐스트 메트릭은 집계되지 않는다.")
 	void sendDirectMessages_Fail_InvalidPrincipal() {
 		// given
 		UUID conversationId = UUID.randomUUID();
@@ -82,6 +116,8 @@ class DirectMessageWebSocketControllerTest {
 
 		verify(directMessageService, never()).create(any(), any(), any());
 		verify(simpMessagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
+
+		assertThat(meterRegistry.find("mopl.dm.broadcast").counter()).isNull();
 	}
 
 	@Test
@@ -94,5 +130,8 @@ class DirectMessageWebSocketControllerTest {
 		assertThatThrownBy(() -> directMessageWebSocketController.handleValidationException(exception))
 			.isInstanceOf(DirectMessageException.class)
 			.hasMessageContaining(DirectMessageErrorCode.DM_BLANK.getMessage());
+
+		double count = meterRegistry.get("mopl.dm.rejected").tag("reason", "invalid_format").counter().count();
+		assertThat(count).isEqualTo(1.0);
 	}
 }

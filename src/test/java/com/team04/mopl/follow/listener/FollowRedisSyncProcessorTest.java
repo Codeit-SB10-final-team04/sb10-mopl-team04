@@ -12,13 +12,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.follow.event.FollowDeletedEvent;
 import com.team04.mopl.follow.redis.FollowRedisStore;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class FollowRedisSyncProcessorTest {
@@ -30,6 +35,12 @@ class FollowRedisSyncProcessorTest {
 
 	@Mock
 	private KafkaTemplate<String, Object> kafkaTemplate;
+
+	@Mock
+	private ObjectMapper objectMapper;
+
+	@Spy
+	private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
 	@InjectMocks
 	private FollowRedisSyncProcessor followRedisSyncProcessor;
@@ -78,7 +89,7 @@ class FollowRedisSyncProcessorTest {
 	}
 
 	@Test
-	@DisplayName("성공: 생성 동기화 최종 실패 시(@Recover), Kafka DLQ 토픽으로 이벤트를 정상적으로 발행한다.")
+	@DisplayName("성공: 생성 동기화 최종 실패 시(@Recover), 이벤트를 직렬화하여 Kafka DLQ 토픽으로 정상적으로 발행하고 메트릭을 기록한다.")
 	void recoverCreateFailure_Success() throws Exception {
 		// given
 		FollowCreatedEvent event = FollowCreatedEvent.of(
@@ -89,23 +100,35 @@ class FollowRedisSyncProcessorTest {
 		);
 
 		Exception syncException = new RuntimeException("최종 실패 예외");
+		String mockPayload = "{\"test\":\"json\"}";
+
+		given(objectMapper.writeValueAsString(event)).willReturn(mockPayload);
 
 		SendResult<String, Object> sendResult = mock(SendResult.class);
 		CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(sendResult);
 
-		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(event.followerId().toString()), eq(event)))
+		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(event.followerId().toString()), eq(mockPayload)))
 			.willReturn(future);
 
 		// when
 		followRedisSyncProcessor.recoverCreateFailure(syncException, event);
 
 		// then
-		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, event.followerId().toString(), event);
+		verify(objectMapper, times(1)).writeValueAsString(event);
+		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, event.followerId().toString(), mockPayload);
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.follow.redis.sync.dlq.publish")
+			.tag("operation", "create")
+			.tag("result", "success")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 
 	@Test
-	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되어 시스템이 중단되지 않는다.")
-	void recoverCreateFailure_KafkaFail_SafelyCaught() {
+	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외 발생 시, 예외를 다시 던져 오프셋 커밋을 방지한다.")
+	void recoverCreateFailure_KafkaFail_ThrowsException() throws Exception {
 		// given
 		FollowCreatedEvent event = FollowCreatedEvent.of(
 			UUID.randomUUID(),
@@ -115,13 +138,24 @@ class FollowRedisSyncProcessorTest {
 		);
 
 		Exception syncException = new RuntimeException("최종 실패 예외");
+		String mockPayload = "{\"test\":\"json\"}";
 
+		given(objectMapper.writeValueAsString(event)).willReturn(mockPayload);
 		willThrow(new RuntimeException("Kafka Broker Down"))
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
 		// when & then
-		assertThatCode(() -> followRedisSyncProcessor.recoverCreateFailure(syncException, event))
-			.doesNotThrowAnyException();
+		assertThatThrownBy(() -> followRedisSyncProcessor.recoverCreateFailure(syncException, event))
+			.isInstanceOf(RuntimeException.class)
+			.hasMessageContaining("DLQ 발행 실패로 인한 이벤트 유실 방지");
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.follow.redis.sync.dlq.publish")
+			.tag("operation", "create")
+			.tag("result", "failure")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 
 	/*
@@ -164,43 +198,66 @@ class FollowRedisSyncProcessorTest {
 	}
 
 	@Test
-	@DisplayName("성공: 취소 동기화 최종 실패 시(@Recover), Kafka DLQ 토픽으로 이벤트를 정상적으로 발행한다.")
-	void recoverDeleteFailure_Success() {
+	@DisplayName("성공: 취소 동기화 최종 실패 시(@Recover), 이벤트를 직렬화하여 Kafka DLQ 토픽으로 정상적으로 발행하고 메트릭을 기록한다.")
+	void recoverDeleteFailure_Success() throws Exception {
 		// given
 		FollowDeletedEvent event = new FollowDeletedEvent(
 			UUID.randomUUID(),
 			UUID.randomUUID()
 		);
 		Exception syncException = new RuntimeException("최종 실패 예외");
+		String mockPayload = "{\"test\":\"json\"}";
+
+		given(objectMapper.writeValueAsString(event)).willReturn(mockPayload);
 
 		SendResult<String, Object> sendResult = mock(SendResult.class);
 		CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(sendResult);
 
-		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(event.followerId().toString()), eq(event)))
+		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(event.followerId().toString()), eq(mockPayload)))
 			.willReturn(future);
 
 		// when
 		followRedisSyncProcessor.recoverDeleteFailure(syncException, event);
 
 		// then
-		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, event.followerId().toString(), event);
+		verify(objectMapper, times(1)).writeValueAsString(event);
+		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, event.followerId().toString(), mockPayload);
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.follow.redis.sync.dlq.publish")
+			.tag("operation", "delete")
+			.tag("result", "success")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 
 	@Test
-	@DisplayName("실패: 취소 동기화 DLQ 발행 중 Kafka 통신 예외가 발생해도, 안전하게 catch 되어 시스템이 중단되지 않는다.")
-	void recoverDeleteFailure_KafkaFail_SafelyCaught() {
+	@DisplayName("실패: 취소 동기화 DLQ 발행 중 Kafka 통신 예외 발생 시, 예외를 다시 던져 오프셋 커밋을 방지한다.")
+	void recoverDeleteFailure_KafkaFail_ThrowsException() throws Exception {
 		// given
 		FollowDeletedEvent event = new FollowDeletedEvent(
 			UUID.randomUUID(),
 			UUID.randomUUID()
 		);
 		Exception syncException = new RuntimeException("최종 실패 예외");
+		String mockPayload = "{\"test\":\"json\"}";
 
+		given(objectMapper.writeValueAsString(event)).willReturn(mockPayload);
 		willThrow(new RuntimeException("Kafka Broker Down"))
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 
 		// when & then
-		assertThatCode(() -> followRedisSyncProcessor.recoverDeleteFailure(syncException, event))
-			.doesNotThrowAnyException();
+		assertThatThrownBy(() -> followRedisSyncProcessor.recoverDeleteFailure(syncException, event))
+			.isInstanceOf(RuntimeException.class)
+			.hasMessageContaining("DLQ 발행 실패로 인한 이벤트 유실 방지");
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.follow.redis.sync.dlq.publish")
+			.tag("operation", "delete")
+			.tag("result", "failure")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
 	}
 }

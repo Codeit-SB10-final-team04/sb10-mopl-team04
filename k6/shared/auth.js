@@ -75,3 +75,41 @@ export const authHeaders = (accessToken) => {
     Cookie: `${CSRF_COOKIE_NAME}=${activeCsrfToken}`,
   };
 };
+
+// setup()에서 호출: 전체 유저 로그인 후 {accessToken, csrfToken} 배열 반환
+// CSRF 토큰은 1회만 발급하여 전체 유저가 공유 (k6 cookie jar가 중복 발급을 막으므로)
+export const loginAll = (userList) => {
+  // CSRF 토큰 1회 발급
+  const csrfRes = http.get(`${BASE_URL}/api/auth/csrf-token`);
+  const csrfToken = csrfCookieFrom(csrfRes);
+  if (!csrfToken) {
+    throw new Error('CSRF 토큰 발급 실패');
+  }
+
+  return userList.map((user) => {
+    const body =
+      `username=${encodeURIComponent(user.email)}` +
+      `&password=${encodeURIComponent(user.password)}`;
+    const loginRes = http.post(`${BASE_URL}/api/auth/sign-in`, body, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        [CSRF_HEADER_NAME]: csrfToken,
+        Cookie: `${CSRF_COOKIE_NAME}=${csrfToken}`,
+      },
+    });
+    const accessToken =
+      loginRes.status === 200 ? loginRes.json('accessToken') : null;
+    if (!accessToken) {
+      throw new Error(`로그인 실패: ${user.email}, status=${loginRes.status}`);
+    }
+
+    return { accessToken, csrfToken };
+  });
+};
+
+// default(data)에서 호출: setup 데이터로 헤더 구성 (로그인 없이 재사용)
+export const headersFromSetup = (tokenData) => ({
+  Authorization: `Bearer ${tokenData.accessToken}`,
+  [CSRF_HEADER_NAME]: tokenData.csrfToken,
+  Cookie: `${CSRF_COOKIE_NAME}=${tokenData.csrfToken}`,
+});

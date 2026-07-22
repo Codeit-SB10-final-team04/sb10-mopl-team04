@@ -1,7 +1,6 @@
 package com.team04.mopl.watching.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
@@ -16,13 +15,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.team04.mopl.common.dto.CursorResponse;
 import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.content.entity.Content;
 import com.team04.mopl.content.entity.ContentType;
-import com.team04.mopl.content.exception.ContentException;
 import com.team04.mopl.content.repository.ContentRepository;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.exception.UserException;
@@ -33,6 +32,9 @@ import com.team04.mopl.watching.dto.response.WatchingSessionDto;
 import com.team04.mopl.watching.enums.ChangeType;
 import com.team04.mopl.watching.enums.WatchingSessionSortBy;
 import com.team04.mopl.watching.store.WatchingSessionStore;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class WatchingSessionServiceTest {
@@ -45,6 +47,9 @@ class WatchingSessionServiceTest {
 
 	@Mock
 	private ContentRepository contentRepository;
+
+	@Spy
+	private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
 	@InjectMocks
 	private WatchingSessionService watchingSessionService;

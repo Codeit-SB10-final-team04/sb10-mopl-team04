@@ -29,4 +29,3 @@ public record CursorResponseDirectMessageDto(
 	String sortDirection
 ) {
 }
-
