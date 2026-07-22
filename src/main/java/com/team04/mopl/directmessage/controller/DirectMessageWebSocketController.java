@@ -104,6 +104,12 @@ public class DirectMessageWebSocketController {
 	// @Valid 검증 실패 시 발생하는 예외를 잡아서 MoplException으로 변환
 	@MessageExceptionHandler(MethodArgumentNotValidException.class)
 	public void handleValidationException(MethodArgumentNotValidException ex) {
+		// 커스텀 메트릭 추가: DM 전송 거부
+		meterRegistry.counter(
+			"mopl.dm.rejected",
+			"reason", "invalid_format"
+		).increment();
+
 		// MoplException으로 래핑하여 StompErrorHandler가 ErrorResponse로 변환하도록 위임
 		throw new DirectMessageException(DirectMessageErrorCode.DM_BLANK);
 	}
