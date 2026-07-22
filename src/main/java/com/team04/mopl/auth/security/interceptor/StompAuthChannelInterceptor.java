@@ -19,6 +19,7 @@ import com.team04.mopl.auth.security.jwt.JwtTokenProvider;
 import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.watching.store.WatchingSessionStore;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,6 +34,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 	private final JwtTokenProvider jwtTokenProvider;
 	private final AuthSessionStore authSessionStore;
 	private final WatchingSessionStore watchingSessionStore;
+	private final MeterRegistry meterRegistry;
 
 	@Override
 	public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -42,24 +44,62 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 			return message;
 		}
 
-		// CONNECT 시 JWT 인증 수행
-		String accessToken = resolveAccessToken(accessor);
-		JwtAuthenticationClaims claims = jwtTokenProvider.parseAccessToken(accessToken);
-		validateAuthSession(claims);
+		try {
+			// CONNECT 시 JWT 인증 수행
+			String accessToken = resolveAccessToken(accessor);
+			JwtAuthenticationClaims claims = jwtTokenProvider.parseAccessToken(accessToken);
+			validateAuthSession(claims);
 
-		// 인증된 사용자 정보를 WebSocket 세션에 바인딩
-		Principal principal = createAuthentication(claims);
-		accessor.setUser(principal);
+			// 인증된 사용자 정보를 WebSocket 세션에 바인딩
+			Principal principal = createAuthentication(claims);
+			accessor.setUser(principal);
 
-		// 세션 스토어에 등록
-		String sessionId = accessor.getSessionId();
-		if (sessionId != null) {
-			watchingSessionStore.registerSession(sessionId, claims.userId());
+			// 세션 스토어에 등록
+			String sessionId = accessor.getSessionId();
+			if (sessionId != null) {
+				watchingSessionStore.registerSession(sessionId, claims.userId());
+			}
+
+			log.debug("WebSocket 연결 인증 성공: userId={}", claims.userId());
+
+			// 커스텀 메트릭 추가: STOMP 인증 성공
+			meterRegistry.counter(
+				"mopl.stomp.authentication",
+				"result", "success"
+			).increment();
+
+			return message;
+
+		} catch (Exception e) {
+			// 커스텀 메트릭 추가: STOMP 인증 실패
+			meterRegistry.counter(
+				"mopl.stomp.authentication",
+				"result", "failure"
+			).increment();
+
+			// 커스텀 메트릭 추가: STOMP 인증 실패 사유별 횟수
+			String reason = extractFailReason(e);
+			meterRegistry.counter(
+				"mopl.stomp.authentication.failure",
+				"reason", reason
+			).increment();
+
+			throw e;
 		}
+	}
 
-		log.debug("WebSocket 연결 인증 성공: userId={}", claims.userId());
+	// 예외 사유 추출 메서드
+	private String extractFailReason(Exception e) {
+		if (e instanceof AuthException authException) {
+			AuthErrorCode errorCode = (AuthErrorCode)authException.getErrorCode();
 
-		return message;
+			if (errorCode == AuthErrorCode.AUTH_SESSION_INVALID) {
+				return "invalid_session";
+			} else if (errorCode == AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN) {
+				return "invalid_token";
+			}
+		}
+		return "unknown";
 	}
 
 	// STOMP CONNECT 프레임의 Authorization 헤더에서 Bearer 토큰 추출
