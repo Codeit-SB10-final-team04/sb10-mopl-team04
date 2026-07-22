@@ -31,14 +31,6 @@ public class ConversationDlqConsumer {
 			conversationCreatedEvent.conversationId());
 
 		try {
-			// 커스텀 메트릭 수집
-			meterRegistry.counter(
-					"mopl.conversation.redis.sync.final.failure",
-					"operation",
-					"create"
-				)
-				.increment();
-
 			log.error("[DLQ_CONSUMER] 대화방 생성 Redis 동기화 최종 실패: Payload={}",
 				conversationCreatedEvent);
 
@@ -46,6 +38,14 @@ public class ConversationDlqConsumer {
 			if (acknowledgment != null) {
 				acknowledgment.acknowledge();
 			}
+
+			// 커스텀 메트릭 수집
+			meterRegistry.counter(
+					"mopl.conversation.redis.sync.final.failure",
+					"operation",
+					"create"
+				)
+				.increment();
 
 		} catch (Exception e) {
 			log.error("[DLQ_CONSUMER] 대화방 DLQ 처리 및 메트릭 수집 중 오류 발생: conversationId={}",

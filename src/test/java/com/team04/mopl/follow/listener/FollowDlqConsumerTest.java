@@ -103,10 +103,7 @@ class FollowDlqConsumerTest {
 		dlqConsumer.consumeFollowCreatedDlqEvent(event, acknowledgment);
 
 		// then
-		double count = meterRegistry.get("mopl.follow.redis.sync.final.failure")
-			.tag("operation", "create")
-			.counter()
-			.count();
-		assertThat(count).isEqualTo(1.0);
+		// 예외가 밖으로 던져지지 않았는지(정상 종료) 확인하며, ack 실패 시 메트릭은 증가하지 않아야 함
+		assertThat(meterRegistry.find("mopl.follow.redis.sync.final.failure").counter()).isNull();
 	}
 }

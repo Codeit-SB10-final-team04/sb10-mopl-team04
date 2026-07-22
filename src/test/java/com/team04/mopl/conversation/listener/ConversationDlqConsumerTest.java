@@ -84,11 +84,7 @@ class ConversationDlqConsumerTest {
 		dlqConsumer.consumeDlqEvent(conversationCreatedEvent, acknowledgment);
 
 		// then
-		// 예외가 밖으로 던져지지 않았는지(정상 종료) 확인하며, 메트릭은 증가했어야 함
-		double count = meterRegistry.get("mopl.conversation.redis.sync.final.failure")
-			.tag("operation", "create")
-			.counter()
-			.count();
-		assertThat(count).isEqualTo(1.0);
+		// 예외가 밖으로 던져지지 않았는지(정상 종료) 확인하며, ack 실패 시 메트릭은 증가하지 않아야 함
+		assertThat(meterRegistry.find("mopl.conversation.redis.sync.final.failure").counter()).isNull();
 	}
 }

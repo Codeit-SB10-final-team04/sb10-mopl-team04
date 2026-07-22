@@ -44,20 +44,20 @@ public class DirectMessageWebSocketController {
 		@Valid @Payload DirectMessageSendRequest directMessageSendRequest,
 		Principal principal
 	) {
-		// 커스텀 메트릭: 처리 시간 측정 시작
+		// 1. 인증 정보로부터 전송자 ID 추출
+		UUID senderId = extractUserId(principal);
+
+		// 2. 메시지 생성 및 저장 (해당 메서드 안에서도 별도로 create 메트릭이 수집됨)
+		DirectMessageDto directMessageDto = directMessageService.create(
+			conversationId,
+			directMessageSendRequest,
+			senderId
+		);
+
+		// 커스텀 메트릭: 브로드캐스트 처리 시간 측정 시작
 		Timer.Sample sample = Timer.start(meterRegistry);
 
 		try {
-			// 1. 인증 정보로부터 전송자 ID 추출
-			UUID senderId = extractUserId(principal);
-
-			// 2. 메시지 생성 및 저장 (해당 메서드 안에서도 별도로 create 메트릭이 수집됨)
-			DirectMessageDto directMessageDto = directMessageService.create(
-				conversationId,
-				directMessageSendRequest,
-				senderId
-			);
-
 			// 3. 메시지 브로드캐스트 전송
 			simpMessagingTemplate.convertAndSend(
 				"/sub/conversations/" + conversationId + "/direct-messages",

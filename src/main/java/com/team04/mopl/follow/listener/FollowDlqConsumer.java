@@ -71,14 +71,6 @@ public class FollowDlqConsumer {
 		Acknowledgment acknowledgment
 	) {
 		try {
-			// 커스텀 메트릭 수집
-			meterRegistry.counter(
-					"mopl.follow.redis.sync.final.failure",
-					"operation",
-					operation
-				)
-				.increment();
-
 			log.error("[DLQ_CONSUMER] 팔로우 Redis 동기화 최종 실패: Payload={}",
 				payload);
 
@@ -86,6 +78,14 @@ public class FollowDlqConsumer {
 			if (acknowledgment != null) {
 				acknowledgment.acknowledge();
 			}
+
+			// 커스텀 메트릭 수집
+			meterRegistry.counter(
+					"mopl.follow.redis.sync.final.failure",
+					"operation",
+					operation
+				)
+				.increment();
 
 		} catch (Exception e) {
 			log.error("[DLQ_CONSUMER] 팔로우 DLQ 처리 및 메트릭 수집 중 오류 발생: operation={}",
