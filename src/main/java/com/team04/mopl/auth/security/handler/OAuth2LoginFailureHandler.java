@@ -47,7 +47,16 @@ public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
 		);
 
 		// 소셜 로그인 실패 로그 기록
-		log.warn("[SOCIAL_LOGIN] 소셜 로그인 실패: errorMessage={}", errorMessage);
+		Throwable cause = exception.getCause();
+		log.warn(
+			"[SOCIAL_LOGIN] 소셜 로그인 실패: requestUri={}, errorCode={}, errorMessage={}, "
+				+ "exceptionType={}, causeType={}",
+			request.getRequestURI(),
+			resolveProviderErrorCode(exception),
+			errorMessage,
+			exception.getClass().getSimpleName(),
+			cause == null ? "none" : cause.getClass().getSimpleName()
+		);
 
 		// 로그인 화면 리다이렉트
 		response.sendRedirect(redirectUri);
@@ -68,6 +77,15 @@ public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
 
 		// 알 수 없는 인증 실패 기본값 처리
 		return "provider_error";
+	}
+
+	// 서버 로그에서 원인을 구분하기 위한 원본 OAuth2 오류 코드 추출
+	private String resolveProviderErrorCode(AuthenticationException exception) {
+		if (exception instanceof OAuth2AuthenticationException oauth2Exception) {
+			return oauth2Exception.getError().getErrorCode();
+		}
+
+		return "unknown";
 	}
 
 	// 실패 리다이렉트 URI에 오류 쿼리 파라미터 추가
