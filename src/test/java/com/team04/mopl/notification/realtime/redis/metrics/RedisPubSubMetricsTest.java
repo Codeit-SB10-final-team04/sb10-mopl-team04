@@ -22,6 +22,20 @@ class RedisPubSubMetricsTest {
 	}
 
 	@Test
+	@DisplayName("생성 시 Redis Pub/Sub Counter와 Timer를 초기값 0으로 등록한다.")
+	void constructor_registerMetersWithZeroCount() {
+		assertAll(
+			() -> assertEquals(0.0, meterRegistry.get("mopl.redis.pubsub.receive").counter().count()),
+			() -> assertEquals(0.0,
+				meterRegistry.get("mopl.redis.pubsub.deserialization.failure").counter().count()),
+			() -> assertEquals(0L, getTimer("mopl.redis.pubsub.publish", "success").count()),
+			() -> assertEquals(0L, getTimer("mopl.redis.pubsub.publish", "failure").count()),
+			() -> assertEquals(0L, getTimer("mopl.redis.pubsub.process", "success").count()),
+			() -> assertEquals(0L, getTimer("mopl.redis.pubsub.process", "failure").count())
+		);
+	}
+
+	@Test
 	@DisplayName("Redis Publish 처리 시간과 횟수를 성공과 실패 결과별로 기록한다.")
 	void recordPublish_recordTimerByResult() {
 		// given
@@ -99,5 +113,12 @@ class RedisPubSubMetricsTest {
 
 		assertEquals(1L, successTimer.count());
 		assertEquals(1L, failureTimer.count());
+	}
+
+	private Timer getTimer(String metric, String result) {
+		return meterRegistry
+			.get(metric)
+			.tag("result", result)
+			.timer();
 	}
 }

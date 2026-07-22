@@ -8,7 +8,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
@@ -86,8 +85,8 @@ class BatchMetricsTest {
 	}
 
 	@Test
-	@DisplayName("처리 건수가 0이면 Counter를 등록하지 않는다.")
-	void recordItems_doesNotRegisterCounter_whenCountIsZero() {
+	@DisplayName("처리 건수가 0이면 Step 처리 건수 Counter를 0으로 등록한다.")
+	void recordItems_registerCounterWithoutIncrement_whenCountIsZero() {
 		// given
 		String job = "tmdbDailyCollectJob";
 		String step = "tmdbDailyCollectStep";
@@ -97,14 +96,15 @@ class BatchMetricsTest {
 		batchMetrics.recordItems(job, step, operation, 0);
 
 		// then
-		Counter count = meterRegistry
-			.find("mopl.batch.items")
+		double count = meterRegistry
+			.get("mopl.batch.items")
 			.tag("batch_job", job)
 			.tag("step", step)
 			.tag("operation", operation)
-			.counter();
+			.counter()
+			.count();
 
-		assertNull(count);
+		assertEquals(0.0, count);
 	}
 
 	@Test

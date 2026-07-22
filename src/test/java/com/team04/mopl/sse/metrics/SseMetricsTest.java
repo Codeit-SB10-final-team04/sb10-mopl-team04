@@ -29,6 +29,21 @@ class SseMetricsTest {
 	}
 
 	@Test
+	@DisplayName("생성 시 고정된 SSE Counter 태그 조합을 초기값 0으로 등록한다.")
+	void constructor_registerFixedCounterTagsWithZeroCount() {
+		assertAll(
+			() -> assertEquals(0.0, getLifecycleCount("connected")),
+			() -> assertEquals(0.0, getLifecycleCount("completed")),
+			() -> assertEquals(0.0, getLifecycleCount("timeout")),
+			() -> assertEquals(0.0, getLifecycleCount("error")),
+			() -> assertEquals(0.0, getSendCount("notifications", "success")),
+			() -> assertEquals(0.0, getSendCount("notifications", "failure")),
+			() -> assertEquals(0.0, getSendCount("direct_messages", "success")),
+			() -> assertEquals(0.0, getSendCount("direct_messages", "failure"))
+		);
+	}
+
+	@Test
 	@DisplayName("SSE 연결 수 Gauge는 Repository의 현재 Emitter 수를 동적으로 반영한다.")
 	void connectionsGauge_reflectRepositoryStateDynamically() {
 		// given

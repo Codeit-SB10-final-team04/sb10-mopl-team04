@@ -1,10 +1,17 @@
 package com.team04.mopl.notification.metrics;
 
+import java.util.List;
 import java.util.Locale;
 
 import org.springframework.stereotype.Component;
 
+import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
+import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.notification.enums.NotificationType;
+import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
+import com.team04.mopl.playlist.event.PlaylistCreatedEvent;
+import com.team04.mopl.playlist.event.PlaylistSubscribedEvent;
+import com.team04.mopl.user.event.UserRoleChangedEvent;
 
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -12,8 +19,23 @@ import io.micrometer.core.instrument.MeterRegistry;
 @Component
 public class NotificationMetrics {
 
+	private static final List<Class<?>> KAFKA_EVENT_CLASSES = List.of(
+		PlaylistSubscribedEvent.class,
+		PlaylistContentAddedEvent.class,
+		FollowCreatedEvent.class,
+		PlaylistCreatedEvent.class,
+		UserRoleChangedEvent.class,
+		DirectMessageCreatedEvent.class
+	);
+
+	private static final List<String> RESULTS = List.of(
+		"success",
+		"failure"
+	);
+
 	// 알림 Kafka 이벤트 역직렬화 실패 횟수 Counter에 사용하는 메트릭 이름
-	private static final String NOTIFICATION_KAFKA_DESERIALIZATION_FAILURE = "mopl.notification.kafka.deserialization.failure";
+	private static final String NOTIFICATION_KAFKA_DESERIALIZATION_FAILURE =
+		"mopl.notification.kafka.deserialization.failure";
 
 	// 저장된 알림 건수 Counter에 사용하는 메트릭 이름
 	private static final String NOTIFICATION_SAVED = "mopl.notification.saved";
@@ -31,6 +53,41 @@ public class NotificationMetrics {
 
 	public NotificationMetrics(MeterRegistry meterRegistry) {
 		this.meterRegistry = meterRegistry;
+		registerCounters();
+	}
+
+	private void registerCounters() {
+		KAFKA_EVENT_CLASSES.forEach(eventClass ->
+			meterRegistry.counter(
+				NOTIFICATION_KAFKA_DESERIALIZATION_FAILURE,
+				"event", eventClass.getSimpleName()
+			)
+		);
+
+		for (NotificationType type : NotificationType.values()) {
+			String typeTag = toTypeTag(type);
+
+			meterRegistry.counter(
+				NOTIFICATION_SAVED,
+				"type", typeTag
+			);
+			meterRegistry.counter(
+				NOTIFICATION_DUPLICATE_SKIPPED,
+				"type", typeTag
+			);
+			meterRegistry.counter(
+				NOTIFICATION_STORE_FAILURE,
+				"type", typeTag
+			);
+
+			RESULTS.forEach(result ->
+				meterRegistry.counter(
+					NOTIFICATION_REALTIME_PUBLISH,
+					"type", typeTag,
+					"result", result
+				)
+			);
+		}
 	}
 
 	// 알림 Kafka 이벤트 역직렬화 실패 횟수를 이벤트 클래스별로 기록

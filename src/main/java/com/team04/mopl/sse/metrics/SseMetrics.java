@@ -1,7 +1,10 @@
 package com.team04.mopl.sse.metrics;
 
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
+import com.team04.mopl.sse.event.SseEventNames;
 import com.team04.mopl.sse.repository.SseEmitterRepository;
 
 import io.micrometer.core.instrument.Gauge;
@@ -10,6 +13,18 @@ import io.micrometer.core.instrument.MeterRegistry;
 // SSE 연결 상태와 이벤트 전송 결과를 Micrometer로 기록하는 컴포넌트
 @Component
 public class SseMetrics {
+
+	private static final List<String> LIFECYCLE_STATES = List.of(
+		"connected",
+		"completed",
+		"timeout",
+		"error"
+	);
+
+	private static final List<String> RESULTS = List.of(
+		"success",
+		"failure"
+	);
 
 	// 현재 인스턴스에 등록된 전체 Emitter 수 Gauge에 사용하는 메트릭 이름
 	private static final String SSE_CONNECTIONS = "mopl.sse.connections";
@@ -33,6 +48,28 @@ public class SseMetrics {
 			)
 			.description("Current SSE connection count")
 			.register(meterRegistry);
+
+		registerCounters();
+	}
+
+	private void registerCounters() {
+		LIFECYCLE_STATES.forEach(state ->
+			meterRegistry.counter(
+				SSE_LIFECYCLE,
+				"state", state
+			)
+		);
+
+		List.of(SseEventNames.NOTIFICATIONS, SseEventNames.DIRECT_MESSAGES)
+			.forEach(eventName ->
+				RESULTS.forEach(result ->
+					meterRegistry.counter(
+						SSE_SEND,
+						"event", toEventTag(eventName),
+						"result", result
+					)
+				)
+			);
 	}
 
 	// SSE 연결 및 종료 상태 발생 횟수를 상태별로 기록

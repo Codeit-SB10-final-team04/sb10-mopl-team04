@@ -1,7 +1,5 @@
 package com.team04.mopl.common.batch.metrics;
 
-import java.util.Set;
-
 import org.jspecify.annotations.Nullable;
 import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.StepExecution;
@@ -14,15 +12,6 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public class MoplBatchStepMetricsListener implements StepExecutionListener {
-
-	// 물리 삭제 Step 이름
-	// writeCount만 보고 저장 작업인지 삭제 작업인지 구분 불가능하기 때문
-	private static final Set<String> HARD_DELETE_STEPS = Set.of(
-		"contentHardDeleteStep",
-		"reviewHardDeleteStep",
-		"playlistHardDeleteStep",
-		"notificationHardDeleteStep"
-	);
 
 	// 메트릭 기록하는 클래스
 	private final BatchMetrics batchMetrics;
@@ -39,9 +28,7 @@ public class MoplBatchStepMetricsListener implements StepExecutionListener {
 		batchMetrics.recordItems(jobName, stepName, "read", stepExecution.getReadCount());
 
 		// write와 delete 구분
-		String operation = HARD_DELETE_STEPS.contains(stepName)
-			? "delete"
-			: "write";
+		String operation = BatchMetricTagValues.writeOperation(stepName);
 
 		// writer 처리 건수 기록
 		batchMetrics.recordItems(jobName, stepName, operation, stepExecution.getWriteCount());

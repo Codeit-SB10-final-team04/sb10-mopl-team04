@@ -2,13 +2,14 @@ package com.team04.mopl.notification.metrics;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.team04.mopl.notification.enums.NotificationType;
 
-import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
@@ -21,6 +22,34 @@ class NotificationMetricsTest {
 	void setUp() {
 		meterRegistry = new SimpleMeterRegistry();
 		notificationMetrics = new NotificationMetrics(meterRegistry);
+	}
+
+	@Test
+	@DisplayName("생성 시 고정된 알림 메트릭 태그 조합을 초기값 0으로 등록한다.")
+	void constructor_registerFixedCounterTagsWithZeroCount() {
+		List.of("role_change", "subscribe", "content_add", "follow", "following_activity", "dm")
+			.forEach(type -> assertAll(
+				() -> assertEquals(0.0, getCounter("mopl.notification.saved", "type", type)),
+				() -> assertEquals(0.0,
+					getCounter("mopl.notification.duplicate.skipped", "type", type)),
+				() -> assertEquals(0.0,
+					getCounter("mopl.notification.store.failure", "type", type)),
+				() -> assertEquals(0.0, getRealtimePublishCount(type, "success")),
+				() -> assertEquals(0.0, getRealtimePublishCount(type, "failure"))
+			));
+
+		List.of(
+			"PlaylistSubscribedEvent",
+			"PlaylistContentAddedEvent",
+			"FollowCreatedEvent",
+			"PlaylistCreatedEvent",
+			"UserRoleChangedEvent",
+			"DirectMessageCreatedEvent"
+		).forEach(event -> assertEquals(0.0, getCounter(
+			"mopl.notification.kafka.deserialization.failure",
+			"event",
+			event
+		)));
 	}
 
 	@Test
@@ -63,8 +92,8 @@ class NotificationMetricsTest {
 	}
 
 	@Test
-	@DisplayName("저장된 알림 건수가 0 이하면 알림 저장 Counter를 등록하지 않는다.")
-	void recordSaved_doesNotRegisterCounter_whenCountIsNotPositive() {
+	@DisplayName("저장된 알림 건수가 0 이하면 알림 저장 Counter를 증가시키지 않는다.")
+	void recordSaved_doesNotIncrementCounter_whenCountIsNotPositive() {
 		// given
 		NotificationType type = NotificationType.SUBSCRIBE;
 
@@ -72,12 +101,7 @@ class NotificationMetricsTest {
 		notificationMetrics.recordSaved(type, 0);
 
 		// then
-		Counter counter = meterRegistry
-			.find("mopl.notification.saved")
-			.tag("type", "subscribe")
-			.counter();
-
-		assertNull(counter);
+		assertEquals(0.0, getCounter("mopl.notification.saved", "type", "subscribe"));
 	}
 
 	@Test
@@ -101,8 +125,8 @@ class NotificationMetricsTest {
 	}
 
 	@Test
-	@DisplayName("중복으로 제외된 수신자 수가 0 이하면 중복 제외 Counter를 등록하지 않는다.")
-	void recordDuplicateSkipped_doesNotRegisterCounter_whenCountIsNotPositive() {
+	@DisplayName("중복으로 제외된 수신자 수가 0 이하면 중복 제외 Counter를 증가시키지 않는다.")
+	void recordDuplicateSkipped_doesNotIncrementCounter_whenCountIsNotPositive() {
 		// given
 		NotificationType type = NotificationType.CONTENT_ADD;
 
@@ -110,12 +134,8 @@ class NotificationMetricsTest {
 		notificationMetrics.recordDuplicateSkipped(type, 0);
 
 		// then
-		Counter counter = meterRegistry
-			.find("mopl.notification.duplicate.skipped")
-			.tag("type", "content_add")
-			.counter();
-
-		assertNull(counter);
+		assertEquals(0.0,
+			getCounter("mopl.notification.duplicate.skipped", "type", "content_add"));
 	}
 
 	@Test
@@ -164,5 +184,22 @@ class NotificationMetricsTest {
 
 		assertEquals(1.0, successCount);
 		assertEquals(1.0, failureCount);
+	}
+
+	private double getCounter(String metric, String tagKey, String tagValue) {
+		return meterRegistry
+			.get(metric)
+			.tag(tagKey, tagValue)
+			.counter()
+			.count();
+	}
+
+	private double getRealtimePublishCount(String type, String result) {
+		return meterRegistry
+			.get("mopl.notification.realtime.publish")
+			.tag("type", type)
+			.tag("result", result)
+			.counter()
+			.count();
 	}
 }

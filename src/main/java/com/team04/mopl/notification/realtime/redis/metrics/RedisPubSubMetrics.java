@@ -1,5 +1,7 @@
 package com.team04.mopl.notification.realtime.redis.metrics;
 
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -8,6 +10,11 @@ import io.micrometer.core.instrument.Timer;
 // Notification Redis Pub/Sub 발행/수신/처리 결과와 시간을 Micrometer로 기록하는 컴포넌트
 @Component
 public class RedisPubSubMetrics {
+
+	private static final List<String> RESULTS = List.of(
+		"success",
+		"failure"
+	);
 
 	// Redis 메시지 Publish 성공/실패 횟수와 처리 시간 Timer에 사용하는 메트릭 이름
 	private static final String REDIS_PUBSUB_PUBLISH = "mopl.redis.pubsub.publish";
@@ -25,6 +32,23 @@ public class RedisPubSubMetrics {
 
 	public RedisPubSubMetrics(MeterRegistry meterRegistry) {
 		this.meterRegistry = meterRegistry;
+		registerMeters();
+	}
+
+	private void registerMeters() {
+		meterRegistry.counter(REDIS_PUBSUB_RECEIVE);
+		meterRegistry.counter(REDIS_PUBSUB_DESERIALIZATION_FAILURE);
+
+		RESULTS.forEach(result -> {
+			meterRegistry.timer(
+				REDIS_PUBSUB_PUBLISH,
+				"result", result
+			);
+			meterRegistry.timer(
+				REDIS_PUBSUB_PROCESS,
+				"result", result
+			);
+		});
 	}
 
 	// Redis Publish 또는 Subscriber 처리 시간을 측정하기 위한 Timer Sample 시작

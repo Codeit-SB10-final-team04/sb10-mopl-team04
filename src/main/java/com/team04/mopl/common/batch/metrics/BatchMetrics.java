@@ -42,6 +42,16 @@ public class BatchMetrics {
 		);
 	}
 
+	// Batch Step 처리 건수 Counter를 증가시키지 않고 등록
+	public void registerItems(String job, String step, String operation) {
+		meterRegistry.counter(
+			BATCH_ITEMS,
+			"batch_job", job,
+			"step", step,
+			"operation", operation
+		);
+	}
+
 	// Job이 한 번 끝날 때마다 실행 횟수를 1 증가 시킴
 	public void recordRun(String job, String result) {
 		meterRegistry.counter(
@@ -53,6 +63,8 @@ public class BatchMetrics {
 
 	// 특정 Step이 처리한 아이템 수를 기록
 	public void recordItems(String job, String step, String operation, long count) {
+		registerItems(job, step, operation);
+
 		if (count <= 0) {
 			return;
 		}
