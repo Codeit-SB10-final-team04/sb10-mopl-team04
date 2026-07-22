@@ -11,6 +11,7 @@ import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.conversation.event.ConversationCreatedEvent;
 import com.team04.mopl.conversation.redis.ConversationRedisStore;
 
@@ -29,6 +30,7 @@ public class ConversationRedisSyncProcessor {
 
 	private final KafkaTemplate<String, Object> kafkaTemplate;
 	private final MeterRegistry meterRegistry;
+	private final ObjectMapper objectMapper;
 
 	@Retryable(
 		value = Exception.class,
@@ -102,11 +104,14 @@ public class ConversationRedisSyncProcessor {
 			log.error("[REDIS_SYNC] 대화방 생성 Redis 동기화 최종 실패 및 DLQ 발행: conversationId={}, 원인={}",
 				conversationCreatedEvent.conversationId(), e.getMessage());
 
+			// JSON 직렬화
+			String payload = objectMapper.writeValueAsString(conversationCreatedEvent);
+
 			// 작업 저장: 5초 타임아웃
 			kafkaTemplate.send(
 				DLQ_TOPIC,
 				conversationCreatedEvent.conversationId().toString(),
-				conversationCreatedEvent
+				payload
 			).get(5, TimeUnit.SECONDS);
 
 			log.info("[REDIS_SYNC] 대화방 생성 Kafka DLQ 발행 완료: topic={}",

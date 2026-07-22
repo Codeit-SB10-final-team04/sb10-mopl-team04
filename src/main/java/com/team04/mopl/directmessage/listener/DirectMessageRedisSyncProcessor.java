@@ -8,6 +8,7 @@ import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.directmessage.event.DirectMessageCreatedEvent;
 import com.team04.mopl.directmessage.event.DirectMessageReadEvent;
 import com.team04.mopl.directmessage.redis.DirectMessageRedisStore;
@@ -28,6 +29,7 @@ public class DirectMessageRedisSyncProcessor {
 
 	private final KafkaTemplate<String, Object> kafkaTemplate;
 	private final MeterRegistry meterRegistry;
+	private final ObjectMapper objectMapper;
 
 	@Retryable(
 		value = Exception.class,
@@ -93,11 +95,14 @@ public class DirectMessageRedisSyncProcessor {
 			log.error("[REDIS_SYNC] DM 생성 Redis 동기화 최종 실패 및 DLQ 발행: directMessageId={}, 원인={}",
 				directMessageCreatedEvent.directMessageId(), e.getMessage());
 
+			// JSON 직렬화
+			String payload = objectMapper.writeValueAsString(directMessageCreatedEvent);
+
 			// 작업 저장: 5초 타임아웃
 			kafkaTemplate.send(
 				DLQ_TOPIC,
 				directMessageCreatedEvent.directMessageId().toString(),
-				directMessageCreatedEvent
+				payload
 			).get(5, TimeUnit.SECONDS);
 
 			log.info("[REDIS_SYNC] DM 생성 Kafka DLQ 발행 완료: topic={}",
@@ -186,11 +191,14 @@ public class DirectMessageRedisSyncProcessor {
 			log.error("[REDIS_SYNC] DM 읽음 처리 Redis 동기화 최종 실패 및 DLQ 발행: receiverId={}, conversationId={}, 원인={}",
 				directMessageReadEvent.receiverId(), directMessageReadEvent.conversationId(), e.getMessage());
 
+			// JSON 직렬화
+			String payload = objectMapper.writeValueAsString(directMessageReadEvent);
+
 			// 작업 저장: 5초 타임아웃
 			kafkaTemplate.send(
 				DLQ_TOPIC,
 				directMessageReadEvent.directMessageId().toString(),
-				directMessageReadEvent
+				payload
 			).get(5, TimeUnit.SECONDS);
 
 			log.info("[REDIS_SYNC] DM 읽음 상태 Kafka DLQ 발행 완료: topic={}",

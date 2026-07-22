@@ -7,6 +7,8 @@ import static org.mockito.BDDMockito.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,7 +18,9 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.conversation.event.ConversationCreatedEvent;
 import com.team04.mopl.conversation.redis.ConversationRedisStore;
 
@@ -33,6 +37,9 @@ class ConversationRedisSyncProcessorTest {
 
 	@Mock
 	private KafkaTemplate<String, Object> kafkaTemplate;
+
+	@Mock
+	private ObjectMapper objectMapper;
 
 	@Spy
 	private MeterRegistry meterRegistry = new SimpleMeterRegistry();
@@ -118,8 +125,47 @@ class ConversationRedisSyncProcessorTest {
 	======================================
 	 */
 	@Test
+	@DisplayName("성공: 생성 동기화 최종 실패 시(@Recover), 이벤트를 JSON으로 직렬화하여 Kafka DLQ 토픽으로 정상 발행한다.")
+	void recoverCreateFailure_Success() throws Exception {
+		// given
+		UUID conversationId = UUID.randomUUID();
+		ConversationCreatedEvent event = new ConversationCreatedEvent(
+			conversationId,
+			List.of(UUID.randomUUID(), UUID.randomUUID()),
+			Instant.now()
+		);
+
+		Exception syncException = new RuntimeException("최종 실패 예외");
+		String mockPayload = "{\"test\":\"json\"}";
+
+		given(objectMapper.writeValueAsString(event)).willReturn(mockPayload);
+
+		// Kafka 통신 CompletableFuture
+		CompletableFuture<SendResult<String, Object>> future = mock(CompletableFuture.class);
+		given(kafkaTemplate.send(eq(DLQ_TOPIC), eq(conversationId.toString()), eq(mockPayload)))
+			.willReturn(future);
+		given(future.get(5, TimeUnit.SECONDS)).willReturn(mock(SendResult.class));
+
+		// when
+		conversationRedisSyncProcessor.recoverCreateFailure(syncException, event);
+
+		// then
+		verify(objectMapper, times(1)).writeValueAsString(event);
+		verify(kafkaTemplate, times(1)).send(DLQ_TOPIC, conversationId.toString(), mockPayload);
+		verify(future, times(1)).get(5, TimeUnit.SECONDS);
+
+		// 메트릭 검증
+		double count = meterRegistry.get("mopl.conversation.redis.sync.dlq.publish")
+			.tag("operation", "create")
+			.tag("result", "success")
+			.counter()
+			.count();
+		assertThat(count).isEqualTo(1.0);
+	}
+
+	@Test
 	@DisplayName("실패: 생성 동기화 DLQ 발행 중 Kafka 통신 예외 발생 시, 예외를 다시 던져 오프셋 커밋을 방지한다.")
-	void recoverCreateFailure_KafkaFail_ThrowsException() {
+	void recoverCreateFailure_KafkaFail_ThrowsException() throws Exception {
 		// given
 		UUID conversationId = UUID.randomUUID();
 		ConversationCreatedEvent event = new ConversationCreatedEvent(
@@ -128,7 +174,9 @@ class ConversationRedisSyncProcessorTest {
 			Instant.now()
 		);
 		Exception syncException = new RuntimeException("최종 실패 예외");
+		String mockPayload = "{\"test\":\"json\"}";
 
+		given(objectMapper.writeValueAsString(event)).willReturn(mockPayload);
 		willThrow(new RuntimeException("Kafka Broker Down"))
 			.given(kafkaTemplate).send(anyString(), anyString(), any());
 

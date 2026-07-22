@@ -8,6 +8,7 @@ import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
 import com.team04.mopl.follow.event.FollowDeletedEvent;
 import com.team04.mopl.follow.redis.FollowRedisStore;
@@ -28,6 +29,7 @@ public class FollowRedisSyncProcessor {
 
 	private final KafkaTemplate<String, Object> kafkaTemplate;
 	private final MeterRegistry meterRegistry;
+	private final ObjectMapper objectMapper;
 
 	@Retryable(
 		value = Exception.class,
@@ -89,11 +91,14 @@ public class FollowRedisSyncProcessor {
 			log.error("[REDIS_SYNC] 팔로우 생성 Redis 동기화 최종 실패: followerId={}, followeeId={}, 원인={}",
 				followCreatedEvent.followerId(), followCreatedEvent.followeeId(), e.getMessage());
 
+			// JSON 직렬화
+			String payload = objectMapper.writeValueAsString(followCreatedEvent);
+
 			// 작업 저장: 5초 타임아웃
 			kafkaTemplate.send(
 				DLQ_TOPIC,
 				followCreatedEvent.followerId().toString(),
-				followCreatedEvent
+				payload
 			).get(5, TimeUnit.SECONDS);
 
 			log.info("[REDIS_SYNC] 팔로우 생성 Kafka DLQ 발행 완료: topic={}",
@@ -178,11 +183,14 @@ public class FollowRedisSyncProcessor {
 			log.error("[REDIS_SYNC] 팔로우 취소 Redis 동기화 최종 실패: followerId={}, followeeId={}, 원인={}",
 				followDeletedEvent.followerId(), followDeletedEvent.followeeId(), e.getMessage());
 
+			// JSON 직렬화
+			String payload = objectMapper.writeValueAsString(followDeletedEvent);
+
 			// 작업 저장: 5초 타임아웃 (스레드 풀 방지)
 			kafkaTemplate.send(
 				DLQ_TOPIC,
 				followDeletedEvent.followerId().toString(),
-				followDeletedEvent
+				payload
 			).get(5, TimeUnit.SECONDS);
 
 			log.info("[REDIS_SYNC] 팔로우 취소 Kafka DLQ 발행 완료: topic={}",
