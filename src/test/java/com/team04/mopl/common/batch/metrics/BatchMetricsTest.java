@@ -24,6 +24,26 @@ class BatchMetricsTest {
 	}
 
 	@Test
+	@DisplayName("Batch Job 실행 결과 Counter를 초기값 0으로 등록한다.")
+	void registerRun_registerCounterWithZeroCount() {
+		String job = "tmdbDailyCollectJob";
+		String result = "success";
+
+		// when
+		batchMetrics.registerRun(job, result);
+
+		// then
+		double count = meterRegistry
+			.get("mopl.batch.run")
+			.tag("batch_job", job)
+			.tag("result", result)
+			.counter()
+			.count();
+
+		assertEquals(0.0, count);
+	}
+
+	@Test
 	@DisplayName("실행 결과가 success이면 Batch Job 실행 횟수를 1 증가시킨다.")
 	void recordRun_incrementCounter_whenResultIsSuccess() {
 		String job = "tmdbDailyCollectJob";

@@ -33,6 +33,15 @@ public class BatchMetrics {
 		this.meterRegistry = meterRegistry;
 	}
 
+	// Batch Job 실행 결과 Counter를 증가시키지 않고 등록
+	public void registerRun(String job, String result) {
+		meterRegistry.counter(
+			BATCH_RUN,
+			"batch_job", job,
+			"result", result
+		);
+	}
+
 	// Job이 한 번 끝날 때마다 실행 횟수를 1 증가 시킴
 	public void recordRun(String job, String result) {
 		meterRegistry.counter(
