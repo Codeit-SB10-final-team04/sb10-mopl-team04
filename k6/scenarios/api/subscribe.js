@@ -19,7 +19,9 @@ export const options = {
     { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {
-    http_req_duration: ['p(95)<500'],
+    'http_req_duration{endpoint:playlist_subscribe}': ['p(95)<500'],
+    'http_req_duration{endpoint:playlist_unsubscribe}': ['p(95)<500'],
+    'http_req_duration{endpoint:playlist_list}': ['p(95)<500'],
     http_req_failed: ['rate<0.05'],
   },
 };
