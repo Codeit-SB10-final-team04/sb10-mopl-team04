@@ -20,7 +20,7 @@ import {fileURLToPath} from 'node:url';
  */
 
 const MIN_USER_COUNT = 100;
-const MAX_USER_COUNT = 200;
+const MAX_USER_COUNT = 1000;
 const DEFAULT_PASSWORD = 'Mopl-load-2026!';
 const REQUEST_TIMEOUT_MS = 10_000;
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN';

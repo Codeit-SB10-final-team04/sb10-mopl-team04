@@ -8,6 +8,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -62,6 +64,7 @@ public class ContentService {
 	}
 
 	// 파일 저장, DB 저장은 한 트랜잭션에 묶일 수 없음
+	@CacheEvict(value = "contentList", allEntries = true)
 	@Transactional
 	public ContentDto createContent(ContentCreateRequest contentCreateRequest, MultipartFile thumbnail) {
 		log.info("[콘텐츠 생성 시작] title={}", contentCreateRequest.title());
@@ -110,6 +113,11 @@ public class ContentService {
 		}
 	}
 
+	@Cacheable(
+		value = "contentList",
+		key = "(#req.typeEqual ?: 'all') + ':' + (#req.tagsIn ?: 'none') + ':' + (#req.sortBy ?: 'default') + ':' + (#req.sortDirection ?: 'DESC')",
+		condition = "#req.cursor == null && #req.keywordLike == null && !'watcherCount'.equals(#req.sortBy ?: 'watcherCount')"
+	)
 	public CursorResponse<ContentDto> getContents(ContentPageRequest req) {
 		int limit = req.limit() != null ? req.limit() : 20;
 		String sortBy = req.sortBy() != null ? req.sortBy() : "watcherCount";
@@ -147,6 +155,7 @@ public class ContentService {
 		return new CursorResponse<>(data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy, sortDirection);
 	}
 
+	@CacheEvict(value = "contentList", allEntries = true)
 	@Transactional
 	public ContentDto updateContent(UUID contentId, ContentUpdateRequest contentUpdateRequest,
 		MultipartFile thumbnail) {
@@ -210,6 +219,7 @@ public class ContentService {
 		}
 	}
 
+	@CacheEvict(value = "contentList", allEntries = true)
 	@Transactional
 	public void deleteContent(UUID contentId) {
 		log.info("[콘텐츠 삭제 시작] contentId={}", contentId);
