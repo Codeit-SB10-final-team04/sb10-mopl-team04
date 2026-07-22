@@ -2,6 +2,7 @@ package com.team04.mopl.review.event;
 
 import java.util.UUID;
 
+import org.springframework.cache.CacheManager;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -24,6 +25,7 @@ public class ReviewRatingEventListener {
 
 	private final ContentRepository contentRepository;
 	private final DistributedLock distributedLock;
+	private final CacheManager cacheManager;
 
 	@Async
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -54,6 +56,12 @@ public class ReviewRatingEventListener {
 				if (updated == 0) {
 					log.warn("[REVIEW_RATING] 평점 업데이트 대상 없음: contentId={}", contentId);
 					return;
+				}
+
+				// DB 업데이트 후 캐시 무효화 (averageRating 변경이 목록 정렬에 영향)
+				var cache = cacheManager.getCache("contentList");
+				if (cache != null) {
+					cache.clear();
 				}
 
 				log.info("[REVIEW_RATING] 평점 업데이트 완료: contentId={}", contentId);
