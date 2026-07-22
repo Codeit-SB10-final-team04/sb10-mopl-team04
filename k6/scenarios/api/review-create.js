@@ -19,7 +19,8 @@ export const options = {
     { duration: '30s', target: 0 },     // Cool-down
   ],
   thresholds: {
-    http_req_duration: ['p(95)<1000'],
+    'http_req_duration{endpoint:review_create}': ['p(95)<1000'],
+    'http_req_duration{endpoint:content_list_for_review_create}': ['p(95)<500'],
     http_req_failed: ['rate<0.05'],
   },
 };
@@ -50,7 +51,7 @@ export default function (data) {
     return;
   }
 
-  const contents = listRes.json().contents || listRes.json().content || [];
+  const contents = listRes.json().data || [];
   if (contents.length === 0) {
     sleep(1);
     return;
