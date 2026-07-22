@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -20,18 +19,22 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.watching.dto.response.WatchingSessionChange;
-import com.team04.mopl.watching.event.WatchingSessionEvent;
 import com.team04.mopl.watching.service.WatchingSessionService;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class StompWatchingInterceptorTest {
 
 	private final WatchingSessionService watchingSessionService = mock(WatchingSessionService.class);
 	private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 	private final MessageChannel channel = mock(MessageChannel.class);
+	private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
 	private final StompWatchingInterceptor interceptor = new StompWatchingInterceptor(
 		watchingSessionService,
-		eventPublisher
+		eventPublisher,
+		meterRegistry
 	);
 
 	@Test
