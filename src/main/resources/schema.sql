@@ -55,10 +55,6 @@ CREATE TABLE contents (
 );
 
 -- 콘텐츠 목록 조회 성능 인덱스 (정렬 기준별 Partial Index)
-CREATE INDEX idx_contents_active_watcher
-    ON contents (watcher_count DESC, id)
-    WHERE deleted_at IS NULL;
-
 CREATE INDEX idx_contents_active_rating
     ON contents (average_rating DESC, id)
     WHERE deleted_at IS NULL;
