@@ -34,7 +34,7 @@ public class FollowDlqConsumer {
 			followCreatedEvent.followerId(), followCreatedEvent.followeeId());
 
 		// 커스텀 메트릭 수집
-		processDlq("create", followCreatedEvent, acknowledgment);
+		processDlq("create", acknowledgment);
 	}
 
 	// 팔로우 취소 최종 실패
@@ -47,7 +47,7 @@ public class FollowDlqConsumer {
 			followDeletedEvent.followerId(), followDeletedEvent.followeeId());
 
 		// 커스텀 메트릭 수집
-		processDlq("delete", followDeletedEvent, acknowledgment);
+		processDlq("delete", acknowledgment);
 	}
 
 	// 공통 메서드: 팔로우 생성 / 취소 이벤트가 아닌 경우, 커밋 처리
@@ -67,12 +67,11 @@ public class FollowDlqConsumer {
 	// 공통 메서드: 커스텀 메트릭 수집
 	private void processDlq(
 		String operation,
-		Object payload,
 		Acknowledgment acknowledgment
 	) {
 		try {
-			log.error("[DLQ_CONSUMER] 팔로우 Redis 동기화 최종 실패: Payload={}",
-				payload);
+			log.error("[DLQ_CONSUMER] 팔로우 Redis 동기화 최종 실패: operation={}",
+				operation);
 
 			// 메시지 정상 소비 처리
 			if (acknowledgment != null) {
