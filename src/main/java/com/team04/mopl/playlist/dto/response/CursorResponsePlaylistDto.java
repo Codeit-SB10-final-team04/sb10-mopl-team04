@@ -5,27 +5,29 @@ import java.util.UUID;
 
 import com.team04.mopl.common.enums.SortDirection;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 public record CursorResponsePlaylistDto(
 
-	// 데이터 목록
+	@Schema(description = "데이터 목록")
 	List<PlaylistDto> data,
 
-	// 다음 커서
+	@Schema(description = "다음 커서")
 	String nextCursor,
 
-	// 다음 요청의 보조 커서
+	@Schema(description = "다음 요청의 보조 커서")
 	UUID nextIdAfter,
 
-	// 다음 데이터가 있는지 여부
+	@Schema(description = "다음 데이터가 있는지 여부")
 	Boolean hasNext,
 
-	// 총 데이터 개수
+	@Schema(description = "총 데이터 개수")
 	Long totalCount,
 
-	// 정렬 기준
+	@Schema(description = "정렬 기준")
 	String sortBy,
 
-	// 정렬 방향
+	@Schema(description = "정렬 방향")
 	SortDirection sortDirection
 ) {
 	public CursorResponsePlaylistDto {

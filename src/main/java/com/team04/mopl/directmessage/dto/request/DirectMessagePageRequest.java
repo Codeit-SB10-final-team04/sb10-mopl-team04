@@ -8,20 +8,22 @@ import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.directmessage.exception.DirectMessageErrorCode;
 import com.team04.mopl.directmessage.exception.DirectMessageException;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 public record DirectMessagePageRequest(
-	// 메인 커서
+	@Schema(description = "커서")
 	String cursor,
 
-	// 보조 커서
+	@Schema(description = "보조 커서")
 	UUID idAfter,
 
-	// 페이지 개수
+	@Schema(description = "조회할 데이터 개수")
 	Integer limit,
 
-	// 정렬 방향
+	@Schema(description = "정렬 방향")
 	SortDirection sortDirection,
 
-	// 정렬 기준
+	@Schema(description = "정렬 기준")
 	String sortBy
 ) {
 	// 기본값 설정을 위한 생성자

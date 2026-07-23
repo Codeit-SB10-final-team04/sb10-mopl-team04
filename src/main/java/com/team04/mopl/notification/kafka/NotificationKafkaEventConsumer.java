@@ -17,6 +17,7 @@ import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationType;
 import com.team04.mopl.notification.kafka.exception.KafkaEventErrorCode;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
+import com.team04.mopl.notification.metrics.NotificationMetrics;
 import com.team04.mopl.notification.realtime.NotificationRealtimePublisher;
 import com.team04.mopl.notification.service.NotificationService;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
@@ -41,10 +42,16 @@ public class NotificationKafkaEventConsumer {
 	private final NotificationService notificationService;
 	private final NotificationRealtimePublisher notificationRealtimePublisher;
 
+	private final NotificationMetrics notificationMetrics;
+
 	private final ObjectMapper objectMapper;
 
 	// 특정 사용자가 플레이리스트를 구독 완료 후 플레이리스트 소유주에게 알림을 보내는 listener
-	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_SUBSCRIBED)
+	@KafkaListener(
+		id = "notification-playlist-subscribed",
+		idIsGroup = false,
+		topics = NotificationKafkaTopics.PLAYLIST_SUBSCRIBED
+	)
 	public void consumePlaylistSubscribedEvent(String kafkaEvent) {
 		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
 			NotificationKafkaTopics.PLAYLIST_SUBSCRIBED, PlaylistSubscribedEvent.class.getSimpleName());
@@ -72,7 +79,11 @@ public class NotificationKafkaEventConsumer {
 	}
 
 	// 구독 중인 플레이리스트에 콘텐츠가 추가되면 해당 플레이리스트 구독자에게 알림을 보내는 listener
-	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_CONTENT_ADDED)
+	@KafkaListener(
+		id = "notification-playlist-content-added",
+		idIsGroup = false,
+		topics = NotificationKafkaTopics.PLAYLIST_CONTENT_ADDED
+	)
 	public void consumePlaylistContentAddedEvent(String kafkaEvent) {
 		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
 			NotificationKafkaTopics.PLAYLIST_CONTENT_ADDED, PlaylistContentAddedEvent.class.getSimpleName());
@@ -104,7 +115,11 @@ public class NotificationKafkaEventConsumer {
 	}
 
 	// 특정 사용자를 팔로우 하면 해당 팔로우를 당한 사용자에게 알림을 보내는 listener
-	@KafkaListener(topics = NotificationKafkaTopics.FOLLOW_CREATED)
+	@KafkaListener(
+		id = "notification-follow-created",
+		idIsGroup = false,
+		topics = NotificationKafkaTopics.FOLLOW_CREATED
+	)
 	public void consumeFollowCreatedEvent(String kafkaEvent) {
 		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
 			NotificationKafkaTopics.FOLLOW_CREATED, FollowCreatedEvent.class.getSimpleName());
@@ -129,7 +144,11 @@ public class NotificationKafkaEventConsumer {
 	}
 
 	// 특정 사용자가 플레이리스트를 생성하면 해당 사용자의 팔로워에게 알림을 보내는 listener
-	@KafkaListener(topics = NotificationKafkaTopics.PLAYLIST_CREATED)
+	@KafkaListener(
+		id = "notification-playlist-created",
+		idIsGroup = false,
+		topics = NotificationKafkaTopics.PLAYLIST_CREATED
+	)
 	public void consumePlaylistCreatedEvent(String kafkaEvent) {
 		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
 			NotificationKafkaTopics.PLAYLIST_CREATED, PlaylistCreatedEvent.class.getSimpleName());
@@ -161,7 +180,11 @@ public class NotificationKafkaEventConsumer {
 	}
 
 	// 사용자 권한 변경 시 해당 사용자에게 알림을 보내는 listener
-	@KafkaListener(topics = NotificationKafkaTopics.USER_ROLE_CHANGED)
+	@KafkaListener(
+		id = "notification-user-role-changed",
+		idIsGroup = false,
+		topics = NotificationKafkaTopics.USER_ROLE_CHANGED
+	)
 	public void consumeUserRoleChangedEvent(String kafkaEvent) {
 		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
 			NotificationKafkaTopics.USER_ROLE_CHANGED, UserRoleChangedEvent.class.getSimpleName());
@@ -189,7 +212,11 @@ public class NotificationKafkaEventConsumer {
 	}
 
 	// DM 생성 시 해당 사용자에게 알림을 보내는 listener
-	@KafkaListener(topics = NotificationKafkaTopics.DIRECT_MESSAGE_CREATED)
+	@KafkaListener(
+		id = "notification-direct-message-created",
+		idIsGroup = false,
+		topics = NotificationKafkaTopics.DIRECT_MESSAGE_CREATED
+	)
 	public void consumeDirectMessageCreatedEvent(String kafkaEvent) {
 		log.info("[NOTIFICATION_KAFKA_CONSUME_START] Kafka 이벤트 처리 시작: topic={}, eventType={}",
 			NotificationKafkaTopics.DIRECT_MESSAGE_CREATED, DirectMessageCreatedEvent.class.getSimpleName());
@@ -219,9 +246,15 @@ public class NotificationKafkaEventConsumer {
 		try {
 			return objectMapper.readValue(kafkaEvent, eventClass);
 		} catch (JsonProcessingException e) {
+			String eventName = eventClass.getSimpleName();
+
+			// 알림 Kafka 역직렬화 실패 횟수 메트릭에 기록
+			notificationMetrics.recordDeserializationFailure(eventName);
+
 			log.error("[EVENT_DESERIALIZATION_FAILED] 이벤트 역직렬화 실패", e);
+
 			throw new KafkaEventException(KafkaEventErrorCode.KAFKA_EVENT_DESERIALIZATION_FAILED, e)
-				.addDetail("event", eventClass.getSimpleName());
+				.addDetail("event", eventName);
 		}
 	}
 
@@ -241,23 +274,49 @@ public class NotificationKafkaEventConsumer {
 		log.info("[NOTIFICATION_REALTIME_PUBLISH_START] 알림 저장 및 실시간 전송 시작: receiverCount={}, type={}",
 			receiverIds.size(), type);
 
-		List<NotificationDto> notificationDtoList = notificationService.saveNotificationList(
-			receiverIds,
-			sourceEventId,
-			title,
-			content,
-			type,
-			level
-		);
+		List<NotificationDto> notificationDtoList;
 
-		// 실패 count
+		try {
+			notificationDtoList = notificationService.saveNotificationList(
+				receiverIds,
+				sourceEventId,
+				title,
+				content,
+				type,
+				level
+			);
+		} catch (RuntimeException e) {
+			// 알림 저장 실패 횟수를 메트릭에 기록
+			notificationMetrics.recordStoreFailure(type);
+			throw e;
+		}
+
+		// 저장된 알림 수
+		long notificationCount = notificationDtoList.size();
+
+		// 저장된 알림 건수 메트릭에 기록
+		notificationMetrics.recordSaved(type, notificationCount);
+
+		// 저장에서 제외된 수신자 수
+		long skippedReceiverCount = receiverIds.size() - notificationCount;
+
+		// 중복 알림으로 저장에서 제외된 수신자 수 메트릭에 기록
+		notificationMetrics.recordDuplicateSkipped(type, skippedReceiverCount);
+
+		// 실시간 Publish 실패 횟수
 		int failureCount = 0;
 
 		// 실시간 알림 전송
 		for (NotificationDto notificationDto : notificationDtoList) {
 			try {
 				notificationRealtimePublisher.publish(notificationDto);
-			} catch (Exception e) {
+
+				// 알림 한 건의 실시간 Publish 성공을 메트릭에 기록
+				notificationMetrics.recordRealtimePublish(type, "success");
+			} catch (RuntimeException e) {
+				// 알림 한 건의 실시간 Publish 실패를 메트릭에 기록
+				notificationMetrics.recordRealtimePublish(type, "failure");
+
 				failureCount++;
 				log.warn("[NOTIFICATION_REALTIME_PUBLISH_FAILED] 실시간 전송 실패: receiverId={}, notificationId={}",
 					notificationDto.receiverId(), notificationDto.id(), e);
@@ -266,7 +325,7 @@ public class NotificationKafkaEventConsumer {
 
 		log.info(
 			"[NOTIFICATION_REALTIME_PUBLISH_COMPLETE] 알림 저장 및 실시간 전송 완료: receiverCount={}, notificationCount={}, failureCount={}, type={}",
-			receiverIds.size(), notificationDtoList.size(), failureCount, type);
+			receiverIds.size(), notificationCount, failureCount, type);
 	}
 
 	private String roleToDisplayName(UserRole role) {

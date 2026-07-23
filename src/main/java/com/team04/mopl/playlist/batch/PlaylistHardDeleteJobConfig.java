@@ -25,6 +25,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import com.team04.mopl.common.batch.BatchTimeZone;
+import com.team04.mopl.common.batch.metrics.MoplBatchJobMetricsListener;
+import com.team04.mopl.common.batch.metrics.MoplBatchStepMetricsListener;
 import com.team04.mopl.playlist.repository.PlaylistRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -44,11 +46,15 @@ public class PlaylistHardDeleteJobConfig {
 
 	private final PlaylistRepository playlistRepository;
 
+	private final MoplBatchJobMetricsListener moplBatchJobMetricsListener;
+	private final MoplBatchStepMetricsListener moplBatchStepMetricsListener;
+
 	// Job 객체를 Spring Bean으로 등록
 	@Bean
 	public Job playlistHardDeleteJob(Step playlistHardDeleteStep) {
 		// `playlistHardDeleteJob` 이라는 Spring Batch Job을 생성
 		return new JobBuilder("playlistHardDeleteJob", jobRepository)
+			.listener(moplBatchJobMetricsListener)
 			.start(playlistHardDeleteStep) // Job이 실행할 Step
 			.build();
 	}
@@ -61,6 +67,7 @@ public class PlaylistHardDeleteJobConfig {
 	) {
 		// Step이 실행할 작업을 Chunk 단위로 Reader가 읽고 Writer가 삭제
 		return new StepBuilder("playlistHardDeleteStep", jobRepository)
+			.listener(moplBatchStepMetricsListener)
 			.<UUID, UUID>chunk(100, transactionManager)
 			.reader(playlistHardDeleteReader)
 			.writer(playlistHardDeleteItemWriter)

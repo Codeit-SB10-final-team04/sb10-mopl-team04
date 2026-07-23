@@ -3,14 +3,20 @@ package com.team04.mopl.common.exception;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 
 // API 에러 응답 공통 포맷
 @Getter
+@Schema(description = "에러 응답")
 public class ErrorResponse {
 
+  @Schema(description = "예외 이름")
   private final String exceptionName;
+  @Schema(description = "오류 메시지")
   private final String message;
+  @Schema(description = "오류 부가 정보")
   private final Map<String, String> details;
 
   private ErrorResponse(

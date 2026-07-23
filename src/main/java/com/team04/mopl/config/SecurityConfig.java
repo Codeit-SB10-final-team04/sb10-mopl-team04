@@ -128,6 +128,7 @@ public class SecurityConfig {
 					"/swagger-ui/**",
 					"/v3/api-docs/**",
 					"/actuator/health",
+					"/actuator/prometheus",
 					"/thumbnails/**",
 					"/profile-images/**",
 					"/",

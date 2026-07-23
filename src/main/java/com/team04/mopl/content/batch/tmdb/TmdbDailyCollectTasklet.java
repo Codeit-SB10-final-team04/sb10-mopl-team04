@@ -50,8 +50,12 @@ public class TmdbDailyCollectTasklet implements Tasklet {
 	// results 순회 → saveIfNotExists → writeCount 증가 패턴을 공통 헬퍼로 추출
 	private void collectPage(JsonNode root, ContentType type, StepContribution contribution) {
 		for (JsonNode item : tmdbClient.extractResults(root)) {
+			contribution.incrementReadCount();
+
 			if (tmdbContentCollectService.saveIfNotExists(item, type)) {
 				contribution.incrementWriteCount(1);
+			} else {
+				contribution.incrementFilterCount(1);
 			}
 		}
 	}

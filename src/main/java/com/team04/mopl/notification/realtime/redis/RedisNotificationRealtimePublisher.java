@@ -9,8 +9,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.realtime.NotificationRealtimePublisher;
 import com.team04.mopl.notification.realtime.dto.NotificationRealtimeMessage;
+import com.team04.mopl.notification.realtime.redis.metrics.RedisPubSubMetrics;
 import com.team04.mopl.sse.event.SseEventNames;
 
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 
 // 알림 실시간 전송 요청을 Redis Pub/Sub 채널로 발행하는 Publisher
@@ -26,8 +28,13 @@ public class RedisNotificationRealtimePublisher implements NotificationRealtimeP
 	private final StringRedisTemplate stringRedisTemplate;
 	private final ObjectMapper objectMapper;
 
+	private final RedisPubSubMetrics redisPubSubMetrics;
+
 	@Override
 	public void publish(NotificationDto notificationDto) {
+		Timer.Sample sample = redisPubSubMetrics.startTimer();
+		String result = "failure";
+
 		try {
 			NotificationRealtimeMessage notificationRealtimeMessage = new NotificationRealtimeMessage(
 				notificationDto.receiverId(),
@@ -44,9 +51,12 @@ public class RedisNotificationRealtimePublisher implements NotificationRealtimeP
 				message
 			);
 
+			result = "success";
 		} catch (JsonProcessingException e) {
 			// Consumer에서 예외를 잡기 때문에 런타임 예외 발생 시킴
 			throw new IllegalStateException("Redis Publish 알림 메시지 직렬화에 실패했습니다.", e);
+		} finally {
+			redisPubSubMetrics.recordPublish(sample, result);
 		}
 	}
 }
