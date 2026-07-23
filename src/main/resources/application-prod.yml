@@ -21,6 +21,11 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:}
       ssl:
         enabled: true
+  session:
+    timeout: 10m
+    redis:
+      namespace: mopl:http-session
+      repository-type: default
   cache:
     type: ${SPRING_CACHE_TYPE}
     redis:
