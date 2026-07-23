@@ -113,3 +113,9 @@ spring.redisson:
 notification:
   realtime:
     mode: redis
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus

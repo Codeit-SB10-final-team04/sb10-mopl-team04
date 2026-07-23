@@ -26,6 +26,7 @@ import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.enums.NotificationLevel;
 import com.team04.mopl.notification.enums.NotificationType;
 import com.team04.mopl.notification.kafka.exception.KafkaEventException;
+import com.team04.mopl.notification.metrics.NotificationMetrics;
 import com.team04.mopl.notification.realtime.NotificationRealtimePublisher;
 import com.team04.mopl.notification.service.NotificationService;
 import com.team04.mopl.playlist.event.PlaylistContentAddedEvent;
@@ -49,6 +50,9 @@ class NotificationKafkaEventConsumerTest {
 
 	@Mock
 	private NotificationRealtimePublisher notificationRealtimePublisher;
+
+	@Mock
+	private NotificationMetrics notificationMetrics;
 
 	@Mock
 	private ObjectMapper objectMapper;
@@ -431,6 +435,89 @@ class NotificationKafkaEventConsumerTest {
 			any(NotificationType.class),
 			any(NotificationLevel.class)
 		);
+		verify(notificationRealtimePublisher, never()).publish(any(NotificationDto.class));
+	}
+
+	@Test
+	@DisplayName("일부 수신자의 알림이 중복이면 저장 건수와 중복 제외 수신자 수를 기록한다.")
+	void consumeKafkaEvent_recordSavedAndDuplicateSkipped_whenSomeNotificationAreDuplicate() throws Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID playlistId = UUID.randomUUID();
+		UUID subscriberId1 = UUID.randomUUID();
+		UUID subscriberId2 = UUID.randomUUID();
+		UUID subscriberId3 = UUID.randomUUID();
+		Set<UUID> subscriberIds = Set.of(subscriberId1, subscriberId2, subscriberId3);
+
+		PlaylistContentAddedEvent event = PlaylistContentAddedEvent.of(
+			playlistId,
+			"플레이리스트 제목",
+			UUID.randomUUID(),
+			UUID.randomUUID(),
+			"콘텐츠 제목"
+		);
+
+		NotificationDto notificationDto1 = createNotificationDto(subscriberId1);
+		NotificationDto notificationDto2 = createNotificationDto(subscriberId2);
+
+		when(objectMapper.readValue(kafkaEvent, PlaylistContentAddedEvent.class))
+			.thenReturn(event);
+		when(playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(playlistId))
+			.thenReturn(subscriberIds);
+		when(notificationService.saveNotificationList(
+			eq(subscriberIds),
+			eq(event.eventId()),
+			anyString(),
+			anyString(),
+			eq(NotificationType.CONTENT_ADD),
+			eq(NotificationLevel.INFO)
+		)).thenReturn(List.of(notificationDto1, notificationDto2));
+
+		// when
+		notificationKafkaEventConsumer.consumePlaylistContentAddedEvent(kafkaEvent);
+
+		// then
+		verify(notificationMetrics).recordSaved(NotificationType.CONTENT_ADD, 2L);
+		verify(notificationMetrics).recordDuplicateSkipped(NotificationType.CONTENT_ADD, 1L);
+	}
+
+	@Test
+	@DisplayName("알림 저장에 실패하면 저장 실패 메트릭을 기록하고 예외를 다시 발생시킨다.")
+	void consumeKafkaEvent_recordStoreFailureAndReThrow_whenNotificationStoreFails() throws Exception {
+		// given
+		String kafkaEvent = "{}";
+		UUID playlistOwnerId = UUID.randomUUID();
+
+		PlaylistSubscribedEvent event = PlaylistSubscribedEvent.of(
+			UUID.randomUUID(),
+			"플레이리스트 제목",
+			playlistOwnerId,
+			UUID.randomUUID(),
+			"구독자 이름"
+		);
+
+		RuntimeException storeFailure = new RuntimeException("Notification Store Failed");
+
+		when(objectMapper.readValue(kafkaEvent, PlaylistSubscribedEvent.class))
+			.thenReturn(event);
+		when(notificationService.saveNotificationList(
+			eq(Set.of(playlistOwnerId)),
+			eq(event.eventId()),
+			anyString(),
+			anyString(),
+			eq(NotificationType.SUBSCRIBE),
+			eq(NotificationLevel.INFO)
+		)).thenThrow(storeFailure);
+
+		// when
+		RuntimeException actualException = assertThrows(RuntimeException.class,
+			() -> notificationKafkaEventConsumer.consumePlaylistSubscribedEvent(kafkaEvent));
+
+		// then
+		assertEquals(storeFailure, actualException);
+
+		verify(notificationMetrics).recordStoreFailure(NotificationType.SUBSCRIBE);
+		verify(notificationMetrics, never()).recordSaved(any(NotificationType.class), anyLong());
 		verify(notificationRealtimePublisher, never()).publish(any(NotificationDto.class));
 	}
 

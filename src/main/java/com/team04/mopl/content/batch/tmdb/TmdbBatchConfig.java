@@ -9,6 +9,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.team04.mopl.common.batch.metrics.MoplBatchJobMetricsListener;
+import com.team04.mopl.common.batch.metrics.MoplBatchStepMetricsListener;
+
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -27,6 +30,9 @@ public class TmdbBatchConfig {
 	private final TmdbInitialCollectTasklet tmdbInitialCollectTasklet;
 	private final TmdbDailyCollectTasklet tmdbDailyCollectTasklet;
 
+	private final MoplBatchJobMetricsListener moplBatchJobMetricsListener;
+	private final MoplBatchStepMetricsListener moplBatchStepMetricsListener;
+
 	/**
 	 초기 수집 Job (최초 1회)
 	 movie/now_playing + tv/on_the_air 전체 페이지 수집
@@ -37,6 +43,7 @@ public class TmdbBatchConfig {
 		Step tmdbInitialCollectStep
 	) {
 		return new JobBuilder("tmdbInitialCollectJob", jobRepository)
+			.listener(moplBatchJobMetricsListener)
 			.start(tmdbInitialCollectStep)
 			.build();
 	}
@@ -51,6 +58,7 @@ public class TmdbBatchConfig {
 		Step tmdbDailyCollectStep
 	) {
 		return new JobBuilder("tmdbDailyCollectJob", jobRepository)
+			.listener(moplBatchJobMetricsListener)
 			.start(tmdbDailyCollectStep)
 			.build();
 	}
@@ -62,6 +70,7 @@ public class TmdbBatchConfig {
 		PlatformTransactionManager transactionManager
 	) {
 		return new StepBuilder("tmdbInitialCollectStep", jobRepository)
+			.listener(moplBatchStepMetricsListener)
 			.tasklet(tmdbInitialCollectTasklet, transactionManager)
 			.build();
 	}
@@ -73,6 +82,7 @@ public class TmdbBatchConfig {
 		PlatformTransactionManager transactionManager
 	) {
 		return new StepBuilder("tmdbDailyCollectStep", jobRepository)
+			.listener(moplBatchStepMetricsListener)
 			.tasklet(tmdbDailyCollectTasklet, transactionManager)
 			.build();
 	}

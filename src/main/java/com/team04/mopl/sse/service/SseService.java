@@ -13,6 +13,7 @@ import com.team04.mopl.directmessage.service.DirectMessageRestoreService;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.service.NotificationRestoreService;
 import com.team04.mopl.sse.event.SseEventNames;
+import com.team04.mopl.sse.metrics.SseMetrics;
 import com.team04.mopl.sse.repository.SseEmitterRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ public class SseService {
 	private final NotificationRestoreService notificationRestoreService;
 	private final DirectMessageRestoreService directMessageRestoreService;
 
+	private final SseMetrics sseMetrics;
+
 	// SseEmitter 객체 생성
 	public SseEmitter connect(UUID receiverId, UUID lastEventId) {
 		SseEmitter sseEmitter = new SseEmitter(TIMEOUT);
@@ -37,12 +40,14 @@ public class SseService {
 		// 콜백 등록: 정상적으로 연결이 끝났을 경우 실행됨
 		sseEmitter.onCompletion(() -> {
 			log.info("[SSE_CONNECT_COMPLETE] SSE 연결 종료 요청 완료: receiverId={}", receiverId);
+			sseMetrics.recordLifecycle("completed");
 			sseEmitterRepository.remove(receiverId, sseEmitter);
 		});
 
 		// 콜백 등록: SseEmitter 생성 시 지정한 TIMEOUT을 넘겼을 경우 실행됨
 		sseEmitter.onTimeout(() -> {
 			log.warn("[SSE_TIMEOUT] SSE 타임아웃 발생: receiverId={}", receiverId);
+			sseMetrics.recordLifecycle("timeout");
 			sseEmitterRepository.remove(receiverId, sseEmitter);
 		});
 
@@ -50,6 +55,7 @@ public class SseService {
 		sseEmitter.onError(e -> {
 			log.error("[SSE_ERROR] SSE 오류 발생: receiverId={}, error={}",
 				receiverId, e.getMessage(), e);
+			sseMetrics.recordLifecycle("error");
 			sseEmitterRepository.remove(receiverId, sseEmitter);
 		});
 
@@ -60,6 +66,8 @@ public class SseService {
 			sseEmitterRepository.remove(receiverId, sseEmitter);
 			return sseEmitter;
 		}
+
+		sseMetrics.recordLifecycle("connected");
 
 		// 유실된 이벤트 복원
 		if (lastEventId != null) {
@@ -181,11 +189,18 @@ public class SseService {
 		String eventName,
 		Object data
 	) throws IOException {
-		sseEmitter.send(
-			SseEmitter.event()
-				.id(eventId.toString())
-				.name(eventName)
-				.data(data)
-		);
+		try {
+			sseEmitter.send(
+				SseEmitter.event()
+					.id(eventId.toString())
+					.name(eventName)
+					.data(data)
+			);
+
+			sseMetrics.recordSend(eventName, "success");
+		} catch (IOException | RuntimeException e) {
+			sseMetrics.recordSend(eventName, "failure");
+			throw e;
+		}
 	}
 }

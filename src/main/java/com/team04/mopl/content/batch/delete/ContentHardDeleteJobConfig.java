@@ -13,6 +13,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.team04.mopl.common.batch.metrics.MoplBatchJobMetricsListener;
+import com.team04.mopl.common.batch.metrics.MoplBatchStepMetricsListener;
+
 import lombok.RequiredArgsConstructor;
 
 @Configuration
@@ -22,9 +25,13 @@ public class ContentHardDeleteJobConfig {
 	private final JobRepository jobRepository;
 	private final PlatformTransactionManager transactionManager;
 
+	private final MoplBatchJobMetricsListener moplBatchJobMetricsListener;
+	private final MoplBatchStepMetricsListener moplBatchStepMetricsListener;
+
 	@Bean
 	public Job contentHardDeleteJob(Step contentHardDeleteStep) {
 		return new JobBuilder("contentHardDeleteJob", jobRepository)
+			.listener(moplBatchJobMetricsListener)
 			.start(contentHardDeleteStep)
 			.build();
 	}
@@ -35,6 +42,7 @@ public class ContentHardDeleteJobConfig {
 		ItemWriter<UUID> contentHardDeleteItemWriter
 	) {
 		return new StepBuilder("contentHardDeleteStep", jobRepository)
+			.listener(moplBatchStepMetricsListener)
 			.<UUID, UUID>chunk(100, transactionManager)
 			.reader(contentHardDeleteReader)
 			.writer(contentHardDeleteItemWriter)

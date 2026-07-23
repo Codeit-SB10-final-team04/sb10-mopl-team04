@@ -65,3 +65,8 @@ mopl:
   oauth2:
     success-redirect-uri: ${MOPL_OAUTH2_SUCCESS_REDIRECT_URI:http://localhost:8080/#/contents}
     failure-redirect-uri: ${MOPL_OAUTH2_FAILURE_REDIRECT_URI:http://localhost:8080/#/sign-in}
+
+management:
+  metrics:
+    tags:
+      application: ${spring.application.name}

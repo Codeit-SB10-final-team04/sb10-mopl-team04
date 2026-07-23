@@ -16,6 +16,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.team04.mopl.common.batch.metrics.MoplBatchJobMetricsListener;
+import com.team04.mopl.common.batch.metrics.MoplBatchStepMetricsListener;
 
 import lombok.RequiredArgsConstructor;
 
@@ -39,6 +41,9 @@ public class SportsDataBatchConfig {
 	private final EventDetailItemProcessor eventDetailItemProcessor;
 	private final EventDetailItemWriter eventDetailItemWriter;
 
+	private final MoplBatchJobMetricsListener moplBatchJobMetricsListener;
+	private final MoplBatchStepMetricsListener moplBatchStepMetricsListener;
+
 	@Bean
 	public Job sportsDataCollectJob(
 		JobRepository jobRepository,
@@ -47,6 +52,7 @@ public class SportsDataBatchConfig {
 		Step eventDetailCollectStep
 	) {
 		return new JobBuilder("sportsDataCollectJob", jobRepository)
+			.listener(moplBatchJobMetricsListener)
 			.start(leagueCollectStep)
 			.next(matchListCollectStep)
 			.next(eventDetailCollectStep)
@@ -60,6 +66,7 @@ public class SportsDataBatchConfig {
 		PlatformTransactionManager transactionManager
 	) {
 		return new StepBuilder("leagueCollectStep", jobRepository)
+			.listener(moplBatchStepMetricsListener)
 			.tasklet(leagueCollectTasklet, transactionManager)
 			.build();
 	}
@@ -71,6 +78,7 @@ public class SportsDataBatchConfig {
 		PlatformTransactionManager transactionManager
 	) {
 		return new StepBuilder("matchListCollectStep", jobRepository)
+			.listener(moplBatchStepMetricsListener)
 			.tasklet(matchListCollectTasklet, transactionManager)
 			.build();
 	}
@@ -99,6 +107,7 @@ public class SportsDataBatchConfig {
 		EventDetailItemReader eventDetailItemReader
 	) {
 		return new StepBuilder("eventDetailCollectStep", jobRepository)
+			.listener(moplBatchStepMetricsListener)
 			.<String, JsonNode>chunk(CHUNK_SIZE, transactionManager)
 			.reader(eventDetailItemReader)
 			.processor(eventDetailItemProcessor)
