@@ -476,7 +476,7 @@ Micrometer + Prometheus + Grafana 기반 실시간 모니터링
 | | Name | Role | Domains | Key Contributions |
 |---|------|------|---------|-------------------|
 | <img src="https://github.com/jsj7878.png" width="60" style="border-radius:50%"/> | [**전승주**](https://github.com/jsj7878) | Team Lead | Content, Review, Watching | AWS 배포/인프라, WebSocket 세션 설계, k6 부하 테스트, 인덱싱 최적화 |
-| <img src="https://placecats.com/millie/60/60" width="60" style="border-radius:50%"/> | [**이다솔**](https://github.com/LeeDyol) | Developer | Conversation, DM, Follow | Redis 동기화(DLQ), 커스텀 메트릭(DM/Chat/WS) |
+| <img src="https://placecats.com/millie/60/60" width="60" style="border-radius:50%"/> | [**이다솔**](https://github.com/LeeDyol) | Developer | Conversation, DM, Follow | CI/CD 환경 구축, Redis 동기화(DLQ), 커스텀 메트릭(DM/Chat/WS) |
 | <img src="https://placecats.com/neo/60/60" width="60" style="border-radius:50%"/> | [**박정현**](https://github.com/JungH200000) | Developer | Playlist, Notification, SSE | Kafka 알림 멱등 처리, Redis Pub/Sub 기반 SSE 멀티서버 대응, 커스텀 메트릭·Grafana 구축 |
 | <img src="https://placecats.com/bella/60/60" width="60" style="border-radius:50%"/> | [**박나경**](https://github.com/parkngg) | Developer | Auth, User | JWT/OAuth2(Google, Kakao), Redis 세션 마이그레이션, k6 유저 플로우 시나리오 |
 
