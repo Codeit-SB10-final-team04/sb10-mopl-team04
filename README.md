@@ -304,7 +304,7 @@ docker compose --profile multi up -d
 | **Follow** | `POST/DELETE/GET /api/follows/*` | 팔로우/언팔로우, 목록 조회 |
 | **Conversation** | `POST/GET /api/conversations/*` | 대화방 생성/목록/메시지 조회 |
 | **DirectMessage** | `POST/GET /api/direct-messages/*` | DM 전송/조회 |
-| **Notification** | `GET/PATCH /api/notifications/*` | 알림 목록/읽음 처리 |
+| **Notification** | `GET/DELETE /api/notifications/*` | 알림 목록/읽음 처리 |
 | **Watching** | `POST/GET /api/watching-sessions/*` | 같이보기 세션 생성/조회 |
 
 
@@ -321,7 +321,7 @@ docker compose --profile multi up -d
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/sse/subscribe` | 실시간 알림 구독 (Server-Sent Events) |
+| `GET /api/sse` | 실시간 알림·DM 구독 및 미수신 이벤트 복구 |
 
 <p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
 
@@ -443,7 +443,8 @@ Nginx 설정 변경 시
 
 ### Custom Metrics (40+)
 
-Micrometer + Prometheus + Grafana 기반 실시간 모니터링
+Micrometer + Prometheus + Grafana 기반 실시간 모니터링  
+> 모든 커스텀 메트릭은 `mopl.` 접두사를 사용합니다.
 
 | Domain | Metrics | Examples |
 |--------|---------|----------|
@@ -451,9 +452,10 @@ Micrometer + Prometheus + Grafana 기반 실시간 모니터링
 | **Review** | 리뷰 작성/수정/삭제, 평점 분포 | `review.create.count`, `review.rating.histogram` |
 | **Watching** | 세션 수, 시청자 수, 채팅 수 | `watching.session.active`, `watching.chat.count` |
 | **Chat** | 메시지 전송량, WebSocket 연결 수 | `chat.message.count`, `websocket.connection.active` |
-| **Notification** | 알림 발행/소비량, DLQ 발행 수 | `notification.publish.count`, `kafka.dlq.count` |
-| **Batch** | 배치 실행 시간, 처리 건수 | `batch.job.duration`, `batch.item.processed` |
-| **Redis** | Pub/Sub 메시지량, 캐시 히트율 | `redis.pubsub.count`, `redis.cache.hit.ratio` |
+| **Notification** | 저장, 중복 제외, 실시간 발행 결과 | `notification.saved`, `notification.duplicate.skipped`, `notification.realtime.publish` |
+| **SSE** | 연결 수, 생명주기, 실제 전송 결과 | `sse.connections`, `sse.lifecycle`, `sse.send` |
+| **Batch** | 실행 결과, 처리 건수, 마지막 성공 시각 | `batch.run`, `batch.items`, `batch.last.success.timestamp` |
+| **Redis Pub/Sub** | 발행·수신, 역직렬화 실패, 처리 시간 | `redis.pubsub.publish`, `redis.pubsub.receive`, `redis.pubsub.process` |
 
 ### Grafana Dashboard
 
@@ -475,7 +477,7 @@ Micrometer + Prometheus + Grafana 기반 실시간 모니터링
 |---|------|------|---------|-------------------|
 | <img src="https://github.com/jsj7878.png" width="60" style="border-radius:50%"/> | [**전승주**](https://github.com/jsj7878) | Team Lead | Content, Review, Watching | AWS 배포/인프라, WebSocket 세션 설계, k6 부하 테스트, 인덱싱 최적화 |
 | <img src="https://placecats.com/millie/60/60" width="60" style="border-radius:50%"/> | [**이다솔**](https://github.com/LeeDyol) | Developer | Conversation, DM, Follow | Redis 동기화(DLQ), 커스텀 메트릭(DM/Chat/WS) |
-| <img src="https://placecats.com/neo/60/60" width="60" style="border-radius:50%"/> | [**박정현**](https://github.com/JungH200000) | Developer | Playlist, Notification, SSE | Kafka 이벤트 알림(멱등성), 커스텀 메트릭(Batch/Notification), SSE 멀티서버 |
+| <img src="https://placecats.com/neo/60/60" width="60" style="border-radius:50%"/> | [**박정현**](https://github.com/JungH200000) | Developer | Playlist, Notification, SSE | Kafka 알림 멱등 처리, Redis Pub/Sub 기반 SSE 멀티서버 대응, 커스텀 메트릭·Grafana 구축 |
 | <img src="https://placecats.com/bella/60/60" width="60" style="border-radius:50%"/> | [**박나경**](https://github.com/parkngg) | Developer | Auth, User | JWT/OAuth2(Google, Kakao), Redis 세션 마이그레이션, k6 유저 플로우 시나리오 |
 
 > **프로젝트 기간**: 2026.06.18 ~ 2026.07.29 (6주)
