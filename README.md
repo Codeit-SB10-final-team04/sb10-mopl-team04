@@ -291,6 +291,7 @@ docker compose --profile multi up -d
 
 > 📄 전체 API 문서: 서버 실행 후 `/swagger-ui.html` 에서 확인
 
+
 ### REST APIs (42 Endpoints)
 
 | Domain | Endpoints | Description |
@@ -305,6 +306,7 @@ docker compose --profile multi up -d
 | **DirectMessage** | `POST/GET /api/direct-messages/*` | DM 전송/조회 |
 | **Notification** | `GET/PATCH /api/notifications/*` | 알림 목록/읽음 처리 |
 | **Watching** | `POST/GET /api/watching-sessions/*` | 같이보기 세션 생성/조회 |
+
 
 ### WebSocket (STOMP)
 
@@ -484,6 +486,3 @@ Micrometer + Prometheus + Grafana 기반 실시간 모니터링
 
 <div align="center">
 
-**모두의 플리 (MOPL)** — Built with ❤️ by Team 04
-
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Codeit-SB10-final-team04/sb10-mopl-team04)
