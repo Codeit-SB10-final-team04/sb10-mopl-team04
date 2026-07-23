@@ -21,6 +21,10 @@ spring:
 server:
   port: 8080
 
+springdoc:
+  swagger-ui:
+    operations-sorter: method
+
 tmdb:
   api:
     key: ${TMDB_API_KEY}
