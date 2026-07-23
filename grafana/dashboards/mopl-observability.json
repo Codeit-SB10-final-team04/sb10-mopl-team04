@@ -2549,7 +2549,7 @@
         "spec": {
           "id": 26,
           "title": "Redis 동기화 이상 징후",
-          "description": "선택한 시간 범위 동안 발생한 REdis 동기화 재시고, DLQ 발행 및 최종 실패 횟수",
+          "description": "선택한 시간 범위 동안 발생한 Redis 동기화 재시도, DLQ 발행 및 최종 실패 횟수",
           "links": [],
           "data": {
             "kind": "QueryGroup",
