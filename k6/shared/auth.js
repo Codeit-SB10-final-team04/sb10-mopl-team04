@@ -17,6 +17,11 @@ const csrfCookieFrom = (response) => {
 
 // 로그인 전 토큰 발급
 const getCsrfToken = () => {
+  // 동일 VU의 반복 로그인에서 기존 CSRF 토큰 재사용
+  if (activeCsrfToken) {
+    return activeCsrfToken;
+  }
+
   const response = http.get(`${BASE_URL}/api/auth/csrf-token`, {
     tags: {endpoint: 'auth_csrf'},
   });
@@ -79,12 +84,8 @@ export const authHeaders = (accessToken) => {
 // setup()에서 호출: 전체 유저 로그인 후 {accessToken, csrfToken} 배열 반환
 // CSRF 토큰은 1회만 발급하여 전체 유저가 공유 (k6 cookie jar가 중복 발급을 막으므로)
 export const loginAll = (userList) => {
-  // CSRF 토큰 1회 발급
-  const csrfRes = http.get(`${BASE_URL}/api/auth/csrf-token`);
-  const csrfToken = csrfCookieFrom(csrfRes);
-  if (!csrfToken) {
-    throw new Error('CSRF 토큰 발급 실패');
-  }
+  // 동일 실행 컨텍스트의 기존 CSRF 토큰 재사용
+  const csrfToken = getCsrfToken();
 
   return userList.map((user) => {
     const body =
