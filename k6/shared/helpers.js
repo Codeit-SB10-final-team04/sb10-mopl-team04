@@ -27,3 +27,19 @@ export const thinkTime = (minSeconds = 1, maxSeconds = 3) => {
   sleep(seconds);
   return seconds;
 };
+
+// 테스트 사용자 수를 초과하지 않는 부하 단계 생성
+export const capStageTargets = (sourceStages, maxVus) => {
+  if (!Array.isArray(sourceStages) || sourceStages.length === 0) {
+    throw new Error('sourceStages는 비어 있지 않은 배열이어야 합니다.');
+  }
+
+  if (!Number.isInteger(maxVus) || maxVus < 1) {
+    throw new Error('maxVus는 1 이상의 정수여야 합니다.');
+  }
+
+  return sourceStages.map((stage) => ({
+    ...stage,
+    target: Math.min(stage.target, maxVus),
+  }));
+};
