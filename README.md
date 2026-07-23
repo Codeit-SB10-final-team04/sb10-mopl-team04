@@ -1,6 +1,8 @@
 <div align="center">
 
 # 🎬 모두의 플리 (MOPL)
+<img width="600" height="400" alt="favicon" src="https://github.com/user-attachments/assets/002b0441-7f8a-4c15-a0fc-8b7f0d0413f4" />
+
 
 ### Global Content Curation & Rating Platform
 
