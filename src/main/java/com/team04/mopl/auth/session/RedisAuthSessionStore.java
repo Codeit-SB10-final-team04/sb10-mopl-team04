@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.HashOperations;
@@ -17,13 +18,12 @@ import org.springframework.stereotype.Component;
 
 import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.exception.AuthException;
+import com.team04.mopl.auth.realtime.AuthSessionChangePublisher;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class RedisAuthSessionStore implements AuthSessionStore {
 
 	// Redis Cluster 동일 hash slot 배치
@@ -70,6 +70,21 @@ public class RedisAuthSessionStore implements AuthSessionStore {
 
 	// 문자열 기반 Redis 연산 템플릿
 	private final StringRedisTemplate redisTemplate;
+	private final AuthSessionChangePublisher authSessionChangePublisher;
+
+	@Autowired
+	public RedisAuthSessionStore(
+		StringRedisTemplate redisTemplate,
+		AuthSessionChangePublisher authSessionChangePublisher
+	) {
+		this.redisTemplate = redisTemplate;
+		this.authSessionChangePublisher = authSessionChangePublisher;
+	}
+
+	// Redis 스크립트 단위 테스트 호환용 생성자
+	RedisAuthSessionStore(StringRedisTemplate redisTemplate) {
+		this(redisTemplate, null);
+	}
 
 	// 로그인 세션 교체
 	@Override
@@ -116,6 +131,7 @@ public class RedisAuthSessionStore implements AuthSessionStore {
 
 			// 세션 교체 완료
 			if (result == SUCCESS) {
+				publishSessionChange(newSession.userId());
 				return;
 			}
 
@@ -281,6 +297,7 @@ public class RedisAuthSessionStore implements AuthSessionStore {
 
 			// 멱등 삭제 완료
 			if (result != RETRY) {
+				publishSessionChange(userId);
 				return;
 			}
 		}
@@ -314,6 +331,7 @@ public class RedisAuthSessionStore implements AuthSessionStore {
 
 			// 멱등 삭제 완료
 			if (result != RETRY) {
+				publishSessionChange(userId);
 				return;
 			}
 		}
@@ -325,6 +343,13 @@ public class RedisAuthSessionStore implements AuthSessionStore {
 	// 현재 refresh hash 조회
 	private String readCurrentRefreshTokenHash(String sessionKey) {
 		return executeRedis(() -> hashOperations().get(sessionKey, REFRESH_TOKEN_HASH_FIELD));
+	}
+
+	private void publishSessionChange(UUID userId) {
+		// 인증 세션 변경 성공 후 실시간 연결 정리 이벤트 발행
+		if (authSessionChangePublisher != null) {
+			authSessionChangePublisher.publish(userId);
+		}
 	}
 
 	// Redis Hash 세션 변환

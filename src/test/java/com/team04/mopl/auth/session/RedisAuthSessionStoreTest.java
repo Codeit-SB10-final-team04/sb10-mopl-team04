@@ -33,6 +33,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 
 import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.exception.AuthException;
+import com.team04.mopl.auth.realtime.AuthSessionChangePublisher;
 
 @ExtendWith(MockitoExtension.class)
 class RedisAuthSessionStoreTest {
@@ -45,6 +46,40 @@ class RedisAuthSessionStoreTest {
 
 	@Mock
 	private ValueOperations<String, String> valueOperations;
+
+	@Mock
+	private AuthSessionChangePublisher authSessionChangePublisher;
+
+	@Test
+	@DisplayName("인증 세션을 교체한 뒤 실시간 연결 정리 이벤트를 발행한다")
+	void replace_publishesSessionChange_whenRedisScriptSucceeds() {
+		// given
+		UUID userId = UUID.randomUUID();
+		Instant issuedAt = Instant.parse("2026-07-15T00:00:00Z");
+		given(redisTemplate.<String, String>opsForHash()).willReturn(hashOperations);
+		given(redisTemplate.execute(
+			RedisScriptMatcher.anyLongScript(),
+			anyList(),
+			any(Object[].class)
+		)).willReturn(1L);
+		RedisAuthSessionStore store = new RedisAuthSessionStore(
+			redisTemplate,
+			authSessionChangePublisher
+		);
+
+		// when
+		store.replace(
+			userId,
+			UUID.randomUUID(),
+			"refresh-token-hash",
+			issuedAt.plusSeconds(1800),
+			issuedAt.plusSeconds(1209600),
+			issuedAt
+		);
+
+		// then
+		verify(authSessionChangePublisher).publish(userId);
+	}
 
 	@Test
 	@DisplayName("로그인 시 Redis 스크립트로 새 인증 세션을 저장한다")

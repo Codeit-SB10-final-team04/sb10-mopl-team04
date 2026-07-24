@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.exception.AuthException;
+import com.team04.mopl.auth.realtime.RealtimeWebSocketSessionRegistry;
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.jwt.JwtAuthenticationClaims;
 import com.team04.mopl.auth.security.jwt.JwtTokenProvider;
@@ -34,13 +35,25 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 	private final JwtTokenProvider jwtTokenProvider;
 	private final AuthSessionStore authSessionStore;
 	private final WatchingSessionStore watchingSessionStore;
+	private final RealtimeWebSocketSessionRegistry realtimeWebSocketSessionRegistry;
 	private final MeterRegistry meterRegistry;
 
 	@Override
 	public Message<?> preSend(Message<?> message, MessageChannel channel) {
 		StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-		if (accessor == null || !StompCommand.CONNECT.equals(accessor.getCommand())) {
+		if (accessor == null || accessor.getCommand() == null) {
+			return message;
+		}
+
+		if (StompCommand.SEND.equals(accessor.getCommand())
+			|| StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+			// 기존 STOMP 세션의 인바운드 요청 시점 재검증
+			validateBoundAuthSession(accessor);
+			return message;
+		}
+
+		if (!StompCommand.CONNECT.equals(accessor.getCommand())) {
 			return message;
 		}
 
@@ -57,7 +70,9 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 			// 세션 스토어에 등록
 			String sessionId = accessor.getSessionId();
 			if (sessionId != null) {
+				// 사용자 시청 세션 및 인증 세션 추적 정보 등록
 				watchingSessionStore.registerSession(sessionId, claims.userId());
+				realtimeWebSocketSessionRegistry.bind(sessionId, claims.userId(), claims.sessionId());
 			}
 
 			log.debug("WebSocket 연결 인증 성공: userId={}", claims.userId());
@@ -128,10 +143,29 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 		}
 	}
 
+	// 기존 STOMP 세션의 SEND/SUBSCRIBE 시점 인증 세션 재검증
+	private void validateBoundAuthSession(StompHeaderAccessor accessor) {
+		if (!(accessor.getUser() instanceof UsernamePasswordAuthenticationToken authentication)
+			|| !(authentication.getPrincipal() instanceof MoplUserDetails principal)
+			|| principal.getSessionId() == null) {
+			throw new AuthException(AuthErrorCode.AUTH_SESSION_INVALID);
+		}
+
+		boolean active = authSessionStore.isActive(
+			principal.getUserId(),
+			principal.getSessionId()
+		);
+
+		if (!active) {
+			throw new AuthException(AuthErrorCode.AUTH_SESSION_INVALID);
+		}
+	}
+
 	// JWT 클레임 기반으로 Spring Security 인증 객체 생성
 	private Principal createAuthentication(JwtAuthenticationClaims claims) {
 		MoplUserDetails principal = MoplUserDetails.authenticated(
 			claims.userId(),
+			claims.sessionId(),
 			claims.email(),
 			claims.role()
 		);

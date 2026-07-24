@@ -13,6 +13,8 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.team04.mopl.auth.realtime.AuthSessionChangePublisher;
+import com.team04.mopl.auth.realtime.AuthSessionChangeRedisSubscriber;
 import com.team04.mopl.common.redis.RedisMessageSubscriber;
 
 // Redis Pub/Sub 설정 (mopl.redis.pubsub.enabled=false 로 비활성화 가능)
@@ -42,11 +44,16 @@ public class RedisMessageConfig {
 	@Bean
 	public RedisMessageListenerContainer redisMessageListenerContainer(
 		RedisConnectionFactory connectionFactory,
-		MessageListenerAdapter stompBroadcastListenerAdapter
+		MessageListenerAdapter stompBroadcastListenerAdapter,
+		AuthSessionChangeRedisSubscriber authSessionChangeRedisSubscriber
 	) {
 		RedisMessageListenerContainer container = new RedisMessageListenerContainer();
 		container.setConnectionFactory(connectionFactory);
 		container.addMessageListener(stompBroadcastListenerAdapter, new PatternTopic(STOMP_BROADCAST_CHANNEL));
+		container.addMessageListener(
+			authSessionChangeRedisSubscriber,
+			new PatternTopic(AuthSessionChangePublisher.CHANNEL)
+		);
 		return container;
 	}
 
