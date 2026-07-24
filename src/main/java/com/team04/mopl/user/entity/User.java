@@ -1,5 +1,6 @@
 package com.team04.mopl.user.entity;
 
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -22,6 +23,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "users")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@BatchSize(size = 100)
 public class User extends BaseUpdatableEntity {
 
 	// 사용자 이름

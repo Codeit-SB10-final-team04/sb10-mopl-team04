@@ -1,5 +1,8 @@
 package com.team04.mopl.notification.service;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,10 +23,13 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class NotificationRestoreService {
 
+	private static final int RECOVERY_LIMIT = 500;
+	private static final int RECOVERY_MINUTES = 10;
+
 	private final NotificationRepository notificationRepository;
 	private final NotificationMapper notificationMapper;
 
-	private static final int RECOVERY_LIMIT = 500;
+	private final Clock clock;
 
 	@Transactional(readOnly = true)
 	public List<NotificationDto> findUnreadNotificationsAfter(
@@ -38,30 +44,18 @@ public class NotificationRestoreService {
 			notificationRepository.findByIdAndReceiverId(lastEventId, receiverId)
 				.orElse(null);
 
-		// 알림이 없을 경우 빈 리스트 반환
-		if (lastNotification == null) {
-			log.warn("[SSE_LAST_EVENT_NOT_FOUND] lastEventId 기준 알림을 찾을 수 없음: receiverId={}, lastEventId={}",
-				receiverId, lastEventId);
+		PageRequest pageRequest = PageRequest.of(0, RECOVERY_LIMIT);
+		Instant timeLimit = Instant.now(clock).minus(RECOVERY_MINUTES, ChronoUnit.MINUTES);
 
-			log.debug(
-				"[NOTIFICATION_RESTORE_FIND_UNREAD_AFTER] 미읽음 알림 복구 조회 완료: receiverId={}, lastEventId={}, restoredCount={}",
-				receiverId, lastEventId, 0);
-
-			return List.of();
-		}
-
-		// lastEvent의 createdAt과 id를 기준으로 미읽음 알림 조회
-		List<Notification> afterNotificationList =
-			notificationRepository.findUnreadNotificationsAfter(
-				receiverId,
-				lastNotification.getId(),
-				lastNotification.getCreatedAt(),
-				PageRequest.of(0, RECOVERY_LIMIT)
-			);
+		List<Notification> notifications = lastNotification == null
+			? notificationRepository.findRecentUnreadNotifications(receiverId, timeLimit, pageRequest)
+			: notificationRepository.findUnreadNotificationsAfter(receiverId, lastNotification.getId(),
+			lastNotification.getCreatedAt(),
+			pageRequest);
 
 		// notificationDto로 변환
-		List<NotificationDto> restoredNotifications = afterNotificationList.stream()
-			.map(notification -> notificationMapper.toDto(notification))
+		List<NotificationDto> restoredNotifications = notifications.stream()
+			.map(notificationMapper::toDto)
 			.toList();
 
 		log.debug(

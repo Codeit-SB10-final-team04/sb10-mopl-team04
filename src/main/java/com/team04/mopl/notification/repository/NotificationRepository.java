@@ -3,10 +3,12 @@ package com.team04.mopl.notification.repository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -16,6 +18,20 @@ import com.team04.mopl.notification.repository.qdsl.NotificationQdslRepository;
 public interface NotificationRepository extends JpaRepository<Notification, UUID>, NotificationQdslRepository {
 
 	Optional<Notification> findByIdAndReceiverId(UUID notificationId, UUID receiverId);
+
+	@Query(value = """
+		SELECT n
+		FROM Notification AS n
+		WHERE n.receiver.id = :receiverId
+			AND n.readAt IS NULL
+			AND n.createdAt >= :timeLimit
+		ORDER BY n.createdAt ASC, n.id ASC
+		""")
+	List<Notification> findRecentUnreadNotifications(
+		@Param("receiverId") UUID receiverId,
+		@Param("timeLimit") Instant timeLimit,
+		Pageable pageable
+	);
 
 	@Query(value = """
 		SELECT n 
@@ -36,4 +52,21 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 		Pageable pageable
 	);
 
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
+		DELETE FROM Notification AS n
+		WHERE n.id IN :notificationIds
+		""")
+	void deleteAllByNotificationIds(@Param("notificationIds") List<UUID> notificationIds);
+
+	@Query("""
+		SELECT n.receiver.id
+		FROM Notification AS n
+		WHERE n.receiver.id IN :receiverIds
+			AND n.sourceEventId = :sourceEventId
+		""")
+	Set<UUID> findExistingReceiverIdsBySourceEventId(
+		@Param("receiverIds") Set<UUID> receiverIds,
+		@Param("sourceEventId") UUID sourceEventId
+	);
 }

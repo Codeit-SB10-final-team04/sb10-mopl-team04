@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users
     is_locked         BOOLEAN                  NOT NULL,
     created_at        TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at        TIMESTAMP WITH TIME ZONE NOT NULL,
-                                    PRIMARY KEY (id)
+    PRIMARY KEY (id)
     );
 
 CREATE TABLE IF NOT EXISTS playlists
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS playlists
     created_at  TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at  TIMESTAMP WITH TIME ZONE NOT NULL,
     deleted_at  TIMESTAMP WITH TIME ZONE,
-                              PRIMARY KEY (id),
+    PRIMARY KEY (id),
     CONSTRAINT fk_playlists_owner FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE
     );
 
@@ -57,4 +57,21 @@ CREATE TABLE IF NOT EXISTS content_reviews
     PRIMARY KEY (id),
     CONSTRAINT fk_reviews_user FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT fk_reviews_content FOREIGN KEY (content_id) REFERENCES contents (id)
+);
+
+CREATE TABLE IF NOT EXISTS notifications
+(
+    id                UUID                     NOT NULL,
+    receiver_id       UUID                     NOT NULL,
+    source_event_id   UUID,
+    title             VARCHAR(50)              NOT NULL,
+    content           TEXT                     NOT NULL,
+    type              VARCHAR(30)              NOT NULL,
+    level             VARCHAR(20)              NOT NULL,
+    read_at           TIMESTAMP WITH TIME ZONE NULL,
+    created_at        TIMESTAMP WITH TIME ZONE NOT NULL,
+
+    CONSTRAINT pk_notifications PRIMARY KEY (id),
+    CONSTRAINT fk_notifications_receiver FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT up_notifications_source_event_receiver UNIQUE (source_event_id, receiver_id)
 );

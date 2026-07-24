@@ -2,14 +2,20 @@ package com.team04.mopl.content.dto.request;
 
 import java.util.List;
 
-import jakarta.validation.constraints.NotBlank;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.annotation.Nullable;
 
 public record ContentUpdateRequest(
-	@NotBlank(message = "제목은 공백일 수 없습니다.")
+	@Schema(description = "콘텐츠 제목")
+	@Nullable
 	String title,
 
-	@NotBlank(message = "설명은 공백일 수 없습니다.")
+	@Schema(description = "콘텐츠 설명")
+	@Nullable
 	String description,
+
+	@Schema(description = "콘텐츠 태그 목록")
+	@Nullable
 	List<String> tags
 ) {
 }

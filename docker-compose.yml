@@ -3,23 +3,19 @@ services:
   app: # 애플리케이션 서비스
     build: .  # 현재 디렉터리의 Dockerfile을 사용해 이미지 build
     image: mopl:local
-    environment:
+    environment: &app-env
       SERVER_PORT: ${SERVER_PORT}
       TMDB_API_KEY: ${TMDB_API_KEY}
-
-      MOPL_STORAGE_TYPE: ${MOPL_STORAGE_TYPE}
-      PROFILE_STORAGE_LOCAL_ROOT_PATH: ${PROFILE_STORAGE_LOCAL_ROOT_PATH}
-      THUMBNAIL_STORAGE_LOCAL_ROOT_PATH: ${THUMBNAIL_STORAGE_LOCAL_ROOT_PATH}
 
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
 
       SPRING_CACHE_TYPE: ${SPRING_CACHE_TYPE}
-      SPRING_DATA_REDIS_HOST: ${SPRING_DATA_REDIS_HOST}
+      SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: ${SPRING_DATA_REDIS_PORT}
 
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: broker:29092
       SPRING_KAFKA_CONSUMER_GROUP_ID: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
       SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET}
 
@@ -45,12 +41,18 @@ services:
       MOPL_ADMIN_PASSWORD: ${MOPL_ADMIN_PASSWORD}
       MOPL_ADMIN_NAME: ${MOPL_ADMIN_NAME}
 
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-disabled}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-disabled}
+      KAKAO_OAUTH_CLIENT_ID: ${KAKAO_OAUTH_CLIENT_ID:-disabled}
+      KAKAO_OAUTH_CLIENT_SECRET: ${KAKAO_OAUTH_CLIENT_SECRET:-disabled}
+      MOPL_OAUTH2_SUCCESS_REDIRECT_URI: ${MOPL_OAUTH2_SUCCESS_REDIRECT_URI:-http://localhost:8080/#/contents}
+      MOPL_OAUTH2_FAILURE_REDIRECT_URI: ${MOPL_OAUTH2_FAILURE_REDIRECT_URI:-http://localhost:8080/#/sign-in}
+
     ports: # 포트 매핑(로컬:컨테이너)
       - "8080:8080"
     volumes: # 애플리케이션 볼륨 구성
-      # 컨테이너가 재시작되어도 데이터 유지
-      - ./.mopl/storage/profiles:/app/${PROFILE_STORAGE_LOCAL_ROOT_PATH}
-      - ./.mopl/storage/thumbnails:/app/${THUMBNAIL_STORAGE_LOCAL_ROOT_PATH}
+      # 컨테이너가 재시작되어도 파일 저장소 데이터 유지 (uploads/ 단일 루트, 하위에 thumbnails/ 등 자동 생성)
+      - ./.mopl/storage:/app/uploads
       - ./.logs:/app/.logs
     depends_on: # 서비스간 의존성 설정
       postgres:
@@ -63,6 +65,32 @@ services:
     networks:
       # backend 네트워크에 app 서비스 연결
       - backend
+
+  # 다중 서버 테스트용 두 번째 앱 인스턴스 (docker-compose --profile multi up -d)
+  app-2:
+    build: .
+    image: mopl:local
+    environment:
+      <<: *app-env
+      MOPL_ADMIN_ENABLED: false
+      MOPL_OAUTH2_SUCCESS_REDIRECT_URI: ${MOPL_OAUTH2_SUCCESS_REDIRECT_URI:-http://localhost:8081/#/contents}
+      MOPL_OAUTH2_FAILURE_REDIRECT_URI: ${MOPL_OAUTH2_FAILURE_REDIRECT_URI:-http://localhost:8081/#/sign-in}
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./.mopl/storage:/app/uploads
+      - ./.logs:/app/.logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles:
+      - multi
 
   postgres: # PostgreSQL 서비스
     image: postgres:17
@@ -136,6 +164,34 @@ services:
     networks:
       - backend
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mopl-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mopl-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - backend
+
 networks: # 서비스 간 통신을 위한 네트워크 정의
   backend:
 
@@ -143,3 +199,7 @@ volumes: # 데이터 영속성을 위한 볼륨 정의
   # PostgreSQL 데이터 저장용 볼륨
   postgres-data:
   redis-data:
+  # Prometheus 데이터 저장용 볼륨
+  prometheus-data:
+  # Grafana 데이터 저장용 볼륨
+  grafana-data:

@@ -54,6 +54,15 @@ CREATE TABLE contents (
                           CONSTRAINT uq_contents_external_id_source UNIQUE (external_id, source)
 );
 
+-- 콘텐츠 목록 조회 성능 인덱스 (정렬 기준별 Partial Index)
+CREATE INDEX idx_contents_active_rating
+    ON contents (average_rating DESC, id)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_contents_active_created
+    ON contents (created_at DESC, id)
+    WHERE deleted_at IS NULL;
+
 CREATE TABLE conversations (
                                id          UUID        NOT NULL,
                                created_at  TIMESTAMPTZ NOT NULL,
@@ -103,32 +112,20 @@ CREATE TABLE social_accounts (
                                  CONSTRAINT uq_social_accounts_provider UNIQUE (social_provider, provider_user_id)
 );
 
-CREATE TABLE auth_sessions (
-                               user_id             UUID        NOT NULL,
-                               session_id          UUID        NOT NULL,
-                               refresh_token_hash  TEXT        NOT NULL,
-                               access_expires_at   TIMESTAMPTZ NOT NULL,
-                               refresh_expires_at  TIMESTAMPTZ NOT NULL,
-                               last_refreshed_at   TIMESTAMPTZ NULL,
-                               updated_at          TIMESTAMPTZ NOT NULL,
-
-                               CONSTRAINT pk_auth_sessions PRIMARY KEY (session_id),
-                               CONSTRAINT fk_auth_sessions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-                               CONSTRAINT uq_auth_sessions_user UNIQUE (user_id)
-);
-
 CREATE TABLE notifications (
-                               id          UUID            NOT NULL,
-                               receiver_id UUID            NOT NULL,
-                               title       VARCHAR(50)     NOT NULL,
-                               content     TEXT            NOT NULL,
-                               type        VARCHAR(30)     NOT NULL,
-                               level       VARCHAR(20)     NOT NULL,
-                               read_at     TIMESTAMPTZ     NULL,
-                               created_at  TIMESTAMPTZ     NOT NULL,
+                               id              UUID            NOT NULL,
+                               receiver_id     UUID            NOT NULL,
+                               source_event_id UUID,
+                               title           VARCHAR(50)     NOT NULL,
+                               content         TEXT            NOT NULL,
+                               type            VARCHAR(30)     NOT NULL,
+                               level           VARCHAR(20)     NOT NULL,
+                               read_at         TIMESTAMPTZ     NULL,
+                               created_at      TIMESTAMPTZ     NOT NULL,
 
                                CONSTRAINT pk_notifications PRIMARY KEY (id),
-                               CONSTRAINT fk_notifications_receiver FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE
+                               CONSTRAINT fk_notifications_receiver FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
+                               CONSTRAINT up_notifications_source_event_receiver UNIQUE (source_event_id, receiver_id)
 );
 
 CREATE TABLE playlists (
@@ -179,6 +176,15 @@ CREATE TABLE content_reviews (
 
 CREATE UNIQUE INDEX uk_content_reviews_user_content_active
     ON content_reviews (user_id, content_id)
+    WHERE deleted_at IS NULL;
+
+-- 리뷰 목록 조회 성능 인덱스 (정렬 기준별 Partial Index)
+CREATE INDEX idx_reviews_content_created
+    ON content_reviews (content_id, created_at DESC, id DESC)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_reviews_content_rating
+    ON content_reviews (content_id, rating DESC, id DESC)
     WHERE deleted_at IS NULL;
 
 CREATE TABLE watching_sessions (
@@ -252,3 +258,62 @@ CREATE TABLE direct_messages (
                                  CONSTRAINT fk_direct_messages_receiver FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
                                  CONSTRAINT fk_direct_messages_conversation FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
 );
+
+-- ================================================================
+-- 6. INDEX
+-- ================================================================
+
+-- notifications
+
+CREATE INDEX idx_notifications_unread_receiver_created_id
+    ON notifications (receiver_id, created_at, id)
+    WHERE read_at IS NULL;
+
+CREATE INDEX idx_notifications_read_at_id
+    ON notifications (read_at, id)
+    WHERE read_at IS NOT NULL;
+
+-- playlists
+
+CREATE INDEX idx_playlists_active_updated_id
+    ON playlists (updated_at, id)
+    WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_playlists_deleted_at_id
+    ON playlists (deleted_at, id)
+    WHERE deleted_at IS NOT NULL;
+
+-- playlist_subscriptions
+
+CREATE INDEX idx_playlist_subscriptions_playlist_subscriber
+    ON playlist_subscriptions (playlist_id, subscriber_id);
+
+-- users
+
+CREATE INDEX idx_users_name_id
+    ON users (name, id);
+
+CREATE INDEX idx_users_email_id
+    ON users (email, id);
+
+CREATE INDEX idx_users_created_at_id
+    ON users (created_at, id);
+
+CREATE INDEX idx_users_is_locked_id
+    ON users (is_locked, id);
+
+CREATE INDEX idx_users_role_id
+    ON users (role, id);
+
+-- direct_messages
+
+CREATE INDEX idx_direct_messages_id
+    ON direct_messages (conversation_id, created_at, id);
+
+-- conversation
+
+CREATE INDEX idx_conversation_participant_user_id
+    ON conversation_participants (user_id);
+
+CREATE INDEX idx_conversations_created_at_id
+    ON conversations (created_at, id);

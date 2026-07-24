@@ -1,8 +1,8 @@
 package com.team04.mopl.content.repository.qdsl;
 
-import static com.team04.mopl.content.entity.QContent.content;
-import static com.team04.mopl.content.entity.QContentTag.contentTag;
-import static com.team04.mopl.content.entity.QTag.tag;
+import static com.team04.mopl.content.entity.QContent.*;
+import static com.team04.mopl.content.entity.QContentTag.*;
+import static com.team04.mopl.content.entity.QTag.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -96,9 +96,9 @@ public class ContentQdslRepositoryImpl implements ContentQdslRepository {
 				BigDecimal cursorVal = new BigDecimal(cursor);
 				yield isDesc
 					? content.averageRating.lt(cursorVal)
-						.or(content.averageRating.eq(cursorVal).and(content.id.gt(idAfter)))
+					.or(content.averageRating.eq(cursorVal).and(content.id.gt(idAfter)))
 					: content.averageRating.gt(cursorVal)
-						.or(content.averageRating.eq(cursorVal).and(content.id.gt(idAfter)));
+					.or(content.averageRating.eq(cursorVal).and(content.id.gt(idAfter)));
 			}
 			case "createdAt" -> {
 				Instant cursorVal;
@@ -109,17 +109,17 @@ public class ContentQdslRepositoryImpl implements ContentQdslRepository {
 				}
 				yield isDesc
 					? content.createdAt.lt(cursorVal)
-						.or(content.createdAt.eq(cursorVal).and(content.id.gt(idAfter)))
+					.or(content.createdAt.eq(cursorVal).and(content.id.gt(idAfter)))
 					: content.createdAt.gt(cursorVal)
-						.or(content.createdAt.eq(cursorVal).and(content.id.gt(idAfter)));
+					.or(content.createdAt.eq(cursorVal).and(content.id.gt(idAfter)));
 			}
 			default -> { // watcherCount
 				long cursorVal = Long.parseLong(cursor);
 				yield isDesc
 					? content.watcherCount.lt(cursorVal)
-						.or(content.watcherCount.eq(cursorVal).and(content.id.gt(idAfter)))
+					.or(content.watcherCount.eq(cursorVal).and(content.id.gt(idAfter)))
 					: content.watcherCount.gt(cursorVal)
-						.or(content.watcherCount.eq(cursorVal).and(content.id.gt(idAfter)));
+					.or(content.watcherCount.eq(cursorVal).and(content.id.gt(idAfter)));
 			}
 		};
 	}

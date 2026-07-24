@@ -1,7 +1,6 @@
 package com.team04.mopl.auth.security.interceptor;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.util.UUID;
@@ -22,19 +21,24 @@ import com.team04.mopl.auth.security.jwt.JwtAuthenticationClaims;
 import com.team04.mopl.auth.security.jwt.JwtTokenProvider;
 import com.team04.mopl.auth.session.AuthSessionStore;
 import com.team04.mopl.user.entity.UserRole;
-import com.team04.mopl.watching.store.WebSocketSessionStore;
+import com.team04.mopl.watching.store.WatchingSessionStore;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class StompAuthChannelInterceptorTest {
 
 	private final JwtTokenProvider jwtTokenProvider = mock(JwtTokenProvider.class);
 	private final AuthSessionStore authSessionStore = mock(AuthSessionStore.class);
-	private final WebSocketSessionStore webSocketSessionStore = mock(WebSocketSessionStore.class);
+	private final WatchingSessionStore watchingSessionStore = mock(WatchingSessionStore.class);
 	private final MessageChannel channel = mock(MessageChannel.class);
+	private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
 	private final StompAuthChannelInterceptor interceptor = new StompAuthChannelInterceptor(
 		jwtTokenProvider,
 		authSessionStore,
-		webSocketSessionStore
+		watchingSessionStore,
+		meterRegistry
 	);
 
 	@Test
@@ -78,7 +82,7 @@ class StompAuthChannelInterceptorTest {
 		// when & then
 		assertThatThrownBy(() -> interceptor.preSend(message, channel))
 			.isInstanceOf(AuthException.class)
-			.satisfies(ex -> assertThat(((AuthException) ex).getErrorCode())
+			.satisfies(ex -> assertThat(((AuthException)ex).getErrorCode())
 				.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN));
 	}
 
@@ -94,7 +98,7 @@ class StompAuthChannelInterceptorTest {
 		// when & then
 		assertThatThrownBy(() -> interceptor.preSend(message, channel))
 			.isInstanceOf(AuthException.class)
-			.satisfies(ex -> assertThat(((AuthException) ex).getErrorCode())
+			.satisfies(ex -> assertThat(((AuthException)ex).getErrorCode())
 				.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN));
 	}
 
@@ -110,7 +114,7 @@ class StompAuthChannelInterceptorTest {
 		// when & then
 		assertThatThrownBy(() -> interceptor.preSend(message, channel))
 			.isInstanceOf(AuthException.class)
-			.satisfies(ex -> assertThat(((AuthException) ex).getErrorCode())
+			.satisfies(ex -> assertThat(((AuthException)ex).getErrorCode())
 				.isEqualTo(AuthErrorCode.AUTH_INVALID_ACCESS_TOKEN));
 	}
 
@@ -134,7 +138,7 @@ class StompAuthChannelInterceptorTest {
 		// when & then
 		assertThatThrownBy(() -> interceptor.preSend(message, channel))
 			.isInstanceOf(AuthException.class)
-			.satisfies(ex -> assertThat(((AuthException) ex).getErrorCode())
+			.satisfies(ex -> assertThat(((AuthException)ex).getErrorCode())
 				.isEqualTo(AuthErrorCode.AUTH_SESSION_INVALID));
 	}
 
@@ -164,8 +168,8 @@ class StompAuthChannelInterceptorTest {
 		assertThat(resultAccessor.getUser()).isNotNull();
 		assertThat(resultAccessor.getUser()).isInstanceOf(UsernamePasswordAuthenticationToken.class);
 
-		UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) resultAccessor.getUser();
-		MoplUserDetails principal = (MoplUserDetails) auth.getPrincipal();
+		UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken)resultAccessor.getUser();
+		MoplUserDetails principal = (MoplUserDetails)auth.getPrincipal();
 		assertThat(principal.getUserId()).isEqualTo(userId);
 		assertThat(principal.getEmail()).isEqualTo(email);
 		assertThat(principal.getRole()).isEqualTo(UserRole.USER);

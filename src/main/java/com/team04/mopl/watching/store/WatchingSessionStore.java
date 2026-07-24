@@ -1,106 +1,270 @@
 package com.team04.mopl.watching.store;
 
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.TimeUnit;
 
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
-// contentId별 시청 중인 유저와 세션 정보(id, joinedAt)를 관리하는 인메모리 저장소
-// watcherCount의 유일한 진실의 원천(source of truth)
-// DB의 Content.watcherCount 컬럼은 사용하지 않고, 이 Store에서 집계
-// 모든 쓰기 연산은 compute 계열로 원자적으로 처리하여 add/remove 간 race condition 방지
-// TODO: 다중 서버 환경에서는 Redis로 교체 필요
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+// 시청 세션 통합 Redis 저장소
+// 키 구조:
+//   watching:session:{sessionId}      → Hash {userId, contentId, joinedAt} (세션 매핑 + 메타)
+//   watching:viewers:{contentId}      → Sorted Set (member=userId, score=joinedAt millis) (시청자 목록)
+//   watching:user-sessions:{userId}   → Set<sessionId> (userId→sessionId 역참조)
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class WatchingSessionStore {
 
-	// contentId → (userId → 시청 세션 정보)
-	private final ConcurrentHashMap<UUID, ConcurrentHashMap<UUID, WatchingSessionInfo>> contentWatcherMap
-		= new ConcurrentHashMap<>();
+	private static final String SESSION_KEY = "watching:session:%s";
+	private static final String VIEWERS_KEY = "watching:viewers:%s";
+	private static final String USER_SESSIONS_KEY = "watching:user-sessions:%s";
+	private static final long TTL_SECONDS = 86400; // 24시간
+	// Lua: 세션 등록 + viewers 추가 (원자적)
+	// 반환: "1" = 첫 탭(JOIN), "0" = 추가 탭 또는 이미 등록됨
+	private static final DefaultRedisScript<String> JOIN_SCRIPT = new DefaultRedisScript<>("""
+		local existingContentId = redis.call('HGET', KEYS[1], 'contentId')
+		if existingContentId then
+		   return '0'
+		end
+		redis.call('HSET', KEYS[1], 'userId', ARGV[1], 'contentId', ARGV[2], 'joinedAt', ARGV[3])
+		redis.call('EXPIRE', KEYS[1], tonumber(ARGV[5]))
+		redis.call('SADD', KEYS[3], ARGV[4])
+		redis.call('EXPIRE', KEYS[3], tonumber(ARGV[5]))
+		if redis.call('ZSCORE', KEYS[2], ARGV[1]) then
+		   return '0'
+		end
+		redis.call('ZADD', KEYS[2], tonumber(ARGV[3]), ARGV[1])
+		redis.call('EXPIRE', KEYS[2], tonumber(ARGV[5]))
+		return '1'
+		""", String.class);
+	// Lua: 세션 삭제 + 마지막 탭이면 viewers에서 제거 (원자적)
+	// 반환: joinedAt = 마지막 탭(LEAVE), "0" = 다른 탭 남음, "-1" = 세션 없음
+	private static final DefaultRedisScript<String> LEAVE_SCRIPT = new DefaultRedisScript<>("""
+		if redis.call('EXISTS', KEYS[1]) == 0 then
+		   return '-1'
+		end
+		local joinedAt = redis.call('HGET', KEYS[1], 'joinedAt')
+		redis.call('DEL', KEYS[1])
+		redis.call('SREM', KEYS[3], ARGV[3])
+		-- 마지막 세션 제거 후 빈 집합이면 키를 완전히 삭제하여 과다 집계 방지
+		if redis.call('SCARD', KEYS[3]) == 0 then
+		   redis.call('DEL', KEYS[3])
+		end
+		local remaining = redis.call('SMEMBERS', KEYS[3])
+		for _, sid in ipairs(remaining) do
+		   local cid = redis.call('HGET', 'watching:session:' .. sid, 'contentId')
+		   if cid == ARGV[2] then
+		      return '0'
+		   end
+		end
+		redis.call('ZREM', KEYS[2], ARGV[1])
+		return joinedAt
+		""", String.class);
+	// Lua: CONNECT 시 session Hash 등록 (user-sessions는 실제 join 시점에 SADD하도록 분리하여 정확한 시청자 집계 보장)
+	private static final DefaultRedisScript<String> REGISTER_SCRIPT = new DefaultRedisScript<>("""
+		redis.call('HSET', KEYS[1], 'userId', ARGV[1])
+		redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
+		return '1'
+		""", String.class);
+	private final StringRedisTemplate redisTemplate;
 
-	// 시청자 추가, 새로 추가되면 생성된 세션 정보 반환, 이미 시청 중이면 empty 반환
-	public Optional<WatchingSessionInfo> addWatcher(UUID contentId, UUID userId) {
-		AtomicReference<WatchingSessionInfo> created = new AtomicReference<>();
+	private final MeterRegistry meterRegistry;
 
-		contentWatcherMap.compute(contentId, (key, watchers) -> {
-			if (watchers == null) {
-				watchers = new ConcurrentHashMap<>();
+	// CONNECT 시 최소 정보 저장 (userId만, contentId는 SUBSCRIBE 시 join에서 추가)
+	public void registerSession(String sessionId, UUID userId) {
+		List<String> keys = Arrays.asList(
+			String.format(SESSION_KEY, sessionId)
+		);
+
+		redisTemplate.execute(REGISTER_SCRIPT, keys,
+			userId.toString(), String.valueOf(TTL_SECONDS));
+	}
+
+	// 시청 세션 입장 (Lua 원자적 처리)
+	// 반환: 첫 탭이면 joinedAt, 추가 탭이면 empty
+	public Optional<Instant> join(String sessionId, UUID userId, UUID contentId) {
+		Instant joinedAt = Instant.now();
+		String joinedAtMillis = String.valueOf(joinedAt.toEpochMilli());
+
+		List<String> keys = Arrays.asList(
+			String.format(SESSION_KEY, sessionId),
+			String.format(VIEWERS_KEY, contentId),
+			String.format(USER_SESSIONS_KEY, userId)
+		);
+
+		String result = redisTemplate.execute(JOIN_SCRIPT, keys,
+			userId.toString(), contentId.toString(), joinedAtMillis,
+			sessionId, String.valueOf(TTL_SECONDS));
+
+		return "1".equals(result) ? Optional.of(joinedAt) : Optional.empty();
+	}
+
+	// 시청 세션 퇴장 (Lua 원자적 처리)
+	// 반환: 마지막 탭이면 joinedAt, 다른 탭 남으면 empty
+	public Optional<Instant> leave(String sessionId, UUID userId, UUID contentId) {
+		List<String> keys = Arrays.asList(
+			String.format(SESSION_KEY, sessionId),
+			String.format(VIEWERS_KEY, contentId),
+			String.format(USER_SESSIONS_KEY, userId)
+		);
+
+		String result = redisTemplate.execute(LEAVE_SCRIPT, keys,
+			userId.toString(), contentId.toString(), sessionId);
+
+		if (result != null && !result.equals("0") && !result.equals("-1")) {
+			return Optional.of(Instant.ofEpochMilli(Long.parseLong(result)));
+		}
+		return Optional.empty();
+	}
+
+	// session Hash에서 userId 조회
+	public Optional<UUID> getUserId(String sessionId) {
+		Object userId = redisTemplate.opsForHash().get(String.format(SESSION_KEY, sessionId), "userId");
+		return userId != null ? Optional.of(UUID.fromString(userId.toString())) : Optional.empty();
+	}
+
+	// session Hash에서 contentId 조회
+	public Optional<UUID> getContentId(String sessionId) {
+		Object contentId = redisTemplate.opsForHash().get(String.format(SESSION_KEY, sessionId), "contentId");
+		return contentId != null ? Optional.of(UUID.fromString(contentId.toString())) : Optional.empty();
+	}
+
+	// 세션 Hash 삭제 (방어적 정리용)
+	public void removeSession(String sessionId) {
+		redisTemplate.delete(String.format(SESSION_KEY, sessionId));
+	}
+
+	// 시청자 수 조회 (ZCARD)
+	public long getViewerCount(UUID contentId) {
+		Long count = redisTemplate.opsForZSet().zCard(String.format(VIEWERS_KEY, contentId));
+		return count != null ? count : 0;
+	}
+
+	// 시청자 목록 조회 (Sorted Set → Map<userId, joinedAt>)
+	public Map<UUID, Instant> getViewers(UUID contentId) {
+		Set<ZSetOperations.TypedTuple<String>> tuples = redisTemplate.opsForZSet()
+			.rangeWithScores(String.format(VIEWERS_KEY, contentId), 0, -1);
+
+		if (tuples == null || tuples.isEmpty()) {
+			return Map.of();
+		}
+
+		Map<UUID, Instant> result = new HashMap<>();
+		for (ZSetOperations.TypedTuple<String> tuple : tuples) {
+			if (tuple.getValue() != null && tuple.getScore() != null) {
+				result.put(
+					UUID.fromString(tuple.getValue()),
+					Instant.ofEpochMilli(tuple.getScore().longValue())
+				);
 			}
-
-			watchers.computeIfAbsent(userId, id -> {
-				WatchingSessionInfo info = WatchingSessionInfo.create();
-				created.set(info);
-				return info;
-			});
-
-			return watchers;
-		});
-
-		return Optional.ofNullable(created.get());
-	}
-
-	// 시청자 제거, 제거된 세션 정보 반환, 시청 중이 아니었으면 empty 반환
-	public Optional<WatchingSessionInfo> removeWatcher(UUID contentId, UUID userId) {
-		AtomicReference<WatchingSessionInfo> removed = new AtomicReference<>();
-
-		contentWatcherMap.computeIfPresent(contentId, (key, watchers) -> {
-			removed.set(watchers.remove(userId));
-
-			// 시청자가 없으면 Map에서 제거 (compute 내부라 addWatcher와 원자적으로 동작)
-			return watchers.isEmpty() ? null : watchers;
-		});
-
-		return Optional.ofNullable(removed.get());
-	}
-
-	// 시청자 수 조회
-	public long getWatcherCount(UUID contentId) {
-		Map<UUID, WatchingSessionInfo> watchers = contentWatcherMap.get(contentId);
-
-		return watchers == null ? 0 : watchers.size();
-	}
-
-	// 특정 콘텐츠의 시청자 목록 조회 (userId → 세션 정보)
-	public Map<UUID, WatchingSessionInfo> getWatchers(UUID contentId) {
-		Map<UUID, WatchingSessionInfo> watchers = contentWatcherMap.get(contentId);
-
-		return watchers == null ? Map.of() : Map.copyOf(watchers);
-	}
-
-	// 특정 유저가 시청 중인지 확인
-	public boolean isWatching(UUID contentId, UUID userId) {
-		Map<UUID, WatchingSessionInfo> watchers = contentWatcherMap.get(contentId);
-
-		return watchers != null && watchers.containsKey(userId);
-	}
-
-	// 특정 유저가 시청 중인 모든 contentId 조회 (DISCONNECT 시 정리용)
-	public Set<UUID> getWatchingContentIds(UUID userId) {
-		Set<UUID> result = ConcurrentHashMap.newKeySet();
-
-		contentWatcherMap.forEach((contentId, watchers) -> {
-			if (watchers.containsKey(userId)) {
-				result.add(contentId);
-			}
-		});
-
+		}
 		return result;
 	}
 
-	// 특정 유저의 시청 세션 전체 조회 (contentId → 세션 정보), 유저별 단건 조회 시 사용
-	public Map<UUID, WatchingSessionInfo> getWatchingSessions(UUID userId) {
-		Map<UUID, WatchingSessionInfo> result = new ConcurrentHashMap<>();
+	// 시청 중인지 확인 (ZSCORE)
+	public boolean isViewing(UUID contentId, UUID userId) {
+		Double score = redisTemplate.opsForZSet()
+			.score(String.format(VIEWERS_KEY, contentId), userId.toString());
+		return score != null;
+	}
 
-		contentWatcherMap.forEach((contentId, watchers) -> {
-			WatchingSessionInfo info = watchers.get(userId);
-			if (info != null) {
-				result.put(contentId, info);
+	// userId로 시청 중인 콘텐츠 조회 (user-sessions → 각 session Hash에서 contentId/joinedAt)
+	public Map<UUID, Instant> getSessionsByUserId(UUID userId) {
+		Set<String> sessionIds = redisTemplate.opsForSet()
+			.members(String.format(USER_SESSIONS_KEY, userId));
+
+		if (sessionIds == null || sessionIds.isEmpty()) {
+			return Map.of();
+		}
+
+		Map<UUID, Instant> result = new HashMap<>();
+		for (String sid : sessionIds) {
+			String sessionKey = String.format(SESSION_KEY, sid);
+			Object contentId = redisTemplate.opsForHash().get(sessionKey, "contentId");
+			Object joinedAt = redisTemplate.opsForHash().get(sessionKey, "joinedAt");
+			if (contentId != null && joinedAt != null) {
+				result.put(
+					UUID.fromString(contentId.toString()),
+					Instant.ofEpochMilli(Long.parseLong(joinedAt.toString()))
+				);
 			}
+		}
+		return result;
+	}
+
+	// 현재 전체 활성 세션 수 조회
+	public double getTotalActiveSessionCount() {
+		return getCountByPattern("watching:session:*", "watching:cache:count:sessions");
+	}
+
+	// 현재 시청 중인 전체 사용자 수 조회
+	public double getTotalActiveWatcherCount() {
+		return getCountByPattern("watching:user-sessions:*", "watching:cache:count:users");
+	}
+
+	// 공통 메서드: 패턴 기반 Key 개수 반환 (스캔 부하 완화를 위한 15초 짧은 캐시 적용)
+	private long getCountByPattern(String pattern, String cacheKey) {
+		// 1. 캐시 확인
+		String cachedCount = redisTemplate.opsForValue().get(cacheKey);
+		if (cachedCount != null) {
+			return Long.parseLong(cachedCount);
+		}
+
+		// 2. 캐시 미스 시 SCAN 수행
+		Long count = redisTemplate.execute((RedisCallback<Long>)connection -> {
+			long size = 0;
+
+			try (Cursor<byte[]> cursor = connection.scan(
+				// 패턴 기반 Key 개수 탐색: 한 번에 1000개씩 묶어서 처리
+				ScanOptions.scanOptions().match(pattern).count(1000).build())) {
+
+				// 데이터가 존재하지 않을 때까지 반복
+				while (cursor.hasNext()) {
+					cursor.next();
+					size++;
+				}
+
+			} catch (Exception e) {
+				log.error("[WATCHING_SESSION_STORE] Redis Scan 중 오류 발생: pattern={}",
+					pattern, e);
+
+				// 커스텀 메트릭 추가: SCAN 실패 횟수 기록
+				meterRegistry.counter(
+					"mopl.watching.scan.error",
+					"pattern", pattern
+				).increment();
+			}
+
+			return size;
 		});
 
-		return result;
+		long finalCount = count != null ? count : 0;
+
+		// 3. 중복 스캔 방지: 15초
+		redisTemplate.opsForValue().set(
+			cacheKey,
+			String.valueOf(finalCount),
+			15,
+			TimeUnit.SECONDS
+		);
+
+		return finalCount;
 	}
 }

@@ -16,6 +16,8 @@ import com.team04.mopl.user.exception.UserErrorCode;
 import com.team04.mopl.user.exception.UserException;
 import com.team04.mopl.user.repository.UserRepository;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -26,23 +28,58 @@ import lombok.extern.slf4j.Slf4j;
 public class ContentChatService {
 
 	private final UserRepository userRepository;
+	private final MeterRegistry meterRegistry;
 
 	public ContentChatDto createChatMessage(Principal principal, ContentChatSendRequest request) {
+		// 커스텀 메트릭: 채팅 메시지 생성 처리 시간 측정 시작
+		Timer.Sample sample = Timer.start(meterRegistry);
+
 		UUID userId = getUserId(principal);
 
 		log.debug("[CONTENT_CHAT_CREATE] 채팅 메시지 생성 시작: userId={}", userId);
 
-		User user = userRepository.findByIdAndLockedFalse(userId)
-			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
-				.addDetail("userId", userId));
+		try {
+			User user = userRepository.findByIdAndLockedFalse(userId)
+				.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND)
+					.addDetail("userId", userId));
 
-		UserSummary sender = new UserSummary(
-			user.getId(),
-			user.getName(),
-			user.getProfileImageUrl()
-		);
+			UserSummary sender = new UserSummary(
+				user.getId(),
+				user.getName(),
+				user.getProfileImageUrl()
+			);
 
-		return new ContentChatDto(sender, request.content());
+			ContentChatDto responseDto = new ContentChatDto(sender, request.content());
+
+			// 커스텀 메트릭: Content 채팅 생성 성공 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.content.chat.send.duration",
+				"result", "success"
+			));
+
+			// 커스텀 메트릭: Content 채팅 생성 성공
+			meterRegistry.counter(
+				"mopl.content.chat.send",
+				"result", "success"
+			).increment();
+
+			return responseDto;
+
+		} catch (Exception e) {
+			// 커스텀 메트릭: Content 채팅 생성 실패 처리 시간
+			sample.stop(meterRegistry.timer(
+				"mopl.content.chat.send.duration",
+				"result", "failure"
+			));
+
+			// 커스텀 메트릭: Content 채팅 생성 실패
+			meterRegistry.counter(
+				"mopl.content.chat.send",
+				"result", "failure"
+			).increment();
+
+			throw e;
+		}
 	}
 
 	// Principal에서 userId 추출

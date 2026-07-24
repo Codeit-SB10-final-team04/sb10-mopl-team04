@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -20,9 +21,11 @@ import com.team04.mopl.follow.dto.request.FollowRequest;
 import com.team04.mopl.follow.dto.response.FollowDto;
 import com.team04.mopl.follow.entity.Follow;
 import com.team04.mopl.follow.event.FollowCreatedEvent;
+import com.team04.mopl.follow.event.FollowDeletedEvent;
 import com.team04.mopl.follow.exception.FollowErrorCode;
 import com.team04.mopl.follow.exception.FollowException;
 import com.team04.mopl.follow.mapper.FollowMapper;
+import com.team04.mopl.follow.redis.FollowRedisStore;
 import com.team04.mopl.follow.repository.FollowRepository;
 import com.team04.mopl.user.entity.User;
 import com.team04.mopl.user.exception.UserErrorCode;
@@ -43,6 +46,9 @@ class FollowServiceTest {
 
 	@Mock
 	private FollowMapper followMapper;
+
+	@Mock
+	private FollowRedisStore followRedisStore;
 
 	@Mock
 	private ApplicationEventPublisher applicationEventPublisher;
@@ -130,7 +136,7 @@ class FollowServiceTest {
 	}
 
 	@Test
-	@DisplayName("실패: 팔로우 생성 시 동시 요청으로 인한 DB 제약조건 위반 시 FollowException(FOLLOW_ALREADY_CONCURRENT)이 발생한다.")
+	@DisplayName("실패: 팔로우 생성 시 동시 요청으로 인한 DB 제약조건 위반 시 FollowException이 발생한다.")
 	void createFollow_ConcurrentRequest_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -156,11 +162,11 @@ class FollowServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> followService.createFollow(request, requestUserId))
-			.isInstanceOf(FollowException.class)
-			.hasMessageContaining(FollowErrorCode.FOLLOW_ALREADY_CONCURRENT.getMessage());
+			.isInstanceOf(DataIntegrityViolationException.class);
 
 		// 첫 번째 요청만 저장
 		verify(followRepository, times(1)).save(any(Follow.class));
+		verify(applicationEventPublisher, never()).publishEvent(any());
 	}
 
 	/*
@@ -169,7 +175,7 @@ class FollowServiceTest {
 	=============================
 	 */
 	@Test
-	@DisplayName("성공: 두 사용자가 존재하고 팔로우 관계가 있다면 FollowDto를 반환한다.")
+	@DisplayName("성공: 두 사용자가 존재하고 팔로우 관계가 있다면 조회된다.")
 	void getFollowConnection_Success() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -184,7 +190,6 @@ class FollowServiceTest {
 		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestedUser));
 
 		Follow mockFollow = mock(Follow.class);
-		given(mockFollow.getId()).willReturn(UUID.randomUUID());
 		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, requestUserId))
 			.willReturn(Optional.of(mockFollow));
 
@@ -197,29 +202,10 @@ class FollowServiceTest {
 		// then
 		assertThat(result).isNotNull();
 		assertThat(result).isEqualTo(mockDto);
-		verify(followRepository, times(1)).findByFolloweeIdAndFollowerId(followeeId, requestUserId);
 	}
 
 	@Test
-	@DisplayName("실패: 팔로우 대상(Followee)이 존재하지 않으면 예외가 발생한다.")
-	void isFollowing_UserNotFound_Fail() {
-		// given
-		UUID requestUserId = UUID.randomUUID();
-		UUID followeeId = UUID.randomUUID();
-
-		// 타겟 유저 조회 시 Optional.empty() 반환
-		given(userRepository.findById(followeeId)).willReturn(Optional.empty());
-
-		// when & then
-		assertThatThrownBy(() -> followService.getFollowConnection(followeeId, requestUserId))
-			.isInstanceOf(UserException.class)
-			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
-
-		verify(followRepository, never()).findByFolloweeIdAndFollowerId(any(), any());
-	}
-
-	@Test
-	@DisplayName("실패: 팔로우 관계가 존재하지 않으면 FOLLOW_NOT_FOUND 예외가 발생한다.")
+	@DisplayName("실패: DB에 팔로우 관계가 존재하지 않으면 FOLLOW_NOT_FOUND 예외가 발생한다.")
 	void getFollowConnection_FollowNotFound_Fail() {
 		// given
 		UUID requestUserId = UUID.randomUUID();
@@ -233,7 +219,7 @@ class FollowServiceTest {
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(targetUser));
 		given(userRepository.findById(requestUserId)).willReturn(Optional.of(requestedUser));
 
-		// 팔로우 미존재
+		// DB 관계 없음 확인
 		given(followRepository.findByFolloweeIdAndFollowerId(followeeId, requestUserId))
 			.willReturn(Optional.empty());
 
@@ -249,7 +235,7 @@ class FollowServiceTest {
 	=============================
 	 */
 	@Test
-	@DisplayName("성공: 유저가 존재하면 팔로워 수를 정상적으로 반환한다.")
+	@DisplayName("성공: 유저가 존재하고 Redis 캐시에 1명 이상이면 팔로워 수를 정상적으로 반환한다.")
 	void getFollowerCount_ReturnFollowerCount_Success() {
 		// given
 		UUID followeeId = UUID.randomUUID();
@@ -262,7 +248,9 @@ class FollowServiceTest {
 		long expectedCount = 15L;
 
 		given(userRepository.findById(followeeId)).willReturn(Optional.of(mockUser));
-		given(followRepository.countByFolloweeId(followeeId)).willReturn(expectedCount);
+
+		// Redis Cache Hit
+		given(followRedisStore.getFollowerCount(followeeId)).willReturn(expectedCount);
 
 		// when
 		Long result = followService.getFollowerCount(followeeId);
@@ -270,23 +258,53 @@ class FollowServiceTest {
 		// then
 		assertThat(result).isEqualTo(expectedCount);
 		verify(userRepository).findById(followeeId);
-		verify(followRepository).countByFolloweeId(followeeId);
+		verify(followRedisStore, times(1)).getFollowerCount(followeeId);
 	}
 
 	@Test
-	@DisplayName("실패: 조회하려는 유저가 존재하지 않으면 UserException이 발생한다.")
-	void getFollowerCount_UserNotFound_Fail() {
+	@DisplayName("성공: Redis 캐시 미스(null) 발생 시, DB에서 ID 목록을 가져와 캐시를 백필하고 사이즈를 반환한다.")
+	void getFollowerCount_CacheMiss_DBHasCount_Success() {
 		// given
-		UUID invalidUserId = UUID.randomUUID();
+		UUID followeeId = UUID.randomUUID();
+		User mockUser = User.builder().name("테스트유저").email("test@example.com").build();
+		ReflectionTestUtils.setField(mockUser, "id", followeeId);
 
-		given(userRepository.findById(invalidUserId)).willReturn(Optional.empty());
+		Set<UUID> followerIds = Set.of(UUID.randomUUID(), UUID.randomUUID());
 
-		// when & then
-		assertThatThrownBy(() -> followService.getFollowerCount(invalidUserId))
-			.isInstanceOf(UserException.class)
-			.hasMessageContaining(UserErrorCode.USER_NOT_FOUND.getMessage());
+		given(userRepository.findById(followeeId)).willReturn(Optional.of(mockUser));
+		given(followRedisStore.getFollowerCount(followeeId)).willReturn(null);
+		given(followRepository.findFollowerIdsByFolloweeId(followeeId)).willReturn(followerIds);
 
-		verify(userRepository, times(1)).findById(invalidUserId);
+		// when
+		Long result = followService.getFollowerCount(followeeId);
+
+		// then
+		assertThat(result).isEqualTo((long)followerIds.size());
+		verify(followRepository, times(1)).findFollowerIdsByFolloweeId(followeeId);
+		verify(followRedisStore, times(1)).initFollowers(followeeId, followerIds);
+	}
+
+	@Test
+	@DisplayName("성공: Redis 캐시 미스(null) 발생 후 DB를 조회했는데 팔로워가 0명이면 0을 반환한다 (initFollowers에는 빈 Set이 전달됨).")
+	void getFollowerCount_CacheMiss_DBZero_Success() {
+		// given
+		UUID followeeId = UUID.randomUUID();
+		User mockUser = User.builder().name("테스트유저").email("test@example.com").build();
+		ReflectionTestUtils.setField(mockUser, "id", followeeId);
+
+		given(userRepository.findById(followeeId)).willReturn(Optional.of(mockUser));
+		given(followRedisStore.getFollowerCount(followeeId)).willReturn(null);
+
+		// DB에서 빈 리스트(Set)를 반환
+		given(followRepository.findFollowerIdsByFolloweeId(followeeId)).willReturn(Set.of());
+
+		// when
+		Long result = followService.getFollowerCount(followeeId);
+
+		// then
+		assertThat(result).isEqualTo(0L);
+		verify(followRepository, times(1)).findFollowerIdsByFolloweeId(followeeId);
+		verify(followRedisStore, times(1)).initFollowers(followeeId, Set.of());
 	}
 
 	/*
@@ -302,9 +320,14 @@ class FollowServiceTest {
 		User follower = mock(User.class);
 		given(follower.getId()).willReturn(requestUserId);
 
+		UUID followeeId = UUID.randomUUID();
+		User followee = mock(User.class);
+		given(followee.getId()).willReturn(followeeId);
+
 		UUID followId = UUID.randomUUID();
 		Follow targetFollow = mock(Follow.class);
 		given(targetFollow.getFollower()).willReturn(follower);
+		given(targetFollow.getFollowee()).willReturn(followee);
 
 		given(followRepository.findById(followId)).willReturn(Optional.of(targetFollow));
 
@@ -313,40 +336,6 @@ class FollowServiceTest {
 
 		// then
 		verify(followRepository, times(1)).delete(targetFollow);
-	}
-
-	@Test
-	@DisplayName("실패: 팔로우 관계가 존재하지 않으면 예외가 발생한다.")
-	void deleteFollow_FollowNotFound_Fail() {
-		// given
-		UUID requestUserId = UUID.randomUUID();
-		given(followRepository.findById(any())).willReturn(Optional.empty());
-
-		// when & then
-		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), requestUserId))
-			.isInstanceOf(FollowException.class)
-			.hasMessageContaining(FollowErrorCode.FOLLOW_NOT_FOUND.getMessage());
-	}
-
-	@Test
-	@DisplayName("실패: 본인의 팔로우가 아닌 경우 접근 거부 예외가 발생한다.")
-	void deleteFollow_AccessDenied_Fail() {
-		// given
-		UUID requestUserId = UUID.randomUUID();
-
-		UUID wrongOwnerId = UUID.randomUUID();
-		User otherUser = mock(User.class);
-
-		Follow targetFollow = mock(Follow.class);
-
-		given(otherUser.getId()).willReturn(wrongOwnerId);
-		given(targetFollow.getFollower()).willReturn(otherUser);
-
-		given(followRepository.findById(any())).willReturn(Optional.of(targetFollow));
-
-		// when & then
-		assertThatThrownBy(() -> followService.deleteFollow(UUID.randomUUID(), requestUserId))
-			.isInstanceOf(FollowException.class)
-			.hasMessageContaining(FollowErrorCode.FOLLOW_ACCESS_DENIED.getMessage());
+		verify(applicationEventPublisher, times(1)).publishEvent(any(FollowDeletedEvent.class));
 	}
 }

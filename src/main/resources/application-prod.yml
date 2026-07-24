@@ -18,12 +18,26 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST}
       port: ${SPRING_DATA_REDIS_PORT}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      ssl:
+        enabled: true
+  session:
+    timeout: 10m
+    redis:
+      namespace: mopl:http-session
+      repository-type: default
   cache:
     type: ${SPRING_CACHE_TYPE}
     redis:
       enable-statistics: true
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+    # Confluent Cloud는 SASL_SSL 인증 필수 (API Key/Secret 사용)
+    security:
+      protocol: SASL_SSL
+    properties:
+      sasl.mechanism: PLAIN
+      sasl.jaas.config: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_API_KEY}" password="${KAFKA_API_SECRET}";'
     producer:
       acks: all
       retries: 3
@@ -44,6 +58,33 @@ spring:
       initialize-schema: never
     job:
       enabled: false
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_OAUTH_CLIENT_ID}
+            client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET}
+            redirect-uri: "https://mopl.kr/login/oauth2/code/google"
+            scope:
+              - openid
+              - email
+              - profile
+          kakao:
+            client-id: ${KAKAO_OAUTH_CLIENT_ID}
+            client-secret: ${KAKAO_OAUTH_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "https://mopl.kr/login/oauth2/code/kakao"
+            client-authentication-method: client_secret_post
+            scope:
+              - profile_nickname
+              - profile_image
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
 
 logging:
   level:
@@ -62,3 +103,19 @@ storage:
     # 키 미설정 시 기본 체인(환경변수 → 프로파일 → EC2/ECS IAM Role) 자동 탐색
     access-key: ${S3_ACCESS_KEY:}
     secret-key: ${S3_SECRET_KEY:}
+
+spring.redisson:
+  config: |
+    singleServerConfig:
+      address: "rediss://${SPRING_DATA_REDIS_HOST}:${SPRING_DATA_REDIS_PORT:6379}"
+      password: "${SPRING_DATA_REDIS_PASSWORD:}"
+
+notification:
+  realtime:
+    mode: redis
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus

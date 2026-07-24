@@ -2,6 +2,7 @@ package com.team04.mopl.notification.entity;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 
 import com.team04.mopl.common.entity.BaseEntity;
 import com.team04.mopl.notification.enums.NotificationLevel;
@@ -16,6 +17,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -24,12 +26,23 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "notifications")
+@Table(
+	name = "notifications",
+	uniqueConstraints = {
+		@UniqueConstraint(
+			name = "uq_notifications_source_event_receiver",
+			columnNames = {"source_event_id", "receiver_id"}
+		)
+	}
+)
 public class Notification extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "receiver_id", nullable = false)
 	private User receiver;
+
+	@Column(name = "source_event_id")
+	private UUID sourceEventId;
 
 	@Column(name = "title", nullable = false, length = 50)
 	private String title;
@@ -51,12 +64,14 @@ public class Notification extends BaseEntity {
 	@Builder
 	protected Notification(
 		User receiver,
+		UUID sourceEventId,
 		String title,
 		String content,
 		NotificationType type,
 		NotificationLevel level
 	) {
 		this.receiver = receiver;
+		this.sourceEventId = sourceEventId;
 		this.title = title;
 		this.content = content;
 		this.type = type;

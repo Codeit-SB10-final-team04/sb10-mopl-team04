@@ -21,6 +21,10 @@ spring:
 server:
   port: 8080
 
+springdoc:
+  swagger-ui:
+    operations-sorter: method
+
 tmdb:
   api:
     key: ${TMDB_API_KEY}
@@ -28,6 +32,11 @@ tmdb:
 playlist:
   hard-delete:
     cron: "0 1 0 * * *"
+    retention-months: 1
+
+notification:
+  hard-delete:
+    cron: "0 0 1 * * *"
     retention-months: 1
 
 content:
@@ -57,3 +66,11 @@ mopl:
     email: ${MOPL_ADMIN_EMAIL:}
     password: ${MOPL_ADMIN_PASSWORD:}
     name: ${MOPL_ADMIN_NAME:ADMIN}
+  oauth2:
+    success-redirect-uri: ${MOPL_OAUTH2_SUCCESS_REDIRECT_URI:http://localhost:8080/#/contents}
+    failure-redirect-uri: ${MOPL_OAUTH2_FAILURE_REDIRECT_URI:http://localhost:8080/#/sign-in}
+
+management:
+  metrics:
+    tags:
+      application: ${spring.application.name}

@@ -48,3 +48,11 @@ uploads/
 
 ### Generated Sources ###
 src/main/generated/
+
+### k6 Load Test ###
+# 테스트 계정 정보와 실행 중 발급한 JWT는 로컬에서만 사용
+k6/data/users.json
+k6/data/users.json.tmp
+# 부하 테스트 결과 파일은 용량이 크고 실행 환경마다 달라질 수 있음
+k6/results/
+summary.json

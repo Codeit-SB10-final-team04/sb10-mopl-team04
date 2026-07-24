@@ -53,6 +53,9 @@ class ContentServiceTest {
 	@Mock
 	private WatchingSessionService watchingSessionService;
 
+	@Mock
+	private com.team04.mopl.review.repository.ReviewRepository reviewRepository;
+
 	@InjectMocks
 	private ContentService contentService;
 
@@ -67,21 +70,21 @@ class ContentServiceTest {
 		// given
 		UUID contentId = UUID.randomUUID();
 		Content content = mock(Content.class);
-		List<String> tags = List.of("영화");
+		when(content.getType()).thenReturn(com.team04.mopl.content.entity.ContentType.movie);
+		List<String> tags = List.of("영화", "액션");
+		List<String> filteredTags = List.of("액션"); // "영화"는 type 태그라 제외됨
 		ContentDto expectedDto = mock(ContentDto.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
 		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(tags);
-		when(contentMapper.toDto(eq(content), eq(tags), anyLong())).thenReturn(expectedDto);
+		when(contentMapper.toDto(eq(content), eq(filteredTags), anyLong())).thenReturn(expectedDto);
 
 		// when
 		ContentDto result = contentService.getContent(contentId);
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(contentRepository).findByIdAndDeletedAtIsNull(contentId);
-		verify(contentTagRepository).findTagNamesByContentId(contentId);
-		verify(contentMapper).toDto(eq(content), eq(tags), anyLong());
+		verify(contentMapper).toDto(eq(content), eq(filteredTags), anyLong());
 	}
 
 	@Test
@@ -145,8 +148,9 @@ class ContentServiceTest {
 
 		when(fileStorage.store(thumbnail, THUMBNAIL_DIRECTORY)).thenReturn("http://localhost:8080/thumbnails/thumb.png");
 		when(contentRepository.save(any(Content.class))).thenAnswer(i -> i.getArgument(0));
-		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(tag1)); // 액션만 기존 존재
-		when(tagRepository.save(any(Tag.class))).thenReturn(tag2);
+		when(tagRepository.findAllByNameIn(List.of("액션", "SF")))
+			.thenReturn(List.of(tag1))        // 첫 호출: 액션만 존재
+			.thenReturn(List.of(tag1, tag2));  // 두 번째 호출: 전체 재조회
 		when(contentMapper.toDto(any(Content.class), eq(List.of("액션", "SF")), anyLong())).thenReturn(expectedDto);
 
 		// when
@@ -154,8 +158,8 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(tagRepository).findAllByNameIn(List.of("액션", "SF"));
-		verify(tagRepository).save(any(Tag.class)); // SF는 새로 생성
+		verify(tagRepository, times(2)).findAllByNameIn(List.of("액션", "SF"));
+		verify(tagRepository).insertIgnore(any(UUID.class), eq("SF"));
 		verify(contentTagRepository).saveAll(any());
 	}
 
@@ -415,19 +419,20 @@ class ContentServiceTest {
 	}
 
 	@Test
-	@DisplayName("태그 목록이 전달되면 기존 태그를 전부 삭제하고 새 태그로 교체한다")
-	void updateContent_replacesTags_whenTagsProvided() {
+	@DisplayName("태그 목록이 전달되면 차집합으로 추가/삭제한다")
+	void updateContent_diffTags_whenTagsProvided() {
 		// given
 		UUID contentId = UUID.randomUUID();
 		Content content = mock(Content.class);
 		ContentUpdateRequest request = new ContentUpdateRequest(null, null, List.of("액션", "SF"));
-		Tag existingTag = Tag.builder().name("액션").build();
 		Tag newTag = Tag.builder().name("SF").build();
 		ContentDto expectedDto = mock(ContentDto.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
-		when(tagRepository.findAllByNameIn(List.of("액션", "SF"))).thenReturn(List.of(existingTag)); // 액션만 기존 존재
-		when(tagRepository.save(any(Tag.class))).thenReturn(newTag);
+		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(List.of("액션", "드라마"));
+		when(tagRepository.findAllByNameIn(List.of("SF")))
+			.thenReturn(List.of())
+			.thenReturn(List.of(newTag));
 		when(contentMapper.toDto(eq(content), eq(List.of("액션", "SF")), anyLong())).thenReturn(expectedDto);
 
 		// when
@@ -435,9 +440,9 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(contentTagRepository).deleteAllByContent(content);
-		verify(tagRepository).findAllByNameIn(List.of("액션", "SF"));
-		verify(tagRepository).save(any(Tag.class));
+		verify(contentTagRepository).deleteByContentAndTagNameIn(content, List.of("드라마"));
+		verify(contentTagRepository, never()).deleteAllByContent(content);
+		verify(tagRepository).insertIgnore(any(UUID.class), eq("SF"));
 		verify(contentTagRepository).saveAll(any());
 	}
 
@@ -451,7 +456,7 @@ class ContentServiceTest {
 		ContentDto expectedDto = mock(ContentDto.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
-		when(tagRepository.findAllByNameIn(List.of())).thenReturn(List.of());
+		when(contentTagRepository.findTagNamesByContentId(contentId)).thenReturn(List.of("액션", "드라마"));
 		when(contentMapper.toDto(eq(content), eq(List.of()), anyLong())).thenReturn(expectedDto);
 
 		// when
@@ -459,9 +464,8 @@ class ContentServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(expectedDto);
-		verify(contentTagRepository).deleteAllByContent(content);
-		verify(tagRepository, never()).save(any());
-		verify(contentTagRepository).saveAll(List.of());
+		verify(contentTagRepository).deleteByContentAndTagNameIn(content, List.of("액션", "드라마"));
+		verify(contentTagRepository, never()).saveAll(any());
 	}
 
 	@Test
@@ -523,12 +527,14 @@ class ContentServiceTest {
 		Content content = mock(Content.class);
 
 		when(contentRepository.findByIdAndDeletedAtIsNull(contentId)).thenReturn(Optional.of(content));
+		when(reviewRepository.bulkMarkDeletedByContentId(eq(contentId), any())).thenReturn(0);
 
 		// when
 		contentService.deleteContent(contentId);
 
 		// then
 		verify(content).markDeleted(any());
+		verify(reviewRepository).bulkMarkDeletedByContentId(eq(contentId), any());
 	}
 
 	@Test

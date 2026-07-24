@@ -50,10 +50,12 @@ class NotificationServiceTest {
 
 	@Test
 	@DisplayName("여러 수신자 알림 생성 요청에 성공하면 수신자 수만큼 알림을 저장한다.")
-	void createNotificationList_saveNotificationList_whenValidReqiest() {
+	void createNotificationList_saveNotificationList_whenValidRequest() {
 		// given
 		UUID receiverId1 = UUID.randomUUID();
 		UUID receiverId2 = UUID.randomUUID();
+		UUID sourceEventId = UUID.randomUUID();
+		Set<UUID> receiverIds = Set.of(receiverId1, receiverId2);
 
 		User receiver1 = createUser(receiverId1);
 		User receiver2 = createUser(receiverId2);
@@ -76,7 +78,9 @@ class NotificationServiceTest {
 			NotificationLevel.INFO
 		);
 
-		when(userRepository.findAllByIdInAndLockedFalse(Set.of(receiverId1, receiverId2)))
+		when(notificationRepository.findExistingReceiverIdsBySourceEventId(receiverIds, sourceEventId))
+			.thenReturn(Set.of());
+		when(userRepository.findAllByIdInAndLockedFalse(receiverIds))
 			.thenReturn(List.of(receiver1, receiver2));
 		when(notificationRepository.saveAll(anyList()))
 			.thenAnswer(invocation -> invocation.getArgument(0));
@@ -85,7 +89,8 @@ class NotificationServiceTest {
 
 		// when
 		List<NotificationDto> result = notificationService.saveNotificationList(
-			Set.of(receiverId1, receiverId2),
+			receiverIds,
+			sourceEventId,
 			"알림 제목",
 			"알림 내용",
 			NotificationType.ROLE_CHANGE,
@@ -112,7 +117,8 @@ class NotificationServiceTest {
 		assertTrue(notificationList.stream()
 			.allMatch(notification -> notification.getLevel() == NotificationLevel.INFO));
 
-		verify(userRepository).findAllByIdInAndLockedFalse(Set.of(receiverId1, receiverId2));
+		verify(notificationRepository).findExistingReceiverIdsBySourceEventId(receiverIds, sourceEventId);
+		verify(userRepository).findAllByIdInAndLockedFalse(receiverIds);
 		verify(notificationRepository).saveAll(anyList());
 		verify(notificationMapper, times(2)).toDto(any(Notification.class));
 	}
@@ -124,6 +130,7 @@ class NotificationServiceTest {
 		assertThrows(NotificationException.class,
 			() -> notificationService.saveNotificationList(
 				null,
+				UUID.randomUUID(),
 				"알림 제목",
 				"알림 내용",
 				NotificationType.ROLE_CHANGE,
@@ -142,6 +149,7 @@ class NotificationServiceTest {
 		// when
 		List<NotificationDto> result = notificationService.saveNotificationList(
 			Set.of(),
+			UUID.randomUUID(),
 			"알림 제목",
 			"알림 내용",
 			NotificationType.ROLE_CHANGE,
@@ -151,6 +159,7 @@ class NotificationServiceTest {
 		// then
 		assertTrue(result.isEmpty());
 
+		verify(notificationRepository, never()).findExistingReceiverIdsBySourceEventId(anySet(), any(UUID.class));
 		verify(userRepository, never()).findAllByIdInAndLockedFalse(anySet());
 		verify(notificationRepository, never()).saveAll(anyList());
 		verify(notificationMapper, never()).toDto(any(Notification.class));
@@ -166,6 +175,7 @@ class NotificationServiceTest {
 		assertThrows(NotificationException.class,
 			() -> notificationService.saveNotificationList(
 				Set.of(receiverId),
+				UUID.randomUUID(),
 				" ",
 				"알림 내용",
 				NotificationType.ROLE_CHANGE,
@@ -188,6 +198,7 @@ class NotificationServiceTest {
 		assertThrows(NotificationException.class,
 			() -> notificationService.saveNotificationList(
 				Set.of(receiverId),
+				UUID.randomUUID(),
 				"테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목테스트제목",
 				"알림 내용",
 				NotificationType.ROLE_CHANGE,
@@ -201,14 +212,49 @@ class NotificationServiceTest {
 	}
 
 	@Test
+	@DisplayName("알림 중복 저장 시 저장을 생략하고 빈 리스트를 반환한다.")
+	void createNotificationList_returnEmptyList_whenNotificationDuplicateSave() {
+		// given
+		UUID receiverId1 = UUID.randomUUID();
+		UUID receiverId2 = UUID.randomUUID();
+		UUID sourceEventId = UUID.randomUUID();
+		Set<UUID> receiverIds = Set.of(receiverId1, receiverId2);
+
+		when(notificationRepository.findExistingReceiverIdsBySourceEventId(receiverIds, sourceEventId))
+			.thenReturn(receiverIds);
+
+		// when
+		List<NotificationDto> result = notificationService.saveNotificationList(
+			receiverIds,
+			sourceEventId,
+			"알림 제목",
+			"알림 내용",
+			NotificationType.ROLE_CHANGE,
+			NotificationLevel.INFO
+		);
+
+		// then
+		assertEquals(0, result.size());
+
+		verify(notificationRepository).findExistingReceiverIdsBySourceEventId(receiverIds, sourceEventId);
+		verify(userRepository, never()).findAllByIdInAndLockedFalse(anySet());
+		verify(notificationRepository, never()).saveAll(anyList());
+		verify(notificationMapper, never()).toDto(any(Notification.class));
+	}
+
+	@Test
 	@DisplayName("존재하지 않는 수신인으로 알림 저장 시 예외가 발생한다.")
 	void createNotificationList_throwException_whenUserNotFound() {
 		// given
 		UUID receiverId1 = UUID.randomUUID();
 		UUID receiverId2 = UUID.randomUUID();
+		UUID sourceEventId = UUID.randomUUID();
+		Set<UUID> receiverIds = Set.of(receiverId1, receiverId2);
 
 		User receiver1 = createUser(receiverId1);
 
+		when(notificationRepository.findExistingReceiverIdsBySourceEventId(receiverIds, sourceEventId))
+			.thenReturn(Set.of());
 		when(userRepository.findAllByIdInAndLockedFalse(Set.of(receiverId1, receiverId2)))
 			.thenReturn(List.of(receiver1));
 
@@ -216,6 +262,7 @@ class NotificationServiceTest {
 		assertThrows(NotificationException.class,
 			() -> notificationService.saveNotificationList(
 				Set.of(receiverId1, receiverId2),
+				sourceEventId,
 				"알림 제목",
 				"알림 내용",
 				NotificationType.ROLE_CHANGE,
@@ -223,6 +270,7 @@ class NotificationServiceTest {
 			));
 
 		// then
+		verify(notificationRepository).findExistingReceiverIdsBySourceEventId(receiverIds, sourceEventId);
 		verify(userRepository).findAllByIdInAndLockedFalse(Set.of(receiverId1, receiverId2));
 		verify(notificationRepository, never()).saveAll(anyList());
 		verify(notificationMapper, never()).toDto(any(Notification.class));

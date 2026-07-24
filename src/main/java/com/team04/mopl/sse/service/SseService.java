@@ -8,8 +8,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.team04.mopl.directmessage.dto.response.DirectMessageDto;
+import com.team04.mopl.directmessage.service.DirectMessageRestoreService;
 import com.team04.mopl.notification.dto.response.NotificationDto;
 import com.team04.mopl.notification.service.NotificationRestoreService;
+import com.team04.mopl.sse.event.SseEventNames;
+import com.team04.mopl.sse.metrics.SseMetrics;
 import com.team04.mopl.sse.repository.SseEmitterRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -21,11 +25,13 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class SseService {
 
-	private final SseEmitterRepository sseEmitterRepository;
-	private final NotificationRestoreService notificationRestoreService;
-
 	// SSE 연결 유지 시간 (현재: 1시간)
 	private static final long TIMEOUT = 60L * 60L * 1000L;
+	private final SseEmitterRepository sseEmitterRepository;
+	private final NotificationRestoreService notificationRestoreService;
+	private final DirectMessageRestoreService directMessageRestoreService;
+
+	private final SseMetrics sseMetrics;
 
 	// SseEmitter 객체 생성
 	public SseEmitter connect(UUID receiverId, UUID lastEventId) {
@@ -34,12 +40,14 @@ public class SseService {
 		// 콜백 등록: 정상적으로 연결이 끝났을 경우 실행됨
 		sseEmitter.onCompletion(() -> {
 			log.info("[SSE_CONNECT_COMPLETE] SSE 연결 종료 요청 완료: receiverId={}", receiverId);
+			sseMetrics.recordLifecycle("completed");
 			sseEmitterRepository.remove(receiverId, sseEmitter);
 		});
 
 		// 콜백 등록: SseEmitter 생성 시 지정한 TIMEOUT을 넘겼을 경우 실행됨
 		sseEmitter.onTimeout(() -> {
 			log.warn("[SSE_TIMEOUT] SSE 타임아웃 발생: receiverId={}", receiverId);
+			sseMetrics.recordLifecycle("timeout");
 			sseEmitterRepository.remove(receiverId, sseEmitter);
 		});
 
@@ -47,6 +55,7 @@ public class SseService {
 		sseEmitter.onError(e -> {
 			log.error("[SSE_ERROR] SSE 오류 발생: receiverId={}, error={}",
 				receiverId, e.getMessage(), e);
+			sseMetrics.recordLifecycle("error");
 			sseEmitterRepository.remove(receiverId, sseEmitter);
 		});
 
@@ -57,6 +66,8 @@ public class SseService {
 			sseEmitterRepository.remove(receiverId, sseEmitter);
 			return sseEmitter;
 		}
+
+		sseMetrics.recordLifecycle("connected");
 
 		// 유실된 이벤트 복원
 		if (lastEventId != null) {
@@ -111,7 +122,22 @@ public class SseService {
 		}
 	}
 
+	// 복원 메서드: 분기
 	private void restoreLostEvents(UUID receiverId, UUID lastEventId, SseEmitter sseEmitter) {
+		// 1. DM 복원
+		boolean isDirectMessageSuccess = restoreDirectMessages(receiverId, lastEventId, sseEmitter);
+
+		// DM 복원 도중 오류 발생 시, 알림 복원 없이 종료
+		if (!isDirectMessageSuccess) {
+			return;
+		}
+
+		// 2. 알림 복원
+		restoreNotifications(receiverId, lastEventId, sseEmitter);
+	}
+
+	// 알림 복원 메서드
+	private void restoreNotifications(UUID receiverId, UUID lastEventId, SseEmitter sseEmitter) {
 		// lastEventId 이후의 이벤트 가져오기
 		List<NotificationDto> afterNotificationDtoList =
 			notificationRestoreService.findUnreadNotificationsAfter(receiverId, lastEventId);
@@ -121,7 +147,7 @@ public class SseService {
 				sendEvent(
 					sseEmitter,
 					notificationDto.id(),
-					"notifications",
+					SseEventNames.NOTIFICATIONS,
 					notificationDto
 				);
 			} catch (Exception e) {
@@ -134,17 +160,47 @@ public class SseService {
 		}
 	}
 
+	// DM 복원 메서드
+	private boolean restoreDirectMessages(UUID receiverId, UUID lastEventId, SseEmitter sseEmitter) {
+		List<DirectMessageDto> missedDms = directMessageRestoreService.findUnreadMessagesAfter(receiverId, lastEventId);
+
+		for (DirectMessageDto directMessageDto : missedDms) {
+			try {
+				sendEvent(
+					sseEmitter,
+					directMessageDto.id(),
+					SseEventNames.DIRECT_MESSAGES,
+					directMessageDto
+				);
+			} catch (Exception e) {
+				log.warn("[SSE_SEND_FAILED] SSE 쪽지 전송 실패: receiverId={}, eventId={}",
+					receiverId, directMessageDto.id(), e);
+				sseEmitter.completeWithError(e);
+				sseEmitterRepository.remove(receiverId, sseEmitter);
+				return false;
+			}
+		}
+		return true;
+	}
+
 	private void sendEvent(
 		SseEmitter sseEmitter,
 		UUID eventId,
 		String eventName,
 		Object data
 	) throws IOException {
-		sseEmitter.send(
-			SseEmitter.event()
-				.id(eventId.toString())
-				.name(eventName)
-				.data(data)
-		);
+		try {
+			sseEmitter.send(
+				SseEmitter.event()
+					.id(eventId.toString())
+					.name(eventName)
+					.data(data)
+			);
+
+			sseMetrics.recordSend(eventName, "success");
+		} catch (IOException | RuntimeException e) {
+			sseMetrics.recordSend(eventName, "failure");
+			throw e;
+		}
 	}
 }
