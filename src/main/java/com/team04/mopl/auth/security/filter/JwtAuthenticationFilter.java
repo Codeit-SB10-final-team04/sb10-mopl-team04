@@ -115,6 +115,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	private void saveAuthentication(HttpServletRequest request, JwtAuthenticationClaims claims) {
 		MoplUserDetails principal = MoplUserDetails.authenticated(
 			claims.userId(),
+			claims.sessionId(),
 			claims.email(),
 			claims.role()
 		);

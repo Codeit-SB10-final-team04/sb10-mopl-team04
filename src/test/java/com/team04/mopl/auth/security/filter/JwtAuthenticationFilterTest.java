@@ -321,6 +321,7 @@ class JwtAuthenticationFilterTest {
 			.getPrincipal();
 
 		assertThat(principal.getUserId()).isEqualTo(userId);
+		assertThat(principal.getSessionId()).isEqualTo(sessionId);
 		assertThat(principal.getEmail()).isEqualTo("test@test.com");
 		assertThat(principal.getRole()).isEqualTo(UserRole.USER);
 		assertThat(filterChain.getRequest()).isSameAs(request);

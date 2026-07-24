@@ -24,6 +24,7 @@ public class MoplUserDetails implements UserDetails {
 	private static final String ROLE_PREFIX = "ROLE_";
 
 	private final UUID userId;
+	private final UUID sessionId;
 	private final Instant createdAt;
 	private final String email;
 	private final String name;
@@ -34,6 +35,7 @@ public class MoplUserDetails implements UserDetails {
 
 	private MoplUserDetails(
 		UUID userId,
+		UUID sessionId,
 		Instant createdAt,
 		String email,
 		String name,
@@ -43,6 +45,7 @@ public class MoplUserDetails implements UserDetails {
 		String passwordHash
 	) {
 		this.userId = userId;
+		this.sessionId = sessionId;
 		this.createdAt = createdAt;
 		this.email = email;
 		this.name = name;
@@ -56,6 +59,7 @@ public class MoplUserDetails implements UserDetails {
 	public static MoplUserDetails from(User user) {
 		return new MoplUserDetails(
 			user.getId(),
+			null,
 			user.getCreatedAt(),
 			user.getEmail(),
 			user.getName(),
@@ -72,8 +76,19 @@ public class MoplUserDetails implements UserDetails {
 		String email,
 		UserRole role
 	) {
+		return authenticated(userId, null, email, role);
+	}
+
+	// 실시간 연결의 인증 세션 추적용 Principal 생성
+	public static MoplUserDetails authenticated(
+		UUID userId,
+		UUID sessionId,
+		String email,
+		UserRole role
+	) {
 		return new MoplUserDetails(
 			userId,
+			sessionId,
 			null,
 			email,
 			null,
@@ -86,6 +101,10 @@ public class MoplUserDetails implements UserDetails {
 
 	public UUID getUserId() {
 		return userId;
+	}
+
+	public UUID getSessionId() {
+		return sessionId;
 	}
 
 	public String getEmail() {
