@@ -11,9 +11,8 @@ COPY gradlew ./
 COPY gradle ./gradle
 COPY build.gradle settings.gradle ./
 
-# 1-4. `gradlew` 파일에 실행 권한 부여
-# `chmod` : 파일의 권한을 변경하는 리눅스 명령어
-# `+x` : `chmod`와 함께 쓰이며, 실행 권한을 추가하는 명령어
+# 1-4. Gradle Wrapper 실행에 필요한 xargs 설치 및 실행 권한 부여
+RUN yum install -y findutils && yum clean all
 RUN chmod +x ./gradlew
 
 # 1-5. Gradle 의존성 관련 레이어를 먼저 생성하여 캐시 활용
