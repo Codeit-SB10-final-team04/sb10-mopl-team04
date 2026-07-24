@@ -25,6 +25,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import com.team04.mopl.common.batch.BatchTimeZone;
+import com.team04.mopl.common.batch.metrics.MoplBatchJobMetricsListener;
+import com.team04.mopl.common.batch.metrics.MoplBatchStepMetricsListener;
 import com.team04.mopl.notification.repository.NotificationRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -44,11 +46,15 @@ public class NotificationHardDeleteJobConfig {
 
 	private final NotificationRepository notificationRepository;
 
+	private final MoplBatchJobMetricsListener moplBatchJobMetricsListener;
+	private final MoplBatchStepMetricsListener moplBatchStepMetricsListener;
+
 	// Job 객체를 Spring Bean으로 등록
 	@Bean
 	public Job notificationHardDeleteJob(Step notificationHardDeleteStep) {
 		// `notificationHardDeleteJob` 이라는 Spring Batch Job을 생성
 		return new JobBuilder("notificationHardDeleteJob", jobRepository)
+			.listener(moplBatchJobMetricsListener)
 			.start(notificationHardDeleteStep) // Job이 실행할 step
 			.build();
 	}
@@ -61,6 +67,7 @@ public class NotificationHardDeleteJobConfig {
 	) {
 		// step이 실행할 작업을 chunk 단위로 Reader가 읽고 writer가 삭제
 		return new StepBuilder("notificationHardDeleteStep", jobRepository)
+			.listener(moplBatchStepMetricsListener)
 			.<UUID, UUID>chunk(100, transactionManager)
 			.reader(notificationHardDeleteItemReader)
 			.writer(notificationHardDeleteItemWriter)

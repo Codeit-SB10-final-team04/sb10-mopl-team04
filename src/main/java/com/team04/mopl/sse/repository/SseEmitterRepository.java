@@ -49,4 +49,10 @@ public class SseEmitterRepository {
 	public Map<UUID, List<SseEmitter>> findAll() {
 		return Map.copyOf(data);
 	}
+
+	public int count() {
+		return data.values().stream()
+			.mapToInt(sseEmitterList -> sseEmitterList.size())
+			.sum();
+	}
 }

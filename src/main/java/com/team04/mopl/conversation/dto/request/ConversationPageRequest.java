@@ -8,23 +8,25 @@ import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.conversation.exception.ConversationErrorCode;
 import com.team04.mopl.conversation.exception.ConversationException;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 public record ConversationPageRequest(
-	// 검색 키워드: 사용자 이름, 메시지 내용
+	@Schema(description = "검색 키워드")
 	String keywordLike,
 
-	// 메인 커서
+	@Schema(description = "커서")
 	String cursor,
 
-	// 보조 커서
+	@Schema(description = "보조 커서")
 	UUID idAfter,
 
-	// 페이지 개수
+	@Schema(description = "조회할 데이터 개수")
 	Integer limit,
 
-	// 정렬 방향
+	@Schema(description = "정렬 방향")
 	SortDirection sortDirection,
 
-	// 정렬 기준
+	@Schema(description = "정렬 기준")
 	String sortBy
 ) {
 	// 기본값 설정을 위한 생성자

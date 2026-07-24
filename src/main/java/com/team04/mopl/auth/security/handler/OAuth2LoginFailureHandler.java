@@ -3,6 +3,7 @@ package com.team04.mopl.auth.security.handler;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -27,6 +28,9 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
 
+	private static final int MAX_LOG_ERROR_CODE_LENGTH = 64;
+	private static final Pattern UNSAFE_LOG_ERROR_CODE_CHARACTERS = Pattern.compile("[^A-Za-z0-9._-]");
+
 	private final OAuth2Properties oauth2Properties;
 
 	// 소셜 로그인 실패 정보를 안전한 오류 코드로 변환하여 로그인 화면으로 이동
@@ -47,7 +51,16 @@ public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
 		);
 
 		// 소셜 로그인 실패 로그 기록
-		log.warn("[SOCIAL_LOGIN] 소셜 로그인 실패: errorMessage={}", errorMessage);
+		Throwable cause = exception.getCause();
+		log.warn(
+			"[SOCIAL_LOGIN] 소셜 로그인 실패: requestUri={}, errorCode={}, errorMessage={}, "
+				+ "exceptionType={}, causeType={}",
+			request.getRequestURI(),
+			sanitizeProviderErrorCodeForLog(resolveProviderErrorCode(exception)),
+			errorMessage,
+			exception.getClass().getSimpleName(),
+			cause == null ? "none" : cause.getClass().getSimpleName()
+		);
 
 		// 로그인 화면 리다이렉트
 		response.sendRedirect(redirectUri);
@@ -68,6 +81,25 @@ public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
 
 		// 알 수 없는 인증 실패 기본값 처리
 		return "provider_error";
+	}
+
+	// 서버 로그에서 원인을 구분하기 위한 원본 OAuth2 오류 코드 추출
+	private String resolveProviderErrorCode(AuthenticationException exception) {
+		if (exception instanceof OAuth2AuthenticationException oauth2Exception) {
+			return oauth2Exception.getError().getErrorCode();
+		}
+
+		return "unknown";
+	}
+
+	// 실패 로그 오류 코드 정제
+	static String sanitizeProviderErrorCodeForLog(String errorCode) {
+		if (errorCode == null || errorCode.isBlank()) {
+			return "unknown";
+		}
+
+		String sanitized = UNSAFE_LOG_ERROR_CODE_CHARACTERS.matcher(errorCode).replaceAll("_");
+		return sanitized.substring(0, Math.min(sanitized.length(), MAX_LOG_ERROR_CODE_LENGTH));
 	}
 
 	// 실패 리다이렉트 URI에 오류 쿼리 파라미터 추가

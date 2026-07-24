@@ -8,6 +8,7 @@ import com.team04.mopl.common.enums.SortDirection;
 import com.team04.mopl.user.entity.UserRole;
 import com.team04.mopl.user.enums.UserSortBy;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -15,32 +16,32 @@ import jakarta.validation.constraints.NotNull;
 
 public record UserPageRequest(
 
-	// 이메일 부분 검색 조건
+	@Schema(description = "이메일 부분 검색 조건")
 	String emailLike,
 
-	// 권한 일치 필터
+	@Schema(description = "권한 일치 필터")
 	UserRole roleEqual,
 
-	// 계정 잠금 상태 필터
+	@Schema(description = "계정 잠금 상태 필터")
 	Boolean isLocked,
 
-	// 정렬 기준 값 커서
+	@Schema(description = "정렬 기준 값 커서")
 	String cursor,
 
-	// 동률 정렬 보조 커서
+	@Schema(description = "동률 정렬 보조 커서")
 	UUID idAfter,
 
-	// 페이지 조회 개수
+	@Schema(description = "페이지 조회 개수")
 	@NotNull(message = "조회할 데이터 개수는 필수입니다.")
 	@Min(value = 1, message = "조회할 데이터 개수는 1개 이상이어야 합니다.")
 	@Max(value = 100, message = "조회할 데이터 개수는 100개를 초과할 수 없습니다.")
 	Integer limit,
 
-	// 정렬 방향
+	@Schema(description = "정렬 방향")
 	@NotNull(message = "정렬 방향은 필수입니다.")
 	SortDirection sortDirection,
 
-	// 정렬 기준
+	@Schema(description = "정렬 기준")
 	@NotNull(message = "정렬 기준은 필수입니다.")
 	UserSortBy sortBy
 ) {

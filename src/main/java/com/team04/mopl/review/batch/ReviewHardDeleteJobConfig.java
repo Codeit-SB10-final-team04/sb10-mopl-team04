@@ -13,6 +13,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.team04.mopl.common.batch.metrics.MoplBatchJobMetricsListener;
+import com.team04.mopl.common.batch.metrics.MoplBatchStepMetricsListener;
+
 import lombok.RequiredArgsConstructor;
 
 @Configuration
@@ -22,9 +25,13 @@ public class ReviewHardDeleteJobConfig {
 	private final JobRepository jobRepository;
 	private final PlatformTransactionManager transactionManager;
 
+	private final MoplBatchJobMetricsListener moplBatchJobMetricsListener;
+	private final MoplBatchStepMetricsListener moplBatchStepMetricsListener;
+
 	@Bean
 	public Job reviewHardDeleteJob(Step reviewHardDeleteStep) {
 		return new JobBuilder("reviewHardDeleteJob", jobRepository)
+			.listener(moplBatchJobMetricsListener)
 			.start(reviewHardDeleteStep)
 			.build();
 	}
@@ -35,6 +42,7 @@ public class ReviewHardDeleteJobConfig {
 		ItemWriter<UUID> reviewHardDeleteItemWriter
 	) {
 		return new StepBuilder("reviewHardDeleteStep", jobRepository)
+			.listener(moplBatchStepMetricsListener)
 			.<UUID, UUID>chunk(100, transactionManager)
 			.reader(reviewHardDeleteReader)
 			.writer(reviewHardDeleteItemWriter)

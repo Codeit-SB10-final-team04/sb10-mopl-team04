@@ -30,6 +30,7 @@ dependencies {
     // Security
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    implementation 'org.springframework.session:spring-session-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
     // DB
@@ -71,6 +72,9 @@ dependencies {
 
     // spotbugs
     compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.6'
+
+    // metric
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
