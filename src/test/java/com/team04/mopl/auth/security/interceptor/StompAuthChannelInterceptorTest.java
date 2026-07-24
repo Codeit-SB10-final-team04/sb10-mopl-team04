@@ -16,6 +16,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 
 import com.team04.mopl.auth.exception.AuthErrorCode;
 import com.team04.mopl.auth.exception.AuthException;
+import com.team04.mopl.auth.realtime.RealtimeWebSocketSessionRegistry;
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.jwt.JwtAuthenticationClaims;
 import com.team04.mopl.auth.security.jwt.JwtTokenProvider;
@@ -31,6 +32,8 @@ class StompAuthChannelInterceptorTest {
 	private final JwtTokenProvider jwtTokenProvider = mock(JwtTokenProvider.class);
 	private final AuthSessionStore authSessionStore = mock(AuthSessionStore.class);
 	private final WatchingSessionStore watchingSessionStore = mock(WatchingSessionStore.class);
+	private final RealtimeWebSocketSessionRegistry realtimeWebSocketSessionRegistry =
+		mock(RealtimeWebSocketSessionRegistry.class);
 	private final MessageChannel channel = mock(MessageChannel.class);
 	private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
@@ -38,37 +41,64 @@ class StompAuthChannelInterceptorTest {
 		jwtTokenProvider,
 		authSessionStore,
 		watchingSessionStore,
+		realtimeWebSocketSessionRegistry,
 		meterRegistry
 	);
 
 	@Test
-	@DisplayName("SEND 프레임은 인증 검사 없이 그대로 통과한다")
+	@DisplayName("SEND 프레임은 바인딩된 인증 세션이 활성 상태이면 통과한다")
 	void preSend_passesThrough_whenCommandIsSend() {
 		// given
+		UUID userId = UUID.randomUUID();
+		UUID sessionId = UUID.randomUUID();
 		StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+		accessor.setUser(authentication(userId, sessionId));
 		Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+		when(authSessionStore.isActive(userId, sessionId)).thenReturn(true);
 
 		// when
 		Message<?> result = interceptor.preSend(message, channel);
 
 		// then
 		assertThat(result).isSameAs(message);
-		verifyNoInteractions(jwtTokenProvider, authSessionStore);
+		verifyNoInteractions(jwtTokenProvider);
+		verify(authSessionStore).isActive(userId, sessionId);
 	}
 
 	@Test
-	@DisplayName("SUBSCRIBE 프레임은 인증 검사 없이 그대로 통과한다")
+	@DisplayName("SUBSCRIBE 프레임은 바인딩된 인증 세션이 활성 상태이면 통과한다")
 	void preSend_passesThrough_whenCommandIsSubscribe() {
 		// given
+		UUID userId = UUID.randomUUID();
+		UUID sessionId = UUID.randomUUID();
 		StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+		accessor.setUser(authentication(userId, sessionId));
 		Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+		when(authSessionStore.isActive(userId, sessionId)).thenReturn(true);
 
 		// when
 		Message<?> result = interceptor.preSend(message, channel);
 
 		// then
 		assertThat(result).isSameAs(message);
-		verifyNoInteractions(jwtTokenProvider, authSessionStore);
+		verifyNoInteractions(jwtTokenProvider);
+		verify(authSessionStore).isActive(userId, sessionId);
+	}
+
+	@Test
+	@DisplayName("SEND 프레임의 인증 세션이 교체되었으면 인증 예외를 던진다")
+	void preSend_throwsException_whenBoundSessionIsInactive() {
+		UUID userId = UUID.randomUUID();
+		UUID sessionId = UUID.randomUUID();
+		StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+		accessor.setUser(authentication(userId, sessionId));
+		Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+		when(authSessionStore.isActive(userId, sessionId)).thenReturn(false);
+
+		assertThatThrownBy(() -> interceptor.preSend(message, channel))
+			.isInstanceOf(AuthException.class)
+			.satisfies(ex -> assertThat(((AuthException)ex).getErrorCode())
+				.isEqualTo(AuthErrorCode.AUTH_SESSION_INVALID));
 	}
 
 	@Test
@@ -171,8 +201,20 @@ class StompAuthChannelInterceptorTest {
 		UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken)resultAccessor.getUser();
 		MoplUserDetails principal = (MoplUserDetails)auth.getPrincipal();
 		assertThat(principal.getUserId()).isEqualTo(userId);
+		assertThat(principal.getSessionId()).isEqualTo(sessionId);
 		assertThat(principal.getEmail()).isEqualTo(email);
 		assertThat(principal.getRole()).isEqualTo(UserRole.USER);
 		assertThat(auth.getAuthorities()).hasSize(1);
+	}
+
+	private UsernamePasswordAuthenticationToken authentication(UUID userId, UUID sessionId) {
+		MoplUserDetails principal = MoplUserDetails.authenticated(
+			userId,
+			sessionId,
+			"test@test.com",
+			UserRole.USER
+		);
+
+		return new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
 	}
 }

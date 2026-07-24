@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.team04.mopl.auth.realtime.RealtimeSseSessionRegistry;
 import com.team04.mopl.auth.security.MoplUserDetails;
 import com.team04.mopl.auth.security.filter.JwtAuthenticationFilter;
 import com.team04.mopl.sse.service.SseService;
@@ -42,6 +43,8 @@ class SseControllerTest {
 
 	@MockitoBean
 	private SseService sseService;
+	@MockitoBean
+	private RealtimeSseSessionRegistry sseSessionRegistry;
 
 	@AfterEach
 	void tearDown() {
@@ -53,25 +56,29 @@ class SseControllerTest {
 	void connect_createSSEConnect_whenValidRequest() throws Exception {
 		// given
 		UUID userId = UUID.randomUUID();
+		UUID authSessionId = UUID.randomUUID();
 		UUID lastEventId = UUID.randomUUID();
 
 		SseEmitter sseEmitter = mock(SseEmitter.class);
 
 		when(sseService.connect(userId, lastEventId))
 			.thenReturn(sseEmitter);
+		when(sseSessionRegistry.bind(userId, authSessionId, sseEmitter))
+			.thenReturn(sseEmitter);
 
 		// when, then
 		mockMvc.perform(get("/api/sse")
 				.param("lastEventId", lastEventId.toString())
 				.accept(MediaType.TEXT_EVENT_STREAM)
-				.with(moplUser(userId)))
+				.with(moplUser(userId, authSessionId)))
 			.andExpect(status().isOk());
 	}
 
-	private RequestPostProcessor moplUser(UUID userId) {
+	private RequestPostProcessor moplUser(UUID userId, UUID authSessionId) {
 		return request -> {
 			MoplUserDetails moplUserDetails = MoplUserDetails.authenticated(
 				userId,
+				authSessionId,
 				"test@example.com",
 				UserRole.USER
 			);

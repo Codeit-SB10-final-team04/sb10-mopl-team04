@@ -6,7 +6,9 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 
+import com.team04.mopl.auth.realtime.RealtimeWebSocketSessionRegistry;
 import com.team04.mopl.auth.security.interceptor.StompAuthChannelInterceptor;
 import com.team04.mopl.common.stomp.StompErrorHandler;
 import com.team04.mopl.watching.interceptor.StompWatchingInterceptor;
@@ -39,6 +41,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
 	private final StompWatchingInterceptor stompWatchingInterceptor;
 	private final StompErrorHandler stompErrorHandler;
+	private final RealtimeWebSocketSessionRegistry realtimeWebSocketSessionRegistry;
 
 	// 메시지 브로커 경로 설정
 	@Override
@@ -70,5 +73,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	public void configureClientInboundChannel(ChannelRegistration registration) {
 		// 인증 인터셉터가 먼저 실행되어 Principal을 설정한 후, 시청 세션 인터셉터가 처리
 		registration.interceptors(stompAuthChannelInterceptor, stompWatchingInterceptor);
+	}
+
+	// WebSocket 전송 세션 추적 데코레이터 등록
+	@Override
+	public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+		// WebSocket 전송 세션 추적 데코레이터 등록
+		registration.addDecoratorFactory(realtimeWebSocketSessionRegistry.decoratorFactory());
 	}
 }
